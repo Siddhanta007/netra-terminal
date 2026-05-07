@@ -41,7 +41,7 @@ export default function Phase1Bias() {
           <h2 className="phase-subheading" style={{ lineHeight: 1.1 }}>1H Bias Context</h2>
         </div>
         <div className="flex-1 flex flex-col gap-3 min-h-0">
-          <div className="label">Context Notes</div>
+          <div className="label" style={{ color: 'var(--text-4)' }}>Context Notes</div>
           <textarea 
             value={notes.bias || ''} 
             onChange={e => setNotes({ ...notes, bias: e.target.value })} 

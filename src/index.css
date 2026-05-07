@@ -491,7 +491,7 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
 .phase-theme-4 { --phase-accent: #f59e0b; --phase-accent-bg: rgba(245, 158, 11, 0.1); }
 
 .phase-heading {
-  color: var(--phase-accent);
+  color: var(--phase-accent); /* Accent Color */
   text-transform: uppercase;
   letter-spacing: 0.15em;
   font-weight: 850;
@@ -499,13 +499,13 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
 }
 
 .phase-subheading {
-  color: var(--text-1);
+  color: var(--text-1); /* Normal Color */
   font-weight: 950;
   letter-spacing: -0.02em;
   font-size: 22px;
 }
 
-/* ── Precision Segment (Design 5/6 - Symmetrical) ────────── */
+/* ── Precision Segment (Design 5/6/11 - Unified) ────────── */
 
 .precision-container {
   padding: 16px 24px;
@@ -529,8 +529,8 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--text-3);
-  min-width: 130px; /* Reclaiming space */
+  color: var(--text-4); /* Muted Color */
+  min-width: 130px;
 }
 
 .precision-selector {
