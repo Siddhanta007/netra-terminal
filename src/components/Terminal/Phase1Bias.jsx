@@ -51,7 +51,7 @@ export default function Phase1Bias() {
         </div>
         <div style={{ display: 'flex', gap: '8px', flexShrink: 0, marginTop: '8px' }}>
           <button onClick={() => editStep(1)} className="btn-reset flex-1"   disabled={highestStep <= 1}>Edit</button>
-          <button onClick={() => confirmStep(1)} className={`${highestStep > 1 ? 'btn-confirmed' : 'btn-confirm'} flex-1`} style={{ background: highestStep <= 1 ? 'var(--phase-accent)' : undefined }}  disabled={highestStep > 1}>{highestStep > 1 ? '✓ Next' : 'Next'}</button>
+          <button onClick={() => confirmStep(1)} className={`${highestStep > 1 ? 'btn-confirmed' : 'btn-confirm'} flex-1`}  disabled={highestStep > 1}>{highestStep > 1 ? '✓ Next' : 'Next'}</button>
         </div>
       </div>
     </div>
