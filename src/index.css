@@ -549,10 +549,9 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
   padding: 0 16px;
   font-size: 10px;
   font-weight: 700;
-  color: #fff; /* Default text to white */
+  color: var(--text-1); /* Theme-aware text color */
   background: transparent;
   border: none;
-  border-right: 1px solid var(--border);
   cursor: pointer;
   transition: all 150ms;
   display: flex;
@@ -561,7 +560,19 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
   white-space: nowrap;
   position: relative;
 }
-.precision-opt:last-child { border-right: none; }
+
+/* Modern floating divider */
+.precision-opt::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 25%;
+  height: 50%;
+  width: 1px;
+  background: var(--border);
+  opacity: 0.8;
+}
+.precision-opt:first-child::before { display: none; }
 
 .precision-opt:hover {
   color: var(--text-1);
