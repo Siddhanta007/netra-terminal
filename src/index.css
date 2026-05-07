@@ -530,7 +530,7 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-3);
-  min-width: 160px;
+  min-width: 130px; /* Reclaiming space */
 }
 
 .precision-selector {
@@ -539,13 +539,13 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
   border: 1px solid var(--border);
   border-radius: 6px;
   overflow: hidden;
-  height: 32px;
+  height: 36px; /* Slightly taller for the underline */
   width: fit-content;
 }
 
 .precision-opt {
   flex: 1;
-  min-width: 100px; /* Force equal-sized boxes */
+  min-width: 130px; /* Wider boxes as requested */
   padding: 0 16px;
   font-size: 10px;
   font-weight: 700;
@@ -559,6 +559,7 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
   align-items: center;
   justify-content: center;
   white-space: nowrap;
+  position: relative;
 }
 .precision-opt:last-child { border-right: none; }
 
@@ -568,8 +569,20 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
 }
 
 .precision-opt.selected {
-  background: var(--phase-accent); /* Dynamic highlight color */
-  color: #fff;
+  background: transparent;
+  color: var(--phase-accent);
+  font-weight: 850;
+}
+
+.precision-opt.selected::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: var(--phase-accent);
+  box-shadow: 0 0 10px var(--phase-accent);
 }
 
 
