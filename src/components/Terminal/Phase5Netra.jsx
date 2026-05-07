@@ -184,29 +184,24 @@ export default function Phase5Netra() {
         {/* ═══ BOX 2: STS DIMENSIONS (STRIKE/INTERCEPTION ONLY) ═══ */}
         {currCommand && currCommand !== 'NO ENGAGEMENT' && commandLocked && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 fade-up">
-            <div className="lg:col-span-7 flex flex-col gap-4">
-              <section>
-                <div className="label" style={{ marginBottom: '8px' }}>STS Dimensions Matrix</div>
-                <div className="grid lg:grid-cols-2 gap-x-8 gap-y-10 p-6 rounded-xl border border-[var(--border)] bg-[var(--surface-2)]">
+          <div className="lg:col-span-7 flex flex-col gap-4">
+            <section>
+              <div className="modern-container">
+                <label className="modern-label" style={{ marginBottom: '24px', borderBottom: '1px solid var(--border)', pb: '12px' }}>STS Dimensions Matrix</label>
+                <div className="grid lg:grid-cols-2 gap-x-10 gap-y-8">
                   {(currCommand === 'STRIKE' ? sysData.strikeDimensions : sysData.interceptionDimensions).map((dim, idx) => (
-                    <div key={dim.id}>
-                      <div className="flex justify-between items-baseline mb-4 pb-2" style={{ borderBottom: '1px solid var(--border)' }}>
-                        <h3 className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-1)' }}>{dim.name}</h3>
-                        <span className="font-mono text-[9px]" style={{ color: 'var(--text-4)' }}>0{idx + 1}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
+                    <div key={dim.id} className="modern-row" style={{ marginBottom: 0 }}>
+                      <label className="modern-label" style={{ fontSize: '9px', opacity: 0.8 }}>{dim.name}</label>
+                      <div className="modern-selector">
                         {dim.opts.map(opt => {
                           const sel = currCommand === 'STRIKE' ? strikeSelections : interSelections;
                           const setSel = currCommand === 'STRIKE' ? setStrikeSelections : setInterSelections;
+                          const isSelected = sel[dim.id] === opt;
                           return (
                             <button
                               key={opt}
                               onClick={() => setSel(prev => ({ ...prev, [dim.id]: opt }))}
-                              className={`px-4 py-2 border text-[11px] font-bold tracking-widest transition-all rounded-lg ${sel[dim.id] === opt
-                                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-200 scale-105'
-                                  : ''
-                                }`}
-                              style={sel[dim.id] !== opt ? { background: 'var(--surface)', color: 'var(--text-2)', border: '1px solid var(--border)' } : {}}
+                              className={`modern-opt ${isSelected ? 'selected' : ''}`}
                             >
                               {opt}
                             </button>
@@ -216,8 +211,9 @@ export default function Phase5Netra() {
                     </div>
                   ))}
                 </div>
-              </section>
-            </div>
+              </div>
+            </section>
+          </div>
 
             <div className="lg:col-span-5 flex flex-col pt-1">
               <div style={{ marginBottom: '16px' }}>

@@ -326,129 +326,228 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
   transform: translateY(-1px);
 }
 
-/* ── Tactical Selector (New Experiment) ────────────────────── */
+/* ── Modern Minimalist (Design 3) ─────────────────────────── */
+/* ── Modern Minimalist (Design 3) ─────────────────────────── */
 
-.tactical-selector {
-  display: flex;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 4px;
-  gap: 4px;
+.modern-container {
+  padding: 32px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  box-shadow: 0 10px 40px -10px rgba(0,0,0,0.05);
 }
 
-.tactical-opt {
-  flex: 1;
-  padding: 10px 16px;
-  border-radius: 8px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  font-weight: 800;
+.modern-row {
+  margin-bottom: 32px;
+}
+.modern-row:last-child { margin-bottom: 0; }
+
+.modern-label {
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.1em;
+  color: var(--text-2);
+  margin-bottom: 12px;
+  display: block;
+}
+
+.modern-selector {
+  display: flex;
+  background: var(--surface-2);
+  border-radius: 12px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  gap: 4px;
+  width: 100%;
+}
+
+.modern-opt {
+  flex: 1;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text-3);
   background: transparent;
-  border: 1px solid transparent;
+  border: none;
+  border-radius: 9px;
   cursor: pointer;
-  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 200ms cubic-bezier(0.23, 1, 0.32, 1);
   text-align: center;
   white-space: nowrap;
 }
 
-.tactical-opt:hover {
-  background: var(--surface-3);
-  color: var(--text-2);
+.modern-opt:hover {
+  color: var(--text-1);
 }
 
-.tactical-opt.selected {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-  box-shadow: 0 4px 12px rgba(24, 71, 177, 0.2);
-  transform: translateY(-1px);
-}
-
-/* ── HUD Selector (Professional Design 2) ─────────────────── */
-
-.hud-container {
-  padding: 20px;
+.modern-opt.selected {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  box-shadow: var(--shadow-lg);
+  color: var(--accent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-.hud-row {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--border);
+.dark .modern-opt.selected {
+  color: #fff;
 }
-.hud-row:last-child { border-bottom: none; padding-bottom: 0; }
 
-.hud-label {
-  font-size: 9px;
+/* ── Elite Matrix (Design 4) ─────────────────────────────── */
+
+.elite-row {
+  margin-bottom: 40px;
+}
+.elite-row:last-child { margin-bottom: 0; }
+
+.elite-label {
+  font-size: 10px;
   font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: 0.25em;
+  letter-spacing: 0.2em;
   color: var(--text-3);
+  margin-bottom: 16px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-left: 4px;
+  gap: 10px;
 }
-
-.hud-selector {
-  display: flex;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 3px;
-  gap: 3px;
-}
-
-.hud-opt {
+.elite-label::after {
+  content: '';
   flex: 1;
-  padding: 10px 4px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
+  height: 1px;
+  background: var(--border);
+  opacity: 0.5;
+}
+
+.elite-tile-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.elite-tile {
+  flex: 1;
+  min-width: 140px;
+  height: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 300ms cubic-bezier(0.2, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.elite-tile:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,0,0,0.1);
+}
+
+.elite-tile.selected {
+  background: var(--surface-2);
+  border-color: var(--accent);
+  border-width: 1.5px;
+  box-shadow: 0 0 20px rgba(65, 105, 225, 0.15);
+}
+
+.elite-tile-text {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-3);
+  transition: color 250ms;
+}
+
+.elite-tile.selected .elite-tile-text {
+  color: var(--accent);
+}
+
+.elite-tile-dot {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  transition: all 300ms;
+}
+
+.elite-tile.selected .elite-tile-dot {
+  box-shadow: 0 0 10px var(--accent);
+}
+
+/* ── Precision Segment (Design 5 - VitePress Inspired) ───── */
+
+.precision-container {
+  padding: 16px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.precision-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  gap: 20px;
+}
+.precision-row:last-child { border-bottom: none; }
+
+.precision-label {
+  font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.1em;
+  color: var(--text-3);
+  min-width: 160px;
+}
+
+.precision-selector {
+  display: flex;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  height: 28px;
+}
+
+.precision-opt {
+  padding: 0 12px;
+  font-size: 10px;
+  font-weight: 700;
   color: var(--text-4);
   background: transparent;
   border: none;
-  border-radius: 7px;
+  border-right: 1px solid var(--border);
   cursor: pointer;
-  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
-  text-align: center;
-  position: relative;
+  transition: all 150ms;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
 }
+.precision-opt:last-child { border-right: none; }
 
-.hud-opt:hover {
+.precision-opt:hover {
   color: var(--text-2);
   background: var(--surface-3);
 }
 
-.hud-opt.selected {
-  color: #fff;
-  background: var(--accent);
-  box-shadow: 0 8px 16px rgba(65, 105, 225, 0.25);
+.precision-opt.selected {
+  background: var(--accent-bg);
+  color: var(--accent);
 }
 
-.hud-opt.selected::after {
-  content: '';
-  position: absolute;
-  top: -2px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 12px;
-  height: 2px;
-  background: #fff;
-  border-radius: 2px;
-  box-shadow: 0 0 8px #fff;
-}
+
+
 
 
 
