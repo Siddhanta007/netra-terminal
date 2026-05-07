@@ -24,22 +24,22 @@ export default function Phase5Netra() {
       <div className="space-y-8 animate-in zoom-in-95 fade-in duration-500">
 
         {/* ═══ BOX 1: NETRA LABS HUB ═══ */}
-        <div className="p-8 md:p-12 rounded-full-xl premium-shadow" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-1)' }}>
+        <div className="p-8 md:p-12 rounded-2xl premium-shadow" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-1)' }}>
           <div className="flex justify-between items-center mb-8 pb-4" style={{ borderBottom: '1px solid var(--border)' }}>
             <h3 className="font-mono text-[10px] uppercase tracking-widest font-semibold" style={{ color: 'var(--text-3)' }}>NETRA LABS</h3>
             <div className="flex items-center gap-3">
-              <span className="text-[9px] px-3 py-1 rounded-full-md tracking-widest font-semibold" style={{ background: 'var(--accent-bg)', color: 'var(--accent)' }}>MAYA 2.5 ACTIVE</span>
-              <span className="text-[9px] px-3 py-1 rounded-full-md tracking-widest font-semibold" style={{ background: 'var(--surface-2)', color: 'var(--text-2)' }}>MISSION EVALUATION</span>
+              <span className="text-[9px] px-3 py-1 rounded-lg tracking-widest font-semibold" style={{ background: 'var(--accent-bg)', color: 'var(--accent)' }}>NETRA 2.5 ACTIVE</span>
+              <span className="text-[9px] px-3 py-1 rounded-lg tracking-widest font-semibold" style={{ background: 'var(--surface-2)', color: 'var(--text-2)' }}>MISSION EVALUATION</span>
             </div>
           </div>
 
           <div className="grid lg:grid-cols-12 gap-10">
-            {/* LEFT: Maya's Analysis Report */}
+            {/* LEFT: NETRA's Analysis Report */}
             <div className="lg:col-span-7 flex flex-col gap-6">
               
               <div className="flex items-start justify-between">
                 <div>
-                   <h2 className="text-2xl font-black tracking-tight mb-1" style={{ color: 'var(--text-1)' }}>Maya's analysis</h2>
+                   <h2 className="text-2xl font-black tracking-tight mb-1" style={{ color: 'var(--text-1)' }}>NETRA's analysis</h2>
                    <p className="text-[10px] font-bold uppercase tracking-widest opacity-60" style={{ color: 'var(--text-3)' }}>Doctrine & Context Synthesis</p>
                 </div>
                 <div className="flex gap-4">
@@ -54,12 +54,12 @@ export default function Phase5Netra() {
                 </div>
               </div>
 
-              {/* THE CORE MAYA SYNTHESIS BOX */}
-              <div className="p-6 rounded-full-2xl border border-[var(--accent-border)] bg-[var(--accent-bg)]/30 min-h-[400px] flex flex-col relative overflow-hidden">
+              {/* THE CORE NETRA SYNTHESIS BOX */}
+              <div className="p-6 rounded-3xl border border-[var(--accent-border)] bg-[var(--accent-bg)]/30 min-h-[400px] flex flex-col relative overflow-hidden">
                 {isEvaluating ? (
                   <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center">
-                    <div className="w-12 h-12 rounded-full-full border-4 border-[var(--accent)]/20 border-t-[var(--accent)] animate-spin"></div>
-                    <span className="text-[10px] font-bold uppercase tracking-widest animate-pulse" style={{ color: 'var(--accent)' }}>Maya is Analysing...</span>
+                    <div className="w-12 h-12 rounded-full border-4 border-[var(--accent)]/20 border-t-[var(--accent)] animate-spin"></div>
+                    <span className="text-[10px] font-bold uppercase tracking-widest animate-pulse" style={{ color: 'var(--accent)' }}>NETRA is Analysing...</span>
                   </div>
                 ) : netraOutput ? (
                   <div className="prose prose-sm dark:prose-invert max-w-none text-[var(--text-2)] leading-relaxed markdown-content w-full h-full overflow-y-auto custom-scrollbar pr-4">
@@ -74,7 +74,7 @@ export default function Phase5Netra() {
                   </div>
                 ) : (
                   <div className="flex-1 flex flex-col items-center justify-center gap-6 text-center opacity-40">
-                    <div className="w-14 h-14 rounded-full-full bg-[var(--surface-3)] flex items-center justify-center">
+                    <div className="w-14 h-14 rounded-full bg-[var(--surface-3)] flex items-center justify-center">
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
                     </div>
                     <p className="text-[11px] font-semibold text-[var(--text-3)] max-w-xs">
@@ -99,13 +99,13 @@ export default function Phase5Netra() {
                   disabled={isEvaluating}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
-                  {isEvaluating ? 'ANALYSING...' : 'Analyse with Maya'}
+                  {isEvaluating ? 'ANALYSING...' : 'Analyse with NETRA'}
                 </button>
               </div>
 
             </div>
 
-            {/* RIGHT: Command Selection + Maya Control */}
+            {/* RIGHT: Command Selection + NETRA Control */}
             <div className="lg:col-span-5 lg:pl-8 border-t lg:border-t-0 lg:border-l border-[var(--border)] flex flex-col gap-6">
               <div>
                 <h3 className="text-[9px] font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--text-4)' }}>Command Selection</h3>
@@ -121,13 +121,13 @@ export default function Phase5Netra() {
                           setFinalCommand(cmd);
                           setCommandLocked(false);
                         }}
-                        className={`p-4 text-left border rounded-full-lg transition-all duration-300 relative ${isSelected
+                        className={`p-4 text-left border rounded-xl transition-all duration-300 relative ${isSelected
                             ? 'border-[var(--accent)] bg-[var(--accent-bg)] text-[var(--accent)] glow-active'
                             : 'border-[var(--border)] hover:border-[var(--border-strong)] text-[var(--text-3)] hover:bg-[var(--surface-2)]'
                           }`}
                       >
                         {isRecommended && (
-                          <div className="absolute top-1/2 -translate-y-1/2 right-4 text-[9px] font-bold tracking-widest bg-blue-600 px-2.5 py-1 text-white rounded-full-full uppercase shadow-sm animate-pulse">
+                          <div className="absolute top-1/2 -translate-y-1/2 right-4 text-[9px] font-bold tracking-widest bg-blue-600 px-2.5 py-1 text-white rounded-full uppercase shadow-sm animate-pulse">
                             SYS REC
                           </div>
                         )}
@@ -164,8 +164,8 @@ export default function Phase5Netra() {
 
         {/* NO ENGAGEMENT inline */}
         {currCommand === 'NO ENGAGEMENT' && commandLocked && (
-          <div className="p-12 rounded-full-xl premium-shadow text-center animate-in fade-in duration-500" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
-            <div className="text-[var(--red)] font-sans text-sm font-bold uppercase tracking-widest py-4 px-6 border border-[var(--red)] bg-[var(--red-bg)] rounded-full-lg inline-block">
+          <div className="p-12 rounded-2xl premium-shadow text-center animate-in fade-in duration-500" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+            <div className="text-[var(--red)] font-sans text-sm font-bold uppercase tracking-widest py-4 px-6 border border-[var(--red)] bg-[var(--red-bg)] rounded-xl inline-block">
               Stand Down — No Execution Parameters Required
             </div>
             {highestStep <= 5 && (
@@ -187,7 +187,7 @@ export default function Phase5Netra() {
             <div className="lg:col-span-7 flex flex-col gap-4">
               <section>
                 <div className="label" style={{ marginBottom: '8px' }}>STS Dimensions Matrix</div>
-                <div className="grid lg:grid-cols-2 gap-x-8 gap-y-10 p-6 rounded-full-lg border border-[var(--border)] bg-[var(--surface-2)]">
+                <div className="grid lg:grid-cols-2 gap-x-8 gap-y-10 p-6 rounded-xl border border-[var(--border)] bg-[var(--surface-2)]">
                   {(currCommand === 'STRIKE' ? sysData.strikeDimensions : sysData.interceptionDimensions).map((dim, idx) => (
                     <div key={dim.id}>
                       <div className="flex justify-between items-baseline mb-4 pb-2" style={{ borderBottom: '1px solid var(--border)' }}>
@@ -202,7 +202,7 @@ export default function Phase5Netra() {
                             <button
                               key={opt}
                               onClick={() => setSel(prev => ({ ...prev, [dim.id]: opt }))}
-                              className={`px-4 py-2 border text-[11px] font-bold tracking-widest transition-all rounded-full-md ${sel[dim.id] === opt
+                              className={`px-4 py-2 border text-[11px] font-bold tracking-widest transition-all rounded-lg ${sel[dim.id] === opt
                                   ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-200 scale-105'
                                   : ''
                                 }`}

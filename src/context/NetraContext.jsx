@@ -42,7 +42,7 @@ export function NetraProvider({ children }) {
 
   // AI Chat State
   const [chatHistory, setChatHistory] = useState([
-    { role: 'ai', text: 'Neural Link established. I am MAYA, your Tactical Synthesis Assistant. How can I assist with your mission analysis today?' }
+    { role: 'ai', text: 'Neural Link established. I am NETRA, your Tactical Synthesis Assistant. How can I assist with your mission analysis today?' }
   ]);
   const [chatInput, setChatInput] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
@@ -206,7 +206,7 @@ export function NetraProvider({ children }) {
       // Backend returns { role: 'assistant', text: '...' }
       setChatHistory(prev => [...prev, { role: 'ai', text: data.text }]);
     } catch (err) {
-      showToast('MAYA Neural Link Interrupted', 'error');
+      showToast('NETRA Neural Link Interrupted', 'error');
       setChatHistory(prev => [...prev, { role: 'ai', text: "Protocol error: My neural link to the terminal's core was briefly interrupted. Please retry the transmission." }]);
     } finally {
       setIsAiLoading(false);
@@ -487,7 +487,7 @@ export function NetraProvider({ children }) {
       })
       .catch((err) => {
         if (err.name === 'AbortError') {
-          showToast('Maya Synthesis Stopped', 'info');
+          showToast('NETRA Synthesis Stopped', 'info');
           return;
         }
         setNetraOutput({ cmd: 'NO ENGAGEMENT', conviction: 'ERROR', size: '0%', synthesis: 'Neural Engine Sync Failure. Check System Logs.' });
@@ -504,7 +504,7 @@ export function NetraProvider({ children }) {
     }
   };
 
-  // Maya Phase 2: Weapon Prediction
+  // NETRA Phase 2: Weapon Prediction
   const triggerWeaponPrediction = () => {
     if (isPredictingWeapon) return;
     setIsPredictingWeapon(true);

@@ -12,7 +12,7 @@ export default function Phase0Vision() {
       <div className="lg:col-span-7 flex flex-col gap-4">
         <section>
           <div className="label" style={{ marginBottom: '8px' }}>Netra Image Labs</div>
-          <div className="p-4 rounded-full-lg border border-[var(--border)] bg-[var(--surface)] min-h-[200px] text-[11px] text-[var(--text-2)] font-mono whitespace-pre-wrap flex flex-col">
+          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] min-h-[200px] text-[11px] text-[var(--text-2)] font-mono whitespace-pre-wrap flex flex-col">
             {isUploadingImage ? (
               <div className="flex-1 flex flex-col items-center justify-center text-blue-500 animate-pulse">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mb-2">
@@ -34,7 +34,7 @@ export default function Phase0Vision() {
       <div className="lg:col-span-5 flex flex-col gap-6">
         <div>
           <div style={{ fontSize: '10px', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '4px' }}>Phase 0: Visual Analyst</div>
-          <h2 style={{ fontSize: '22px', fontWeight: 950, letterSpacing: '-0.03em', color: 'var(--text-1)', lineHeight: 1.1 }}>Maya Chart analysis</h2>
+          <h2 style={{ fontSize: '22px', fontWeight: 950, letterSpacing: '-0.03em', color: 'var(--text-1)', lineHeight: 1.1 }}>NETRA Chart analysis</h2>
         </div>
 
         <div className="flex flex-col gap-4">
@@ -56,7 +56,7 @@ export default function Phase0Vision() {
           </div>
 
           <label
-            className={`flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed rounded-full-xl cursor-pointer transition-all ${
+            className={`flex flex-col items-center justify-center gap-2 p-6 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${
               isUploadingImage 
                 ? 'border-[var(--border)] bg-[var(--surface)] opacity-50' 
                 : 'border-[#f59e0b] bg-[rgba(245,158,11,0.05)] hover:bg-[rgba(245,158,11,0.1)]'

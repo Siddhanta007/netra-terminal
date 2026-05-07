@@ -13,7 +13,7 @@ export default function WeaponArmory({ protocol = 'strike' }) {
     activeEditLog,
     commitTradeLog,
     updateTradeLog,
-    // Maya Phase 2
+    // NETRA Phase 2
     triggerWeaponPrediction, stopWeaponPrediction, isPredictingWeapon, weaponPrediction,
     auditData, isAuditing, triggerPostTradeAudit,
     selections,
@@ -38,14 +38,14 @@ export default function WeaponArmory({ protocol = 'strike' }) {
     <div className="space-y-6 animate-in fade-in duration-700">
       
       {/* ═══ TIER 1: OPERATIONAL SELECTION & ADVICE ═══ */}
-      <div className="p-8 md:p-10 rounded-full-xl premium-shadow" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-1)' }}>
+      <div className="p-8 md:p-10 rounded-2xl premium-shadow" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-1)' }}>
         <div className="flex justify-between items-center mb-8 pb-4" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-4">
-            <div className="w-1.5 h-6 bg-[var(--accent)] rounded-full-full"></div>
+            <div className="w-1.5 h-6 bg-[var(--accent)] rounded-full"></div>
             <h3 className="font-mono text-[11px] uppercase tracking-[0.3em] font-black text-[var(--accent)]">Netra Labs</h3>
             <div className="flex items-center gap-3">
-              <span className="text-[9px] px-3 py-1.5 rounded-full-md tracking-widest font-black bg-[var(--accent-bg)] text-[var(--accent)] border border-[var(--accent-border)]/20 uppercase">Maya Advisor</span>
-              <span className="text-[9px] px-3 py-1.5 rounded-full-md tracking-widest font-black bg-[var(--surface-2)] text-[var(--text-4)] border border-[var(--border)] uppercase">{protocol} Sector</span>
+              <span className="text-[9px] px-3 py-1.5 rounded-lg tracking-widest font-black bg-[var(--accent-bg)] text-[var(--accent)] border border-[var(--accent-border)]/20 uppercase">NETRA Advisor</span>
+              <span className="text-[9px] px-3 py-1.5 rounded-lg tracking-widest font-black bg-[var(--surface-2)] text-[var(--text-4)] border border-[var(--border)] uppercase">{protocol} Sector</span>
             </div>
           </div>
         </div>
@@ -67,13 +67,13 @@ export default function WeaponArmory({ protocol = 'strike' }) {
                       key={weapon.id}
                       onClick={() => !weaponLocked && setSelectedWeaponId(weapon.id)}
                       disabled={weaponLocked}
-                      className={`group p-5 text-left border rounded-full-xl transition-all duration-300 relative flex flex-col justify-between h-full ${isSelected
+                      className={`group p-5 text-left border rounded-2xl transition-all duration-300 relative flex flex-col justify-between h-full ${isSelected
                         ? 'border-blue-600 bg-blue-600/10 text-blue-500 ring-1 ring-blue-600 shadow-lg scale-[1.02]'
                         : 'border-[var(--border)] hover:border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--text-3)]'
                       } ${weaponLocked && !isSelected ? 'opacity-20 grayscale cursor-not-allowed' : 'cursor-pointer'}`}
                     >
                       {isRec && (
-                        <div className="absolute -top-2.5 -right-1 text-[7px] font-black tracking-widest bg-blue-600 px-3 py-1 uppercase text-white rounded-full-full shadow-lg z-20">SYS REC</div>
+                        <div className="absolute -top-2.5 -right-1 text-[7px] font-black tracking-widest bg-blue-600 px-3 py-1 uppercase text-white rounded-full shadow-lg z-20">SYS REC</div>
                       )}
                       <div className="space-y-1">
                         <h4 className="font-sans text-xl font-black tracking-tighter uppercase leading-none">{weapon.id}</h4>
@@ -86,7 +86,7 @@ export default function WeaponArmory({ protocol = 'strike' }) {
                 <button
                   onClick={() => !weaponLocked && setSelectedWeaponId('MANUAL')}
                   disabled={weaponLocked}
-                  className={`group p-5 text-left border rounded-full-xl transition-all duration-300 relative flex flex-col justify-between h-full ${selectedWeaponId === 'MANUAL'
+                  className={`group p-5 text-left border rounded-2xl transition-all duration-300 relative flex flex-col justify-between h-full ${selectedWeaponId === 'MANUAL'
                     ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)] ring-1 ring-[var(--accent)] shadow-lg scale-[1.02]'
                     : 'border-[var(--border)] hover:border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--text-3)]'
                   } ${weaponLocked && selectedWeaponId !== 'MANUAL' ? 'opacity-20 grayscale cursor-not-allowed' : 'cursor-pointer'}`}
@@ -105,9 +105,9 @@ export default function WeaponArmory({ protocol = 'strike' }) {
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--text-4)] opacity-50">Mission Protocol Briefing</h3>
                 <div className="h-[1px] flex-1 bg-[var(--border)]"></div>
               </div>
-              <div className="bg-[var(--surface-2)]/30 border border-[var(--border)] rounded-full-2xl p-8 flex-1">
+              <div className="bg-[var(--surface-2)]/30 border border-[var(--border)] rounded-3xl p-8 flex-1">
                 {selectedWeaponId === 'MANUAL' ? (
-                  <div className="h-full flex flex-col items-center justify-center relative overflow-hidden bg-[#0a0c10] rounded-full-xl border border-[var(--accent)]/30 group shadow-inner min-h-[240px]">
+                  <div className="h-full flex flex-col items-center justify-center relative overflow-hidden bg-[#0a0c10] rounded-2xl border border-[var(--accent)]/30 group shadow-inner min-h-[240px]">
                     <div className="relative z-10 text-center">
                        <h4 className="text-2xl font-black tracking-tight uppercase text-white italic">Manual Override</h4>
                        <span className="text-[9px] font-black tracking-[0.4em] uppercase text-[var(--accent)] animate-pulse">Operator Engagement Area</span>
@@ -127,7 +127,7 @@ export default function WeaponArmory({ protocol = 'strike' }) {
                     </div>
                     <div className="grid grid-cols-4 gap-4">
                       {[{l:'Entry',v:activeWeapon.entry,c:'text-blue-400'}, {l:'Stop',v:activeWeapon.stop,c:'text-rose-400'}, {l:'Target',v:activeWeapon.target,c:'text-emerald-400'}, {l:'Misfire',v:activeWeapon.misfire,c:'text-amber-400'}].map((item, idx) => (
-                        <div key={idx} className="space-y-2 text-center p-3 bg-[var(--surface-3)]/40 rounded-full-xl border border-[var(--border)]/20">
+                        <div key={idx} className="space-y-2 text-center p-3 bg-[var(--surface-3)]/40 rounded-2xl border border-[var(--border)]/20">
                           <span className="text-[8px] font-black uppercase opacity-60">{item.l}</span>
                           <div className={`text-[10px] font-black ${item.c}`}>{item.v}</div>
                         </div>
@@ -147,12 +147,12 @@ export default function WeaponArmory({ protocol = 'strike' }) {
           <div className="lg:col-span-5 lg:pl-10 border-t lg:border-t-0 lg:border-l border-[var(--border)] flex flex-col gap-8">
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">Maya's Advice</h3>
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--text-3)]">NETRA's Advice</h3>
                 {weaponPrediction && (
-                  <div className={`text-[8px] font-black px-3 py-1 rounded-full-full border ${weaponPrediction.predictability === 'HIGH' ? 'bg-green-500/10 text-green-500' : 'bg-amber-500/10 text-amber-500'}`}>CONFIDENCE: {weaponPrediction.predictability}</div>
+                  <div className={`text-[8px] font-black px-3 py-1 rounded-full border ${weaponPrediction.predictability === 'HIGH' ? 'bg-green-500/10 text-green-500' : 'bg-amber-500/10 text-amber-500'}`}>CONFIDENCE: {weaponPrediction.predictability}</div>
                 )}
               </div>
-              <div className="p-6 rounded-full-xl border border-[var(--accent-border)] bg-[var(--accent-bg)]/20 min-h-[240px] relative overflow-hidden">
+              <div className="p-6 rounded-2xl border border-[var(--accent-border)] bg-[var(--accent-bg)]/20 min-h-[240px] relative overflow-hidden">
                 {isPredictingWeapon ? (
                   <div className="absolute inset-0 flex items-center justify-center bg-[var(--surface)]/80 backdrop-blur-sm">
                     <span className="text-[9px] font-black uppercase tracking-[0.3em] animate-pulse text-[var(--accent)]">Synthesizing Protocol...</span>
@@ -179,7 +179,7 @@ export default function WeaponArmory({ protocol = 'strike' }) {
                   disabled={isPredictingWeapon || weaponLocked} 
                   className="btn-confirm flex-1"
                 >
-                  Analyse with Maya
+                  Analyse with NETRA
                 </button>
               </div>
             </div>
@@ -191,7 +191,7 @@ export default function WeaponArmory({ protocol = 'strike' }) {
                 onChange={(e) => setNotes({ ...notes, weapon_thought: e.target.value })}
                 placeholder="Capture tactical nuances..."
                 disabled={weaponLocked}
-                className="w-full h-32 bg-[var(--surface-2)]/50 border border-[var(--border)] rounded-full-lg p-4 text-xs text-[var(--text-2)] focus:outline-none focus:border-[var(--accent)] resize-none"
+                className="w-full h-32 bg-[var(--surface-2)]/50 border border-[var(--border)] rounded-xl p-4 text-xs text-[var(--text-2)] focus:outline-none focus:border-[var(--accent)] resize-none"
               />
             </div>
 
@@ -205,47 +205,47 @@ export default function WeaponArmory({ protocol = 'strike' }) {
 
       {/* ═══ TIER 2: MISSION CONTROL & PERFORMANCE ═══ */}
       {(weaponLocked || activeEditLog) && (
-        <div className="p-8 rounded-full-xl premium-shadow animate-in fade-in duration-500" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+        <div className="p-8 rounded-2xl premium-shadow animate-in fade-in duration-500" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
           <div className="flex items-center gap-3 mb-6 pb-3" style={{ borderBottom: '1px solid var(--border)' }}>
-            <div className="w-2 h-2 rounded-full-full bg-[var(--accent)]" />
+            <div className="w-2 h-2 rounded-full bg-[var(--accent)]" />
             <div className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--text-1)]">Mission Control & Performance</div>
           </div>
 
           <div className="grid lg:grid-cols-12 gap-6 items-stretch">
             {/* LEFT: Tactical Parameters */}
             <div className="lg:col-span-7">
-              <div className="p-6 rounded-full-xl bg-[var(--surface-2)]/40 border border-[var(--border)] h-full flex flex-col justify-between space-y-6">
+              <div className="p-6 rounded-2xl bg-[var(--surface-2)]/40 border border-[var(--border)] h-full flex flex-col justify-between space-y-6">
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-1 h-3 bg-[var(--accent)] rounded-full-full"></div>
+                    <div className="w-1 h-3 bg-[var(--accent)] rounded-full"></div>
                     <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-2)]">Tactical Parameters</span>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[8px] font-black uppercase text-[var(--text-4)] tracking-widest opacity-60">Target Asset</label>
-                    <input type="text" value={editFormData.trading_asset ?? (session?.assetName || '')} onChange={e => setEditFormData({ ...editFormData, trading_asset: e.target.value })} className="w-full h-9 px-4 bg-[var(--surface)] border border-[var(--border)] rounded-full-lg text-xs font-bold" />
+                    <input type="text" value={editFormData.trading_asset ?? (session?.assetName || '')} onChange={e => setEditFormData({ ...editFormData, trading_asset: e.target.value })} className="w-full h-9 px-4 bg-[var(--surface)] border border-[var(--border)] rounded-xl text-xs font-bold" />
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     {[{l:'Entry',k:'entry_price'}, {l:'Stop',k:'stop_loss'}, {l:'Exit',k:'exit_price'}].map(f => (
                       <div key={f.k} className="space-y-1.5">
                         <label className="text-[8px] font-black uppercase text-[var(--text-4)] tracking-widest opacity-60">{f.l}</label>
-                        <input type="number" value={editFormData[f.k] || ''} onChange={e => setEditFormData({ ...editFormData, [f.k]: e.target.value })} className="w-full h-9 px-4 bg-[var(--surface)] border border-[var(--border)] rounded-full-lg text-xs font-bold" />
+                        <input type="number" value={editFormData[f.k] || ''} onChange={e => setEditFormData({ ...editFormData, [f.k]: e.target.value })} className="w-full h-9 px-4 bg-[var(--surface)] border border-[var(--border)] rounded-xl text-xs font-bold" />
                       </div>
                     ))}
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-[8px] font-black uppercase text-[var(--text-4)] tracking-widest opacity-60">Protocol</label>
-                      <select value={editFormData.buying_type || 'Market'} onChange={e => setEditFormData({ ...editFormData, buying_type: e.target.value })} className="w-full h-9 px-4 bg-[var(--surface)] border border-[var(--border)] rounded-full-lg text-xs font-black appearance-none">
+                      <select value={editFormData.buying_type || 'Market'} onChange={e => setEditFormData({ ...editFormData, buying_type: e.target.value })} className="w-full h-9 px-4 bg-[var(--surface)] border border-[var(--border)] rounded-xl text-xs font-black appearance-none">
                         <option value="Market">Market</option>
                         <option value="Limit">Limit</option>
                       </select>
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-[8px] font-black uppercase text-[var(--text-4)] tracking-widest opacity-60">Costs</label>
-                      <input type="number" value={editFormData.additional_cost || ''} onChange={e => setEditFormData({ ...editFormData, additional_cost: e.target.value })} className="w-full h-9 px-4 bg-[var(--surface)] border border-[var(--border)] rounded-full-lg text-xs font-bold" />
+                      <input type="number" value={editFormData.additional_cost || ''} onChange={e => setEditFormData({ ...editFormData, additional_cost: e.target.value })} className="w-full h-9 px-4 bg-[var(--surface)] border border-[var(--border)] rounded-xl text-xs font-bold" />
                     </div>
                   </div>
-                  <div className="p-4 rounded-full-lg bg-[var(--surface-3)]/40 border border-[var(--border)] border-dashed flex justify-between items-center">
+                  <div className="p-4 rounded-xl bg-[var(--surface-3)]/40 border border-[var(--border)] border-dashed flex justify-between items-center">
                     <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-4)]">Breakeven</span>
                     <span className="text-base font-black text-amber-500">
                       {((parseFloat(editFormData.entry_price) || 0) + (parseFloat(editFormData.additional_cost) || 0)).toFixed(2)}
@@ -280,15 +280,15 @@ export default function WeaponArmory({ protocol = 'strike' }) {
 
                   return (
                     <>
-                      <div className="text-center p-2 rounded-full-lg bg-[var(--surface-2)] border border-[var(--border)]">
+                      <div className="text-center p-2 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]">
                         <div className="text-[7px] font-black uppercase text-[var(--text-4)] mb-0.5 tracking-widest opacity-60">Net P/L</div>
                         <div className={`text-[13px] font-black ${isWin ? 'text-emerald-500' : pnl < 0 ? 'text-rose-500' : 'text-[var(--text-1)]'}`}>{pnl.toFixed(1)}</div>
                       </div>
-                      <div className="text-center p-2 rounded-full-lg bg-[var(--surface-2)] border border-[var(--border)]">
+                      <div className="text-center p-2 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]">
                         <div className="text-[7px] font-black uppercase text-[var(--text-4)] mb-0.5 tracking-widest opacity-60">Return %</div>
                         <div className={`text-[13px] font-black ${isWin ? 'text-emerald-500' : pnl < 0 ? 'text-rose-500' : 'text-[var(--text-1)]'}`}>{pnlP.toFixed(1)}%</div>
                       </div>
-                      <div className="text-center p-2 rounded-full-lg bg-[var(--surface-2)] border border-[var(--border)]">
+                      <div className="text-center p-2 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]">
                         <div className="text-[7px] font-black uppercase text-[var(--text-4)] mb-0.5 tracking-widest opacity-60">Risk Reward</div>
                         <div className={`text-[13px] font-black ${rrr >= 2 ? 'text-emerald-500' : rrr > 0 ? 'text-amber-500' : 'text-[var(--text-4)]'}`}>{rrr.toFixed(1)}</div>
                       </div>
@@ -297,12 +297,12 @@ export default function WeaponArmory({ protocol = 'strike' }) {
                 })()}
               </div>
 
-              <div className="p-6 rounded-full-xl bg-[var(--surface-2)]/40 border border-[var(--border)] flex-1 flex flex-col space-y-4">
+              <div className="p-6 rounded-2xl bg-[var(--surface-2)]/40 border border-[var(--border)] flex-1 flex flex-col space-y-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-1 h-3 bg-blue-500 rounded-full-full"></div>
+                  <div className="w-1 h-3 bg-blue-500 rounded-full"></div>
                   <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-2)]">User Review</span>
                 </div>
-                <textarea value={editFormData.notes || ''} onChange={e => setEditFormData({...editFormData, notes: e.target.value})} placeholder="Journal post-trade debrief..." className="w-full flex-1 p-4 bg-[var(--surface)] border border-[var(--border)] rounded-full-lg text-xs font-medium focus:outline-none resize-none shadow-inner" />
+                <textarea value={editFormData.notes || ''} onChange={e => setEditFormData({...editFormData, notes: e.target.value})} placeholder="Journal post-trade debrief..." className="w-full flex-1 p-4 bg-[var(--surface)] border border-[var(--border)] rounded-xl text-xs font-medium focus:outline-none resize-none shadow-inner" />
                 <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                   <button onClick={() => editStep(6)} className="btn-reset flex-1" disabled={highestStep <= 6}>Edit</button>
                   <button onClick={() => confirmStep(6)} className={`${highestStep > 6 ? 'btn-confirmed' : 'btn-confirm'} flex-1`} disabled={highestStep > 6}>{highestStep > 6 ? '✓ Confirmed' : 'Next'}</button>
@@ -313,21 +313,21 @@ export default function WeaponArmory({ protocol = 'strike' }) {
         </div>
       )}
 
-      {/* ═══ TIER 3: MAYA STRATEGIC REVIEW (STRATEGIC AUDIT FRAMEWORK) ═══ */}
+      {/* ═══ TIER 3: NETRA STRATEGIC REVIEW (STRATEGIC AUDIT FRAMEWORK) ═══ */}
       {(weaponLocked || activeEditLog) && (
         <div className="space-y-6">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-1.5 h-1.5 rounded-full-full bg-[var(--accent)]" />
-            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-1)]">Maya Strategic Review</div>
+            <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
+            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-1)]">NETRA Strategic Review</div>
           </div>
 
-          <div className="p-8 rounded-full-xl bg-[var(--surface-2)]/60 border border-[var(--border)] shadow-xl">
+          <div className="p-8 rounded-2xl bg-[var(--surface-2)]/60 border border-[var(--border)] shadow-xl">
             <div className="grid lg:grid-cols-12 gap-8 items-start">
               <div className="lg:col-span-8 space-y-6">
-                <div className="min-h-[320px] rounded-full-lg border border-[var(--border)] bg-[var(--surface)]/50 p-8 relative overflow-hidden shadow-inner">
+                <div className="min-h-[320px] rounded-xl border border-[var(--border)] bg-[var(--surface)]/50 p-8 relative overflow-hidden shadow-inner">
                   {isAuditing ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[var(--surface)]/90 backdrop-blur-sm z-10">
-                      <div className="w-10 h-10 rounded-full-full border-2 border-[var(--accent)]/10 border-t-[var(--accent)] animate-spin"></div>
+                      <div className="w-10 h-10 rounded-full border-2 border-[var(--accent)]/10 border-t-[var(--accent)] animate-spin"></div>
                       <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[var(--accent)] animate-pulse">Consulting Neural Context...</span>
                     </div>
                   ) : auditData ? (
@@ -340,7 +340,7 @@ export default function WeaponArmory({ protocol = 'strike' }) {
                               <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-4)] opacity-70">{key}</span>
                               <span className="text-[10px] font-black text-[var(--accent)]">{data.score}%</span>
                             </div>
-                            <div className="h-1.5 w-full bg-[var(--surface-3)] rounded-full-full overflow-hidden">
+                            <div className="h-1.5 w-full bg-[var(--surface-3)] rounded-full overflow-hidden">
                               <div className="h-full bg-[var(--accent)] transition-all duration-1000" style={{ width: `${data.score}%` }}></div>
                             </div>
                             <p className="text-[10px] text-[var(--text-3)] leading-relaxed font-medium">{data.critique}</p>
@@ -350,7 +350,7 @@ export default function WeaponArmory({ protocol = 'strike' }) {
 
                       {/* Tactical Drift Box */}
                       {auditData.tactical_drift && (
-                        <div className="p-5 rounded-full-lg bg-amber-500/5 border border-amber-500/20">
+                        <div className="p-5 rounded-xl bg-amber-500/5 border border-amber-500/20">
                           <span className="text-[8px] font-black uppercase text-amber-500 tracking-widest block mb-1">Tactical Drift Analysis</span>
                           <p className="text-[12px] font-bold text-[var(--text-1)] italic">"{auditData.tactical_drift}"</p>
                         </div>
@@ -361,7 +361,7 @@ export default function WeaponArmory({ protocol = 'strike' }) {
                           <span className="text-[8px] font-black uppercase text-emerald-500 tracking-widest block">Tactical Gains</span>
                           <div className="space-y-2">
                             {auditData.positives?.map((p, i) => (
-                              <div key={i} className="text-[11px] font-bold text-[var(--text-2)] flex items-start gap-2 bg-emerald-500/5 p-3 rounded-full-lg border border-emerald-500/10"><span className="text-emerald-500 mt-0.5">✓</span> {p}</div>
+                              <div key={i} className="text-[11px] font-bold text-[var(--text-2)] flex items-start gap-2 bg-emerald-500/5 p-3 rounded-xl border border-emerald-500/10"><span className="text-emerald-500 mt-0.5">✓</span> {p}</div>
                             ))}
                           </div>
                         </div>
@@ -369,7 +369,7 @@ export default function WeaponArmory({ protocol = 'strike' }) {
                           <span className="text-[8px] font-black uppercase text-rose-500 tracking-widest block">Strategic Gaps</span>
                           <div className="space-y-2">
                             {auditData.negatives?.map((n, i) => (
-                              <div key={i} className="text-[11px] font-bold text-[var(--text-2)] flex items-start gap-2 bg-rose-500/5 p-3 rounded-full-lg border border-rose-500/10"><span className="text-rose-500 mt-0.5">!</span> {n}</div>
+                              <div key={i} className="text-[11px] font-bold text-[var(--text-2)] flex items-start gap-2 bg-rose-500/5 p-3 rounded-xl border border-rose-500/10"><span className="text-rose-500 mt-0.5">!</span> {n}</div>
                             ))}
                           </div>
                         </div>
@@ -377,7 +377,7 @@ export default function WeaponArmory({ protocol = 'strike' }) {
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center gap-5 opacity-20 h-full py-12 text-center">
-                      <div className="w-16 h-16 rounded-full-full bg-[var(--surface-3)] flex items-center justify-center border border-[var(--border)] shadow-inner">
+                      <div className="w-16 h-16 rounded-full bg-[var(--surface-3)] flex items-center justify-center border border-[var(--border)] shadow-inner">
                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
                       </div>
                       <p className="text-[10px] font-black tracking-[0.3em] uppercase">Awaiting Strategic Synthesis</p>
@@ -388,12 +388,12 @@ export default function WeaponArmory({ protocol = 'strike' }) {
 
               <div className="lg:col-span-4 space-y-6">
                 {auditData && (
-                  <div className="p-5 rounded-full-lg bg-[var(--accent-bg)]/10 border border-[var(--accent-border)]/20 shadow-sm">
+                  <div className="p-5 rounded-xl bg-[var(--accent-bg)]/10 border border-[var(--accent-border)]/20 shadow-sm">
                     <span className="text-[8px] font-black uppercase text-[var(--accent)] tracking-widest block mb-2">Neural Recommendation</span>
                     <p className="text-[12px] font-bold text-[var(--text-1)] leading-relaxed">{auditData.next_mission_advice}</p>
                   </div>
                 )}
-                <div className="p-6 rounded-full-lg bg-[var(--surface)] border border-[var(--border)] shadow-sm flex flex-col items-center justify-center gap-3">
+                <div className="p-6 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-sm flex flex-col items-center justify-center gap-3">
                   <span className="text-[8px] font-black uppercase text-[var(--text-4)] tracking-widest">Tactical Score</span>
                   <div className={`text-4xl font-black ${auditData?.tactical_score >= 80 ? 'text-emerald-500' : auditData?.tactical_score >= 60 ? 'text-amber-500' : auditData ? 'text-rose-500' : 'text-[var(--text-4)] opacity-20'}`}>
                     {auditData?.tactical_score || '--'}
@@ -427,7 +427,7 @@ export default function WeaponArmory({ protocol = 'strike' }) {
                       className="btn-confirm flex-[2] flex items-center justify-center gap-2"
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
-                      {isAuditing ? 'Consulting...' : auditData ? 'Update Audit' : 'Initiate Maya Audit'}
+                      {isAuditing ? 'Consulting...' : auditData ? 'Update Audit' : 'Initiate NETRA Audit'}
                     </button>
                   </div>
 

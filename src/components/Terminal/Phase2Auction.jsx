@@ -15,7 +15,7 @@ export default function Phase2Auction() {
           <div className="label" style={{ marginBottom: '8px' }}>Dimension Matrix</div>
           <div className="flex flex-col gap-3">
             {auctionData && auctionData.dimensions && auctionData.dimensions.map((dim) => (
-              <div key={dim.id} className="p-3 rounded-full-lg border border-[var(--border)] bg-[var(--surface)] flex flex-col md:flex-row md:items-center gap-4">
+              <div key={dim.id} className="p-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] flex flex-col md:flex-row md:items-center gap-4">
                 <div className="w-48 text-[11px] font-bold uppercase tracking-widest text-[var(--text-2)]">{dim.name}</div>
                 <div className="flex flex-wrap gap-2 flex-1">
                   {dim.options.map(opt => {

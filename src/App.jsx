@@ -174,12 +174,12 @@ export default function NetraTerminal() {
 return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)', overflow: 'hidden' }}>
 
-      <header style={{ height: '64px', position: 'sticky', top: 0, background: 'var(--header-bg)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid var(--border)', zIndex: 200, flexShrink: 0 }} className="px-6 lg:px-10 flex justify-between items-center maxWidth-100">
+      <header style={{ height: '64px', position: 'sticky', top: 0, background: darkMode ? '#000' : '#fff', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: darkMode ? '1px solid white' : '1px solid #4169E1', zIndex: 200, flexShrink: 0 }} className="px-6 lg:px-10 flex justify-between items-center maxWidth-100">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button
             className="mobile-only"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: 'var(--text-1)' }}
+            style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: darkMode ? 'white' : '#4169E1' }}
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
           </button>
@@ -189,22 +189,19 @@ return (
             style={{ background: 'none', border: 'none', padding: 0, cursor: session ? 'pointer' : 'default', display: 'flex', alignItems: 'center' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#4169E1', boxShadow: '0 0 10px rgba(65, 105, 225, 0.8)', animation: 'pulse 2s infinite' }}></div>
               <h1 style={{ 
                 fontSize: '20px', 
                 fontWeight: 950, 
                 letterSpacing: '0.1em', 
-                background: 'linear-gradient(to right, var(--text-1), #4169E1)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
+                color: darkMode ? 'white' : '#4169E1',
                 lineHeight: 1, 
                 marginBottom: 0,
                 textTransform: 'uppercase'
-              }}>MAYA AI</h1>
+              }}>NETRA</h1>
             </div>
           </button>
 
-          <div className="desktop-only" style={{ width: '1px', height: '24px', background: 'var(--border)', margin: '0 4px', opacity: 0.6 }}></div>
+          <div className="desktop-only" style={{ width: '1px', height: '24px', background: darkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(65, 105, 225, 0.3)', margin: '0 4px', opacity: 0.6 }}></div>
 
           <div className="desktop-only" style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
             {[
@@ -221,7 +218,7 @@ return (
                   fontWeight: 850,
                   textTransform: 'uppercase',
                   letterSpacing: '0.06em',
-                  color: nav.active ? '#4169E1' : 'var(--text-3)',
+                  color: nav.active ? '#4169E1' : (darkMode ? 'white' : '#4169E1'),
                   borderTop: 'none',
                   borderLeft: 'none',
                   borderRight: 'none',
@@ -243,17 +240,17 @@ return (
           {/* GLOBAL CHART UPLOAD */}
 
 
-          {/* QUICK MAYA CHAT (Blue Elite) */}
+          {/* QUICK NETRA CHAT (Blue Elite) */}
           <button
             onClick={() => setIsAiPaneOpen(!isAiPaneOpen)}
-            title="Launch MAYA Console"
+            title="Launch NETRA Console"
             style={{
               width: '38px',
               height: '38px',
-              borderRadius: '12px',
-              background: isAiPaneOpen ? 'linear-gradient(135deg, #4169E1, #6366f1)' : 'rgba(65, 105, 225, 0.08)',
-              border: `1px solid ${isAiPaneOpen ? '#4169E1' : 'rgba(65, 105, 225, 0.3)'}`,
-              color: isAiPaneOpen ? 'white' : '#4169E1',
+              borderRadius: '16px',
+              background: isAiPaneOpen ? 'linear-gradient(135deg, #4169E1, #6366f1)' : (darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(65, 105, 225, 0.05)'),
+              border: `1px solid ${isAiPaneOpen ? '#4169E1' : (darkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(65, 105, 225, 0.2)')}`,
+              color: darkMode ? 'white' : '#4169E1',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -279,10 +276,10 @@ return (
               style={{
                 width: '38px',
                 height: '38px',
-                borderRadius: '12px',
-                background: isTuningOpen ? '#4169E1' : 'rgba(65, 105, 225, 0.05)',
-                border: `1px solid ${isTuningOpen ? '#4169E1' : 'rgba(65, 105, 225, 0.2)'}`,
-                color: isTuningOpen ? 'white' : '#4169E1',
+                borderRadius: '16px',
+                background: isTuningOpen ? '#4169E1' : (darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(65, 105, 225, 0.05)'),
+                border: `1px solid ${isTuningOpen ? '#4169E1' : (darkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(65, 105, 225, 0.2)')}`,
+                color: darkMode ? 'white' : '#4169E1',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -330,7 +327,7 @@ return (
                           width: '100%',
                           background: darkMode ? '#050505' : '#F9F9F9',
                           border: darkMode ? '1px solid #222' : '1px solid #DDD',
-                          borderRadius: '2px',
+                          borderRadius: '8px',
                           padding: '8px',
                           fontSize: '11px',
                           color: 'var(--text-1)',
@@ -390,13 +387,13 @@ return (
               <div style={{ 
                 width: '38px', 
                 height: '38px', 
-                borderRadius: '12px', 
-                background: isProfileOpen ? '#4169E1' : 'rgba(65, 105, 225, 0.05)', 
-                border: `1px solid ${isProfileOpen ? '#4169E1' : 'rgba(65, 105, 225, 0.2)'}`,
+                borderRadius: '16px', 
+                background: isProfileOpen ? '#4169E1' : (darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(65, 105, 225, 0.05)'), 
+                border: `1px solid ${isProfileOpen ? '#4169E1' : (darkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(65, 105, 225, 0.2)')}`,
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'center', 
-                color: isProfileOpen ? 'white' : '#4169E1',
+                color: darkMode ? 'white' : '#4169E1',
                 transition: 'all 200ms' 
               }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -674,7 +671,7 @@ return (
               <div className="flex-1 overflow-y-auto custom-scrollbar p-5 flex flex-col gap-8">
                 
                 {/* 1. MISSION PROFILE */}
-                <div style={{ padding: '16px', borderRadius: '12px', background: darkMode ? 'rgba(255,255,255,0.02)' : '#ffffff', border: '1px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
+                <div style={{ padding: '16px', borderRadius: '16px', background: darkMode ? 'rgba(255,255,255,0.02)' : '#ffffff', border: '1px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
                   <div style={{ fontSize: '9px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'var(--accent)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 10px var(--accent)' }}></div>
                     Mission Profile
@@ -705,7 +702,7 @@ return (
                     { label: 'Phase 3: Liquidity', val: activeEditLog ? activeEditLog.phase1?.liquidity : selections.liquidity, note: activeEditLog ? activeEditLog.phase1?.liquidity_note : notes.liquidity, color: '#10b981' },
                     { label: 'Phase 4: Behaviour', val: activeEditLog ? activeEditLog.phase1?.behaviour : selections.behaviour, note: activeEditLog ? activeEditLog.phase1?.behaviour_note : notes.behaviour, color: '#f59e0b' },
                   ].map((phase, i) => (
-                    <div key={i} style={{ padding: '14px', borderRadius: '12px', background: darkMode ? 'rgba(255,255,255,0.01)' : '#ffffff', border: '1px solid var(--border)' }}>
+                    <div key={i} style={{ padding: '14px', borderRadius: '16px', background: darkMode ? 'rgba(255,255,255,0.01)' : '#ffffff', border: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                         <div style={{ fontSize: '10px', fontWeight: 850, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{phase.label}</div>
                       </div>
@@ -758,7 +755,7 @@ return (
                 {/* 4. ENGAGEMENT SUITE (WEAPON & LOGIC) */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ fontSize: '9px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'var(--text-3)', paddingLeft: '4px' }}>Engagement Suite</div>
-                  <div style={{ padding: '16px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.03)', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
+                  <div style={{ padding: '16px', borderRadius: '16px', background: 'rgba(16, 185, 129, 0.03)', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                       <span style={{ fontSize: '10px', fontWeight: 800, color: '#10b981', textTransform: 'uppercase' }}>Weapon Identity</span>
                       <span style={{ fontSize: '12px', fontWeight: 950, color: '#10b981' }}>{selectedWeaponId || activeEditLog?.weapon || 'LOCKED'}</span>
@@ -1605,7 +1602,7 @@ return (
         </div>
       </div>
 
-        {/* RIGHT SIDEBAR — MAYA AI Synthesis (Floating Glass Overlay) */}
+        {/* RIGHT SIDEBAR — NETRA Synthesis (Floating Glass Overlay) */}
         <aside
           className={`sidebar-transition flex flex-col z-[150] ${isAiPaneOpen ? 'w-[440px] opacity-100 translate-x-0' : 'w-0 opacity-0 translate-x-full overflow-hidden'}`}
               style={{
@@ -1620,7 +1617,7 @@ return (
               }}
             >
               <div style={{ minWidth: '440px', height: '100%', display: 'flex', flexDirection: 'column' }}>
-              {/* Sidebar Content (MAYA AI) */}
+              {/* Sidebar Content (NETRA) */}
               <div className="flex-1 flex flex-col h-full relative">
                 {/* MINIMAL CENTERED HEADER */}
                 <div style={{ height: '54px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.02)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
@@ -1628,7 +1625,7 @@ return (
                     <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 15px rgba(65, 105, 225, 0.4)' }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
                     </div>
-                    <span style={{ fontSize: '12px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.2em', color: 'var(--text-1)' }}>MAYA AI</span>
+                    <span style={{ fontSize: '12px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.2em', color: 'var(--text-1)' }}>NETRA</span>
                   </div>
                   <button onClick={() => setIsAiPaneOpen(false)} style={{ position: 'absolute', right: '16px', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%', color: 'var(--text-3)', cursor: 'pointer', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="hover:bg-red-500/20 hover:text-red-500 transition-colors">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -1662,7 +1659,7 @@ return (
                               <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
                             </div>
                           )}
-                          {msg.role === 'user' ? 'Operator' : 'MAYA Synthesis'}
+                          {msg.role === 'user' ? 'Operator' : 'NETRA Synthesis'}
                         </div>
                         <div className="prose prose-invert max-w-none prose-sm">
                           <ReactMarkdown children={msg.text} />

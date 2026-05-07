@@ -14,8 +14,8 @@
   --surface-3:     hsl(220, 12%, 94%);      /* Depth Surface */
 
   /* Precise Borders */
-  --border:        hsla(220, 15%, 20%, 0.08);
-  --border-strong: hsla(220, 15%, 20%, 0.15);
+  --border:        hsla(220, 15%, 20%, 0.12);
+  --border-strong: hsla(220, 15%, 20%, 0.25);
 
   /* Tactical Typography */
   --text-1:        hsl(220, 40%, 8%);       /* Midnight Carbon */
@@ -84,15 +84,15 @@
 
 .card {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
   box-shadow: var(--shadow-sm);
 }
 
 .card-inset {
   background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
 }
 
 /* ── Buttons ──────────────────────────────────────────────── */
@@ -214,7 +214,7 @@
   padding: 12px 16px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 12px;
   cursor: pointer;
   transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
@@ -260,7 +260,7 @@
   padding: 0 12px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 10px;
   font-family: 'Inter', sans-serif;
   font-size: 13px;
   font-weight: 500;
@@ -286,7 +286,7 @@
   padding: 10px 12px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 10px;
   font-family: 'Inter', sans-serif;
   font-size: 12px;
   font-weight: 400;
@@ -307,7 +307,7 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
 .proto-opt {
   padding: 5px 12px;
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: 8px;
   background: var(--surface);
   font-size: 10px;
   font-weight: 700;
@@ -331,8 +331,8 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
 .cmd-btn {
   padding: 16px 20px;
   text-align: left;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
   background: var(--surface);
   cursor: pointer;
   transition: border-color 120ms, background 120ms, box-shadow 120ms;
@@ -359,8 +359,8 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
   flex: 1;
   padding: 16px 18px;
   text-align: left;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
   background: var(--surface);
   cursor: pointer;
   position: relative;
@@ -416,7 +416,7 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
   padding: 5px 10px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: 8px;
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
@@ -543,8 +543,8 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
   --surface-3:     hsl(222, 18%, 18%);      /* interactive Layer */
 
   /* High-Contrast Borders */
-  --border:        hsla(222, 20%, 100%, 0.06);
-  --border-strong: hsla(222, 20%, 100%, 0.12);
+  --border:        hsla(222, 20%, 100%, 0.12);
+  --border-strong: hsla(222, 20%, 100%, 0.25);
 
   /* Radiant Typography */
   --text-1:        hsl(210, 40%, 98%);      /* Pure Frost */
@@ -709,8 +709,8 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
 }
 .stat-card {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
   padding: 20px;
   box-shadow: var(--shadow-sm);
 }
