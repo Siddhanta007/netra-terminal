@@ -326,6 +326,49 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
   transform: translateY(-1px);
 }
 
+/* ── Tactical Selector (New Experiment) ────────────────────── */
+
+.tactical-selector {
+  display: flex;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.tactical-opt {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.tactical-opt:hover {
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+
+.tactical-opt.selected {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(24, 71, 177, 0.2);
+  transform: translateY(-1px);
+}
+
+
 /* ── Command Cards (STRIKE / INTERCEPTION / NO ENGAGEMENT) ── */
 
 .cmd-btn {
