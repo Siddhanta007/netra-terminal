@@ -12,23 +12,25 @@ export default function Phase1Bias() {
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 fade-up">
       <div className="lg:col-span-7 flex flex-col gap-4">
         <section>
-          <div className="flex flex-col gap-6">
+          <div className="hud-container space-y-6">
             {biasData && biasData.dimensions && biasData.dimensions.map((dim) => (
-              <div key={dim.id} className="space-y-3">
-                <div className="flex justify-between items-center px-1">
-                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-3)]">{dim.name}</div>
+              <div key={dim.id} className="hud-row">
+                <div className="flex justify-between items-center">
+                  <div className="hud-label">
+                    {dim.name}
+                  </div>
                   {selections.bias?.[dim.id] && (
-                    <div className="text-[8px] font-bold text-[var(--accent)] uppercase tracking-widest animate-in fade-in">Selection Active</div>
+                    <div className="text-[7px] font-black text-[var(--accent)] uppercase tracking-[0.2em] animate-pulse">Telemetry Locked</div>
                   )}
                 </div>
-                <div className="tactical-selector">
+                <div className="hud-selector">
                   {dim.options.map(opt => {
                     const isSelected = selections.bias?.[dim.id] === opt;
                     return (
                       <button
                         key={opt}
                         onClick={() => setSelections({ ...selections, bias: { ...(selections.bias || {}), [dim.id]: opt } })}
-                        className={`tactical-opt ${isSelected ? 'selected' : ''}`}
+                        className={`hud-opt ${isSelected ? 'selected' : ''}`}
                       >
                         {opt}
                       </button>
