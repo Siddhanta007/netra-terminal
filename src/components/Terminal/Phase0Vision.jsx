@@ -11,7 +11,7 @@ export default function Phase0Vision() {
       phaseId="vision"
       phaseNum={0}
       title="Netra AI Labs"
-      subheading="Visual Intelligence Engine"
+      subheading="MAYA - AI Chart Analysis"
       showUpload={true}
       isEvaluating={isUploadingImage}
       output={imageDescription}

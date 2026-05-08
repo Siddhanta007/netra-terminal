@@ -165,8 +165,8 @@ export default function Phase10MissionControl() {
           <NetraAILabs 
             phaseId="mission_audit"
             phaseNum={10}
-            title="NETRA Strategic Audit"
-            subheading="Mission Performance Laboratory"
+            title="NETRA AI LABS"
+            subheading="MAYA - Audit Engine"
             showUpload={false}
             isEvaluating={isAuditing}
             output={auditData}

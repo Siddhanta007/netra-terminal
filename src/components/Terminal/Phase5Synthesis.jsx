@@ -61,7 +61,7 @@ export default function Phase5Synthesis() {
       phaseId="synthesis"
       phaseNum={5}
       title="NETRA AI Labs"
-      subheading="Doctrine Synthesis"
+      subheading="MAYA - Market Type Selector"
       showUpload={false}
       isEvaluating={isEvaluating}
       output={netraOutput}

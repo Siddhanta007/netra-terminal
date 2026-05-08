@@ -62,8 +62,8 @@ export default function Phase8WeaponIntel() {
     <NetraAILabs 
       phaseId="weapon_intel"
       phaseNum={8}
-      title="Weapon Intelligence"
-      subheading="Maya Tactical Engine"
+      title="NETRA AI Labs"
+      subheading="MAYA - Weapon Recommendation Engine"
       showUpload={false}
       isEvaluating={isPredictingWeapon}
       output={weaponPrediction}
