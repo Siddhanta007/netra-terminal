@@ -2,6 +2,16 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { loadState, saveState } from '../utils/storage';
 import { API_BASE, WEIGHTS, SCORES, STEP_NAMES } from '../utils/constants';
 
+const parseModels = (envStr) => {
+  if (!envStr) return [];
+  return envStr.split(',').map(m => {
+    const [name, id] = m.split('::');
+    return { name: name?.trim(), id: id?.trim() };
+  }).filter(m => m.name && m.id);
+};
+
+export const AVAILABLE_MODELS = parseModels(import.meta.env.VITE_MODELS);
+
 const NetraContext = createContext(null);
 
 export function NetraProvider({ children }) {
@@ -54,7 +64,7 @@ export function NetraProvider({ children }) {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const [session, setSession] = useState(() => loadState('session', null));
-  const [sessionInput, setSessionInput] = useState({ userName: '', password: '', assetName: '', tradeName: '', modelName: 'pinaka' });
+  const [sessionInput, setSessionInput] = useState({ userName: '', password: '', assetName: '', tradeName: '', marketType: 'TRENDING', modelName: 'pinaka' });
   const [prepStep, setPrepStep] = useState(() => {
     const s = loadState('session', null);
     if (!s) return 0;
@@ -71,16 +81,18 @@ export function NetraProvider({ children }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAiPaneOpen, setIsAiPaneOpen] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(() => loadState('selectedModel', 'google|gemini-2.5-flash'));
-  const [visionModel, setVisionModel] = useState(() => loadState('visionModel', 'anthropic|claude-4.6-sonnet'));
+  const [selectedModel, setSelectedModel] = useState(() => loadState('selectedModel', AVAILABLE_MODELS[0]?.id || 'anthropic|claude-4.6-sonnet'));
+  const [visionModel, setVisionModel] = useState(() => loadState('visionModel', AVAILABLE_MODELS[0]?.id || 'anthropic|claude-4.6-sonnet'));
   const [modelConfig, setModelConfig] = useState(() => loadState('modelConfig', {
-    temperature: 0.2,
+    temperature: parseFloat(import.meta.env.VITE_DEFAULT_TEMPERATURE) || 0.2,
     top_p: 1.0,
     max_tokens: 2048,
-    seed: 42
+    seed: 42,
+    frequency_penalty: parseFloat(import.meta.env.VITE_DEFAULT_PENALTY) || 0.0
   }));
   const [imageDescription, setImageDescription] = useState(() => loadState('imageDescription', null));
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadedVisionFiles, setUploadedVisionFiles] = useState([]);
 
   const getAuthHeaders = useCallback((extraHeaders = {}) => {
     const token = import.meta.env.VITE_HF_TOKEN;
@@ -630,7 +642,7 @@ export function NetraProvider({ children }) {
     setVisionAbortController(controller);
 
     const formData = new FormData();
-    formData.append('file', uploadedVisionFile);
+    uploadedVisionFiles.forEach(f => formData.append('files', f));
     
     const [providerVal, modelIdVal] = visionModel.split('|');
     formData.append('provider', providerVal);
@@ -695,15 +707,18 @@ export function NetraProvider({ children }) {
   const editStep = (stepLevel) => {
     setHighestStep(stepLevel);
     if (stepLevel <= 4) { setFinalCommand(null); setNetraOutput(null); setSysRecommendation(null); setSelectedWeaponId(null); setCommandLocked(false); }
-    if (stepLevel <= 5) { setSelectedWeaponId(null); setWeaponLocked(false); }
+    if (stepLevel <= 5) { setFinalCommand(null); setCommandLocked(false); }
+    if (stepLevel <= 6) { setSelectedWeaponId(null); setWeaponLocked(false); }
+    if (stepLevel <= 7) { setWeaponLocked(false); }
   };
 
   const doResetStep = (stepLevel) => {
     const stepKeys = ['bias', 'auction', 'liquidity', 'behaviour'];
     const key = stepKeys[stepLevel - 1];
-    if (key) { setSelections(prev => ({ ...prev, [key]: '' })); setNotes(prev => ({ ...prev, [key]: '' })); }
+    if (key) { setSelections(prev => ({ ...prev, [key]: {} })); setNotes(prev => ({ ...prev, [key]: '' })); }
     setHighestStep(stepLevel);
     if (stepLevel <= 4) { setFinalCommand(null); setNetraOutput(null); setSysRecommendation(null); setSelectedWeaponId(null); }
+    if (stepLevel <= 5) { setFinalCommand(null); setCommandLocked(false); }
     setConfirmModal(null);
     showToast('Step reset');
   };
@@ -781,9 +796,10 @@ export function NetraProvider({ children }) {
     auditData, setAuditData, isAuditing, setIsAuditing, triggerPostTradeAudit, stopPostTradeAudit,
     selectedModel, setSelectedModel,
     visionModel, setVisionModel,
+    AVAILABLE_MODELS,
     modelConfig, setModelConfig,
     imageDescription, setImageDescription, uploadAndDescribeImage, isUploadingImage,
-    uploadedVisionFile, setUploadedVisionFile, stopVisualAnalysis
+    uploadedVisionFiles, setUploadedVisionFiles, stopVisualAnalysis
   };
 
   return <NetraContext.Provider value={value}>{children}</NetraContext.Provider>;

@@ -8,8 +8,13 @@ import Phase1Bias from './components/Terminal/Phase1Bias';
 import Phase2Auction from './components/Terminal/Phase2Auction';
 import Phase3Liquidity from './components/Terminal/Phase3Liquidity';
 import Phase4Behaviour from './components/Terminal/Phase4Behaviour';
-import Phase5Netra from './components/Terminal/Phase5Netra';
-import WeaponArmory from './components/Terminal/WeaponArmory';
+import Phase5Synthesis from './components/Terminal/Phase5Synthesis';
+import Phase6Command from './components/Terminal/Phase6Command';
+import Phase7STS from './components/Terminal/Phase7STS';
+import Phase8WeaponIntel from './components/Terminal/Phase8WeaponIntel';
+import Phase9WeaponArmory from './components/Terminal/Phase9WeaponArmory';
+import Phase10MissionControl from './components/Terminal/Phase10MissionControl';
+import MarketTypeSelector from './components/Terminal/MarketTypeSelector';
 
 // Protocol sub-views (small, kept inline)
 function NoEngagementProtocol() {
@@ -83,6 +88,7 @@ export default function NetraTerminal() {
     getNCSBreakdown,
     tradeName, setTradeName,
     selectedModel, setSelectedModel,
+    AVAILABLE_MODELS,
     modelConfig, setModelConfig,
     uploadAndDescribeImage, isUploadingImage
   } = useNetra();
@@ -90,7 +96,6 @@ export default function NetraTerminal() {
   const [isDockExpanded, setIsDockExpanded] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [isTuningOpen, setIsTuningOpen] = useState(false); // Added Tuning State
 
   const downloadCSV = () => {
     if (!tradeLogs || tradeLogs.length === 0) {
@@ -267,116 +272,6 @@ return (
               <circle cx="12" cy="5" r="2" fill="currentColor" className={isAiPaneOpen ? "animate-pulse" : ""}/>
             </svg>
           </button>
-
-          {/* NEURAL TUNING (Advanced Console) */}
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => setIsTuningOpen(!isTuningOpen)}
-              title="Advanced Neural Calibration"
-              style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '16px',
-                background: isTuningOpen ? '#4169E1' : (darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(65, 105, 225, 0.05)'),
-                border: `1px solid ${isTuningOpen ? '#4169E1' : (darkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(65, 105, 225, 0.2)')}`,
-                color: darkMode ? 'white' : '#4169E1',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                transition: 'all 200ms'
-              }}
-              className="hover:scale-110 active:scale-95"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 20v-6M6 20V10M18 20V4" /></svg>
-            </button>
-
-            {isTuningOpen && (
-              <>
-                <div style={{ position: 'fixed', inset: 0, zIndex: 140 }} onClick={() => setIsTuningOpen(false)}></div>
-                <div 
-                  className="animate-in fade-in duration-200 slide-in-from-top-1"
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    marginTop: '12px',
-                    width: '300px',
-                    background: darkMode ? '#050505' : '#FFFFFF',
-                    border: darkMode ? '1px solid #222' : '1px solid #DDD',
-                    borderRadius: '12px',
-                    padding: '24px',
-                    boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
-                    zIndex: 150
-                  }}
-                >
-                  <div style={{ marginBottom: '20px', paddingBottom: '12px', borderBottom: darkMode ? '1px solid #111' : '1px solid #EEE' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 800, color: '#4169E1', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Neural Calibration</div>
-                    <div style={{ fontSize: '8px', color: 'var(--text-4)', textTransform: 'uppercase', marginTop: '2px', opacity: 0.6 }}>Precision Tier — Node 007</div>
-                  </div>
-
-                  <div className="space-y-6">
-                    {/* Provider */}
-                    <div className="space-y-2">
-                      <div style={{ fontSize: '9px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Intelligence Model</div>
-                      <select
-                        value={selectedModel}
-                        onChange={(e) => setSelectedModel(e.target.value)}
-                        style={{
-                          width: '100%',
-                          background: darkMode ? '#050505' : '#F9F9F9',
-                          border: darkMode ? '1px solid #222' : '1px solid #DDD',
-                          borderRadius: '8px',
-                          padding: '8px',
-                          fontSize: '11px',
-                          color: 'var(--text-1)',
-                          outline: 'none'
-                        }}
-                      >
-                        <option value="google|gemini-2.5-flash">Google: Gemini 2.5 Flash (Paid)</option>
-                        <option value="google|gemini-1.5-pro">Google: Gemini 1.5 Pro (Paid)</option>
-                        <option value="google|gemini-3.1-pro">Google: Gemini 3.1 Pro (Paid)</option>
-                        <option value="groq|llama-3.3-70b-versatile">Groq: Llama 3.3 70B (Free)</option>
-                        <option value="openai|gpt-4o">OpenAI: GPT-4o (Paid)</option>
-                        <option value="openai|gpt-5-latest">OpenAI: GPT-5 Latest (Paid)</option>
-                        <option value="anthropic|claude-3-5-sonnet-20241022">Anthropic: Claude 3.5 Sonnet (Paid)</option>
-                        <option value="anthropic|claude-3-opus-20240229">Anthropic: Claude 3 Opus (Paid)</option>
-                        <option value="anthropic|claude-4.6-sonnet">Anthropic: Claude 4.6 Sonnet (Paid)</option>
-                        <option value="anthropic|claude-4.6-opus">Anthropic: Claude 4.6 Opus (Paid)</option>
-                        <option value="openrouter|meta-llama/llama-3.1-8b-instruct:free">OpenRouter: Llama 3.1 8B (Free)</option>
-                        <option value="openrouter|nvidia/nemotron-4-340b-instruct:free">OpenRouter: Nemotron 4 340B (Free)</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span style={{ fontSize: '9px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Temperature</span>
-                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#4169E1' }}>{modelConfig.temperature.toFixed(2)}</span>
-                      </div>
-                      <input type="range" min="0" max="1" step="0.05" value={modelConfig.temperature} onChange={(e) => setModelConfig({ ...modelConfig, temperature: parseFloat(e.target.value) })} style={{ width: '100%', accentColor: '#4169E1' }} />
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span style={{ fontSize: '9px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Penalty (Freq)</span>
-                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#4169E1' }}>{(modelConfig.frequency_penalty || 0).toFixed(1)}</span>
-                      </div>
-                      <input type="range" min="0" max="2" step="0.1" value={modelConfig.frequency_penalty || 0} onChange={(e) => setModelConfig({ ...modelConfig, frequency_penalty: parseFloat(e.target.value) })} style={{ width: '100%', accentColor: '#4169E1' }} />
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span style={{ fontSize: '9px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Token Width</span>
-                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#4169E1' }}>{modelConfig.top_k || 40}</span>
-                      </div>
-                      <input type="range" min="1" max="100" step="1" value={modelConfig.top_k || 40} onChange={(e) => setModelConfig({ ...modelConfig, top_k: parseInt(e.target.value) })} style={{ width: '100%', accentColor: '#4169E1' }} />
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
 
           {/* Profile Dropdown (Unified Style) */}
           <div style={{ position: 'relative' }}>
@@ -1038,6 +933,8 @@ return (
                       </div>
                     </div>
 
+                    <MarketTypeSelector />
+
                     <div className="group">
                       <label className="text-[10px] font-black uppercase tracking-widest mb-4 lg:mb-6 block opacity-40 group-focus-within:opacity-100 transition-opacity">Trading Model Directive</label>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
@@ -1548,11 +1445,27 @@ return (
 
                 {highestStep > 4 && <hr className="step-divider" />}
 
-                {highestStep >= 5 && <Phase5Netra />}
+                {highestStep >= 5 && <Phase5Synthesis />}
+
+                {highestStep >= 5 && <hr className="step-divider" />}
+
+                {highestStep >= 5 && <Phase6Command />}
 
                 {highestStep > 5 && <hr className="step-divider" />}
 
-                {highestStep >= 6 && (
+                {highestStep >= 6 && <Phase8WeaponIntel />}
+
+                {highestStep >= 6 && <hr className="step-divider" />}
+
+                {highestStep >= 6 && <Phase9WeaponArmory />}
+
+                {highestStep > 6 && <hr className="step-divider" />}
+
+                {highestStep >= 7 && <Phase10MissionControl />}
+
+                {highestStep > 7 && <hr className="step-divider" />}
+
+                {highestStep >= 9 && (
                   <div className="space-y-6 animate-in slide-in-from-bottom-10 fade-in duration-700">
                     {(finalCommand || (netraOutput ? netraOutput.cmd : null)) === 'NO ENGAGEMENT' && <NoEngagementProtocol />}
                     {(finalCommand || (netraOutput ? netraOutput.cmd : null)) === 'STRIKE' && <StrikeProtocol />}
@@ -1619,49 +1532,40 @@ return (
               <div style={{ minWidth: '440px', height: '100%', display: 'flex', flexDirection: 'column' }}>
               {/* Sidebar Content (NETRA) */}
               <div className="flex-1 flex flex-col h-full relative">
-                {/* MINIMAL CENTERED HEADER */}
-                <div style={{ height: '54px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.02)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 15px rgba(65, 105, 225, 0.4)' }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
-                    </div>
-                    <span style={{ fontSize: '12px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.2em', color: 'var(--text-1)' }}>NETRA</span>
-                  </div>
-                  <button onClick={() => setIsAiPaneOpen(false)} style={{ position: 'absolute', right: '16px', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%', color: 'var(--text-3)', cursor: 'pointer', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="hover:bg-red-500/20 hover:text-red-500 transition-colors">
+                {/* ELEVATED CHAT HISTORY */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-4 relative" style={{ background: darkMode ? 'transparent' : '#f8f9fa' }}>
+                  {/* Floating Close Button */}
+                  <button onClick={() => setIsAiPaneOpen(false)} style={{ position: 'absolute', top: '16px', right: '16px', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%', color: 'var(--text-3)', cursor: 'pointer', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20 }} className="hover:bg-red-500/20 hover:text-red-500 transition-colors">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                   </button>
-                </div>
 
-                {/* ELEVATED CHAT HISTORY */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-6 flex flex-col gap-8" style={{ background: darkMode ? 'transparent' : '#f8f9fa' }}>
+                  {/* MAYA Watermark */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
+                    <span className="text-[120px] font-black opacity-[0.03] tracking-[0.2em] text-[var(--text-1)] dark:text-white uppercase">MAYA</span>
+                  </div>
+
                   {chatHistory.map((msg, idx) => (
-                    <div key={idx} className="flex flex-col w-full">
+                    <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} w-full`}>
                       <div 
                         style={{ 
-                          width: '100%', 
-                          padding: '16px',
-                          borderRadius: '16px',
-                          fontSize: '14px',
-                          lineHeight: '1.7',
-                          background: msg.role === 'user' ? (darkMode ? 'rgba(65, 105, 225, 0.15)' : '#EBF0FF') : 'transparent',
-                          color: msg.role === 'user' ? 'var(--accent)' : 'var(--text-1)',
-                          position: 'relative',
-                          border: msg.role === 'user' ? '1px solid var(--accent)' : 'none',
-                          marginBottom: '8px'
+                          maxWidth: '85%', 
+                          padding: '12px 16px',
+                          borderRadius: msg.role === 'user' ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
+                          fontSize: '13px',
+                          lineHeight: '1.6',
+                          background: msg.role === 'user' 
+                            ? (darkMode ? '#4169E1' : '#4169E1') 
+                            : (darkMode ? 'rgba(255,255,255,0.05)' : '#FFFFFF'),
+                          color: msg.role === 'user' ? '#FFFFFF' : 'var(--text-1)',
+                          boxShadow: msg.role === 'user' ? 'none' : '0 2px 8px rgba(0,0,0,0.05)',
+                          border: msg.role === 'user' ? 'none' : '1px solid rgba(255,255,255,0.05)',
                         }}
-                        className="animate-in fade-in slide-in-from-bottom-2 duration-300 markdown-content"
+                        className="animate-in fade-in slide-in-from-bottom-1 duration-300 markdown-content"
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', opacity: 0.6, color: msg.role === 'user' ? 'var(--accent)' : 'var(--text-3)' }}>
-                          {msg.role === 'user' ? (
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-                          ) : (
-                            <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
-                            </div>
-                          )}
-                          {msg.role === 'user' ? 'Operator' : 'NETRA Synthesis'}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', fontSize: '9px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.6, color: msg.role === 'user' ? '#EBF0FF' : 'var(--text-3)' }}>
+                          {msg.role === 'user' ? 'Operator' : 'MAYA'}
                         </div>
-                        <div className="prose prose-invert max-w-none prose-sm">
+                        <div className="prose prose-sm dark:prose-invert max-w-none text-inherit">
                           <ReactMarkdown children={msg.text} />
                         </div>
                       </div>
@@ -1680,14 +1584,15 @@ return (
                   )}
                 </div>
 
+
                 {/* MULTIMODAL TACTICAL INPUT */}
-                <div className="p-3 border-t border-white/5 bg-white/[0.02] flex flex-col">
+                <div className="p-4 border-t border-white/5 bg-white/[0.02] flex flex-col">
                   <div 
                     style={{ 
-                      background: darkMode ? 'rgba(0,0,0,0.2)' : '#ffffff', 
+                      background: darkMode ? 'rgba(255,255,255,0.03)' : '#ffffff', 
                       border: '1px solid rgba(255,255,255,0.1)', 
-                      borderRadius: '8px', 
-                      padding: '2px',
+                      borderRadius: '24px', 
+                      padding: '4px',
                       boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.05)',
                       position: 'relative',
                       display: 'flex',
@@ -1716,6 +1621,58 @@ return (
                     
                     <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {/* Stealth AI Controls (Popover) */}
+                        <details className="relative">
+                          <summary className="w-[34px] h-[34px] rounded-[10px] bg-white/5 border border-white/10 text-[var(--text-3)] flex items-center justify-center cursor-pointer hover:bg-indigo-500/20 hover:text-indigo-500 transition-all list-none">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 12h6"/></svg>
+                          </summary>
+                          <div className="absolute bottom-full mb-2 left-0 w-[260px] bg-[#0A0A0A] border border-white/10 rounded-xl p-4 shadow-2xl space-y-4 z-30">
+                            {/* Model Selector */}
+                            <div className="space-y-1">
+                              <div style={{ fontSize: '9px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Intelligence Model</div>
+                              <select
+                                value={selectedModel}
+                                onChange={(e) => setSelectedModel(e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  background: darkMode ? '#050505' : '#F9F9F9',
+                                  border: darkMode ? '1px solid #222' : '1px solid #DDD',
+                                  borderRadius: '8px',
+                                  padding: '6px',
+                                  fontSize: '11px',
+                                  color: 'var(--text-1)',
+                                  outline: 'none'
+                                }}
+                              >
+                                {AVAILABLE_MODELS.map(m => (
+                                  <option key={m.id} value={m.id}>{m.name}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Sliders in a compact row */}
+                            <div className="grid grid-cols-2 gap-4">
+                              {/* Temperature */}
+                              <div className="space-y-1">
+                                <div className="flex justify-between items-center">
+                                  <span style={{ fontSize: '8px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Temp</span>
+                                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#4169E1' }}>{modelConfig.temperature.toFixed(2)}</span>
+                                </div>
+                                <input type="range" min="0" max="1" step="0.05" value={modelConfig.temperature} onChange={(e) => setModelConfig({ ...modelConfig, temperature: parseFloat(e.target.value) })} style={{ width: '100%', accentColor: '#4169E1' }} />
+                              </div>
+
+                              {/* Penalty */}
+                              <div className="space-y-1">
+                                <div className="flex justify-between items-center">
+                                  <span style={{ fontSize: '8px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Penalty</span>
+                                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#4169E1' }}>{(modelConfig.frequency_penalty || 0).toFixed(1)}</span>
+                                </div>
+                                <input type="range" min="0" max="2" step="0.1" value={modelConfig.frequency_penalty || 0} onChange={(e) => setModelConfig({ ...modelConfig, frequency_penalty: parseFloat(e.target.value) })} style={{ width: '100%', accentColor: '#4169E1' }} />
+                              </div>
+                            </div>
+                          </div>
+                        </details>
+
                         <label 
                           title="Upload Intelligence (Image/Data)"
                           style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isUploadingImage ? 'wait' : 'pointer' }}

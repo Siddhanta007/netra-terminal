@@ -9,4 +9,13 @@ export const SCORES = {
   behaviour: { 'Clean Drive': 10, 'Hidden Wall': 8, 'Absorptive Push': 8, 'Exhaustion': 5, 'Dead Market': 0 }
 };
 
-export const STEP_NAMES = { 1: 'bias', 2: 'auction', 3: 'liquidity', 4: 'behaviour', 5: 'netra' };
+export const STEP_NAMES = { 
+  1: 'bias', 
+  2: 'auction', 
+  3: 'liquidity', 
+  4: 'behaviour', 
+  5: 'evaluation',
+  6: 'matrix',
+  7: 'armory',
+  8: 'control'
+};
