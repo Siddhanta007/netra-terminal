@@ -1,6 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useNetra } from './context/NetraContext';
+import { useSelector, useDispatch } from 'react-redux';
+import { setSelectedModel, setModelConfig } from './store/slices/modelSlice';
+import { setIncludeData, setIncludeDoctrine, setChatInput } from './store/slices/chatSlice';
+import { setTradeName, setLogSearchTerm, setLogFilterOutcome, setLogSortOrder } from './store/slices/logsSlice';
+import { setSessionInput } from './store/slices/sessionSlice';
 import Login from './components/Auth/Login';
 import GlobalOverlay from './components/Layout/GlobalOverlay';
 import Phase0Vision from './components/Terminal/Phase0Vision';
@@ -10,11 +15,39 @@ import Phase3Liquidity from './components/Terminal/Phase3Liquidity';
 import Phase4Behaviour from './components/Terminal/Phase4Behaviour';
 import Phase5Synthesis from './components/Terminal/Phase5Synthesis';
 import Phase6Command from './components/Terminal/Phase6Command';
-import Phase7STS from './components/Terminal/Phase7STS';
 import Phase8WeaponIntel from './components/Terminal/Phase8WeaponIntel';
 import Phase9WeaponArmory from './components/Terminal/Phase9WeaponArmory';
 import Phase10MissionControl from './components/Terminal/Phase10MissionControl';
+
+const MessageContent = ({ text }) => {
+  if (typeof text !== 'string') text = JSON.stringify(text);
+  
+  const thinkRegex = /<think>([\s\S]*?)<\/think>/;
+  const match = text.match(thinkRegex);
+  
+  if (match) {
+    const thinking = match[1];
+    const response = text.replace(thinkRegex, '').trim();
+    
+    return (
+      <>
+        <details className="mb-2 bg-white/5 rounded-lg p-2 border border-white/10">
+          <summary className="text-xs font-bold text-indigo-400 cursor-pointer hover:text-indigo-300 transition-colors">
+            Thoughts
+          </summary>
+          <div className="mt-1 text-xs text-white/70 whitespace-pre-wrap">
+            {thinking}
+          </div>
+        </details>
+        <ReactMarkdown children={response} />
+      </>
+    );
+  }
+  
+  return <ReactMarkdown children={text} />;
+};
 import MarketTypeSelector from './components/Terminal/MarketTypeSelector';
+import ProfilePage from './components/Terminal/ProfilePage';
 
 // Protocol sub-views (small, kept inline)
 function NoEngagementProtocol() {
@@ -50,8 +83,10 @@ function InterceptionProtocol() {
 }
 
 export default function NetraTerminal() {
+  const chatContainerRef = useRef(null);
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
   const {
-    session, sysData,
+    session, setSession, sysData,
     prepStep, setPrepStep,
     activeSessionId, setActiveSessionId,
     activeView, setActiveView,
@@ -62,36 +97,56 @@ export default function NetraTerminal() {
     darkMode, setDarkMode,
     toggleTradeData, toggleAnalyst,
     confirmModal, setConfirmModal,
-    toast,
-    tradeLogs, logSearchTerm, setLogSearchTerm,
-    logFilterOutcome, setLogFilterOutcome,
-    logSortOrder, setLogSortOrder,
-    activeEditLog, setActiveEditLog,
-    editFormData, setEditFormData,
     commitTradeLog, updateTradeLog, deleteTradeLog,
     resumeSession, resetTerminalState,
-    sessionInput, setSessionInput,
     initializeMission, handleGlobalSave,
     saveSession,
-    selections, notes, finalCommand, netraOutput,
-    highestStep, confirmStep, editStep, doResetStep,
-    stepTimestamps, setStepTimestamps,
-    interSelections, strikeSelections,
-    weaponLocked, setWeaponLocked,
-    selectedWeaponId, analyticsData, fetchAnalytics,
+    confirmStep, editStep, doResetStep,
+    fetchAnalytics,
     showToast,
-    chatHistory, chatInput, setChatInput,
-    isAiLoading,
-    includeData, setIncludeData,
-    includeDoctrine, setIncludeDoctrine,
     handleSendMessage,
     getNCSBreakdown,
-    tradeName, setTradeName,
-    selectedModel, setSelectedModel,
-    AVAILABLE_MODELS,
-    modelConfig, setModelConfig,
-    uploadAndDescribeImage, isUploadingImage
+    uploadAndDescribeImage,
+    uploadedVisionFiles, setUploadedVisionFiles
   } = useNetra();
+
+  const toast = useSelector(state => state.ui.toast);
+  const tradeLogs = useSelector(state => state.logs.tradeLogs);
+  const logSearchTerm = useSelector(state => state.logs.logSearchTerm);
+  const logFilterOutcome = useSelector(state => state.logs.logFilterOutcome);
+  const logSortOrder = useSelector(state => state.logs.logSortOrder);
+  const activeEditLog = useSelector(state => state.logs.activeEditLog);
+  const editFormData = useSelector(state => state.logs.editFormData);
+  const sessionInput = useSelector(state => state.session.sessionInput);
+  const selections = useSelector(state => state.analysis.selections);
+  const notes = useSelector(state => state.analysis.notes);
+  const finalCommand = useSelector(state => state.analysis.finalCommand);
+  const netraOutput = useSelector(state => state.analysis.netraOutput);
+  const highestStep = useSelector(state => state.analysis.highestStep);
+  const stepTimestamps = useSelector(state => state.analysis.stepTimestamps);
+  const interSelections = useSelector(state => state.analysis.interSelections);
+  const strikeSelections = useSelector(state => state.analysis.strikeSelections);
+  const weaponLocked = useSelector(state => state.analysis.weaponLocked);
+  const selectedWeaponId = useSelector(state => state.analysis.selectedWeaponId);
+  const analyticsData = useSelector(state => state.analysis.analyticsData);
+  const chatHistory = useSelector(state => state.chat.chatHistory);
+  const chatInput = useSelector(state => state.chat.chatInput);
+
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [chatHistory]);
+
+  const selectedModel = useSelector(state => state.model.selectedModel);
+  const AVAILABLE_MODELS = useSelector(state => state.model.availableModels);
+  const modelConfig = useSelector(state => state.model.modelConfig);
+  const includeData = useSelector(state => state.chat.includeData);
+  const includeDoctrine = useSelector(state => state.chat.includeDoctrine);
+  const isAiLoading = useSelector(state => state.chat.isAiLoading);
+  const isUploadingImage = useSelector(state => state.analysis.isUploadingImage);
+  const tradeName = useSelector(state => state.logs.tradeName);
+  const dispatch = useDispatch();
 
   const [isDockExpanded, setIsDockExpanded] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -210,7 +265,7 @@ return (
 
           <div className="desktop-only" style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
             {[
-              { label: 'Home', active: prepStep === 1, action: () => { setPrepStep(1); setActiveSessionId(null); setIsLoggerOpen(false); setIsAiPaneOpen(false); } },
+              { label: 'Home', active: prepStep === 1 && activeView !== 'profile', action: () => { setPrepStep(1); setActiveView('terminal'); setActiveSessionId(null); setIsLoggerOpen(false); setIsAiPaneOpen(false); } },
               { label: 'Pinaka', active: prepStep > 1 && (currentModel === 'pinaka' || !currentModel), action: () => { setActiveView('terminal'); setCurrentModel('pinaka'); setPrepStep(2); setActiveSessionId(null); setIsLoggerOpen(false); setIsAiPaneOpen(false); } },
               { label: 'Trishul', active: prepStep > 1 && currentModel === 'trishul', action: () => { setActiveView('trishul'); setCurrentModel('trishul'); setPrepStep(2); setActiveSessionId(null); setIsLoggerOpen(false); setIsAiPaneOpen(false); } }
             ].map((nav, i) => (
@@ -291,7 +346,9 @@ return (
                 color: darkMode ? 'white' : '#4169E1',
                 transition: 'all 200ms' 
               }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span style={{ fontSize: '14px', fontWeight: 900, textTransform: 'uppercase' }}>
+                  {(session?.userName || 'O')[0]}
+                </span>
               </div>
             </button>
 
@@ -319,6 +376,14 @@ return (
                     <div style={{ fontSize: '14px', fontWeight: 800, color: '#4169E1', marginTop: '2px' }}>{session?.userName || 'Operator'}</div>
                   </div>
                   
+                  <button onClick={() => {
+                    setActiveView('profile');
+                    setIsProfileOpen(false);
+                  }} style={{ width: '100%', padding: '10px', borderRadius: '2px', border: '1px solid #333', background: '#0a0a0a', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#888', marginBottom: '8px' }} className="hover:bg-blue-900 hover:text-white transition-all">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase' }}>View Profile</span>
+                  </button>
+
                   <button onClick={() => {
                     setSession(null);
                     setPrepStep(0);
@@ -745,14 +810,16 @@ return (
                 padding: prepStep === 1 ? '0' : '24px 40px', 
                 display: 'flex', 
                 flexDirection: 'column', 
-                overflow: (activeSessionId || activeView === 'trishul' || prepStep === 1) ? 'auto' : 'hidden',
+                overflow: 'auto',
                 background: darkMode 
                   ? 'radial-gradient(circle at 50% 50%, rgba(65, 105, 225, 0.05) 0%, transparent 80%)' 
                   : 'radial-gradient(circle at 50% 50%, rgba(65, 105, 225, 0.03) 0%, transparent 80%)',
                 filter: 'none' // Ensure no blur is applied to main console
               }}
             >
-            {prepStep === 1 && !activeSessionId ? (
+            {activeView === 'profile' ? (
+              <ProfilePage />
+            ) : prepStep === 1 && !activeSessionId ? (
               /* CENTRAL COMMAND HUB (HOME) */
               <div className="flex-1 flex flex-col animate-in fade-in duration-700" style={{ position: 'relative', background: 'var(--bg)', overflow: 'hidden' }}>
                 {/* Hero Background - Fixed relative to the Command Hub container */}
@@ -781,7 +848,7 @@ return (
                             if (card.step) {
                               setPrepStep(card.step);
                               if (card.step === 3) {
-                                setSessionInput(prev => ({ ...prev, assetName: '', tradeName: '' }));
+                                dispatch(setSessionInput({ ...sessionInput, assetName: '', tradeName: '' }));
                               }
                             }
                           }}
@@ -889,46 +956,46 @@ return (
               </div>
             ) : prepStep === 3 ? (
               /* PHASE 3: FULL PAGE MISSION PREPARATION */
-              <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-12 animate-in fade-in zoom-in-95 duration-500 overflow-auto bg-[var(--bg)]">
-                <div className="w-full max-w-[600px] space-y-8 lg:space-y-12">
-                  <div className="flex justify-between items-start mb-2 lg:mb-4">
+              <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-8 animate-in fade-in duration-500 overflow-auto bg-[var(--bg)]">
+                <div className="w-full max-w-[500px] space-y-6 lg:space-y-8">
+                  <div className="flex justify-between items-start">
                     <button
                       onClick={() => setPrepStep(1)}
-                      className="group flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-300 hover:text-[#4169E1] transition-all"
+                      className="group flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-[#3B82F6] transition-all"
                     >
-                      <div className="w-8 h-8 rounded-full border border-gray-100 flex items-center justify-center group-hover:border-[#4169E1]/20 group-hover:bg-blue-50 transition-all">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                      <div className="w-6 h-6 rounded-full border border-white/[0.05] flex items-center justify-center group-hover:border-[#3B82F6]/20 group-hover:bg-[#3B82F6]/5 transition-all">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="15 18 9 12 15 6"></polyline></svg>
                       </div>
-                      Back to Command
+                      Back to Dashboard
                     </button>
                   </div>
 
                   <div className="text-center">
-                    <div className="text-[10px] font-black uppercase tracking-[0.4em] text-[#4169E1] mb-4">Trade Setup</div>
-                    <h2 className="text-4xl lg:text-6xl font-black tracking-tighter uppercase mb-4">Trade<br />Preparation</h2>
-                    <p className="text-[13px] opacity-50 font-medium max-w-sm mx-auto">Establish administrative identifiers and select your trading logic for the next session.</p>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#3B82F6] mb-2">Trade Setup</div>
+                    <h2 className="text-3xl lg:text-4xl font-black tracking-tight uppercase mb-2">Trade Preparation</h2>
+                    <p className="text-xs opacity-50 font-medium max-w-sm mx-auto">Establish identifiers and select your trading logic for the next session.</p>
                   </div>
 
-                  <div className="space-y-10">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="group">
-                        <label className="text-[10px] font-black uppercase tracking-widest mb-3 block opacity-40 group-focus-within:opacity-100 transition-opacity">Asset Ticker</label>
+                        <label className="text-[9px] font-bold uppercase tracking-wider mb-1.5 block opacity-50 group-focus-within:opacity-100 transition-opacity">Asset Ticker</label>
                         <input
                           type="text"
                           value={sessionInput.assetName}
                           onChange={e => setSessionInput({ ...sessionInput, assetName: e.target.value })}
                           placeholder="E.G. NIFTY50"
-                          className="field field-lg w-full py-4 lg:py-6 text-lg lg:text-xl font-bold tracking-tight border-b-2 border-gray-100 focus:border-[#4169E1] transition-all"
+                          className="w-full bg-[#111622] border border-white/[0.05] rounded-lg py-2.5 px-4 text-sm font-medium text-white placeholder-gray-700 outline-none focus:border-[#3B82F6]/50 transition-colors"
                         />
                       </div>
                       <div className="group">
-                        <label className="text-[10px] font-black uppercase tracking-widest mb-3 block opacity-40 group-focus-within:opacity-100 transition-opacity">Trade Reference</label>
+                        <label className="text-[9px] font-bold uppercase tracking-wider mb-1.5 block opacity-50 group-focus-within:opacity-100 transition-opacity">Trade Reference</label>
                         <input
                           type="text"
                           value={sessionInput.tradeName}
-                          onChange={e => setSessionInput({ ...sessionInput, tradeName: e.target.value })}
+                          onChange={e => dispatch(setSessionInput({ ...sessionInput, tradeName: e.target.value }))}
                           placeholder="E.G. H1_SWEEP"
-                          className="field field-lg w-full py-4 lg:py-6 text-lg lg:text-xl font-bold tracking-tight border-b-2 border-gray-100 focus:border-[#4169E1] transition-all"
+                          className="w-full bg-[#111622] border border-white/[0.05] rounded-lg py-2.5 px-4 text-sm font-medium text-white placeholder-gray-700 outline-none focus:border-[#3B82F6]/50 transition-colors"
                         />
                       </div>
                     </div>
@@ -936,8 +1003,8 @@ return (
                     <MarketTypeSelector />
 
                     <div className="group">
-                      <label className="text-[10px] font-black uppercase tracking-widest mb-4 lg:mb-6 block opacity-40 group-focus-within:opacity-100 transition-opacity">Trading Model Directive</label>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
+                      <label className="text-[9px] font-bold uppercase tracking-wider mb-3 block opacity-50 group-focus-within:opacity-100 transition-opacity">Trading Model Directive</label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {[
                           { id: 'pinaka', name: 'Pinaka', desc: 'High-Conviction Execution' },
                           { id: 'trishul', name: 'Trishul', desc: 'Neural Synthesis Engine' }
@@ -945,30 +1012,32 @@ return (
                           <button
                             key={m.id}
                             onClick={() => { setSessionInput({ ...sessionInput, modelName: m.id }); setCurrentModel(m.id); }}
-                            className={`p-6 lg:p-8 rounded-[16px] border-2 text-left transition-all ${sessionInput.modelName === m.id ? 'border-[#4169E1] bg-blue-50/30' : 'border-gray-100 hover:border-blue-200'}`}
+                            className={`p-4 rounded-lg border text-left transition-all ${sessionInput.modelName === m.id ? 'border-[#3B82F6] bg-[#1E3A8A]/10' : 'border-white/[0.03] bg-[#111622] hover:border-[#3B82F6]/30'}`}
                           >
-                            <div className={`w-4 h-4 rounded-full border-2 mb-4 lg:mb-6 flex items-center justify-center ${sessionInput.modelName === m.id ? 'border-[#4169E1]' : 'border-gray-300'}`}>
-                              {sessionInput.modelName === m.id && <div className="w-2 h-2 rounded-full bg-[#4169E1]"></div>}
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="text-sm font-bold uppercase tracking-tight">{m.name}</div>
+                              <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${sessionInput.modelName === m.id ? 'border-[#3B82F6]' : 'border-gray-600'}`}>
+                                {sessionInput.modelName === m.id && <div className="w-2 h-2 rounded-full bg-[#3B82F6]"></div>}
+                              </div>
                             </div>
-                            <div className="text-lg font-black uppercase tracking-tighter mb-1">{m.name}</div>
-                            <div className="text-[10px] font-bold opacity-40 uppercase tracking-widest">{m.desc}</div>
+                            <div className="text-[10px] font-medium opacity-40 uppercase tracking-wider">{m.desc}</div>
                           </button>
                         ))}
                       </div>
                     </div>
 
-                    <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 mt-6 lg:mt-8">
+                    <div className="flex flex-col lg:flex-row gap-3 mt-4">
                       <button
                         onClick={() => setPrepStep(1)}
-                        className="order-2 lg:order-1 px-10 py-4 lg:py-6 rounded-3xl border border-gray-100 font-bold uppercase text-[10px] tracking-widest hover:bg-gray-50 transition-all"
+                        className="order-2 lg:order-1 flex-1 px-6 py-3 rounded-lg border border-white/[0.05] bg-[#111622] text-xs font-bold uppercase tracking-wider hover:bg-[#1E293B] transition-colors"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={initializeMission}
-                        className="order-1 lg:order-2 flex-1 bg-[#4169E1] text-white py-4 lg:py-6 rounded-[16px] font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        className="order-1 lg:order-2 flex-[2] bg-[#2563EB] hover:bg-[#1D4ED8] text-white py-3 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors shadow-lg shadow-blue-500/10"
                       >
-                        Launch Trade Hub
+                        Initialize Terminal
                       </button>
                     </div>
                   </div>
@@ -990,12 +1059,12 @@ return (
                     </button>
                   </div>
                   <div className="text-center">
-                    <div className="text-[10px] font-black uppercase tracking-[0.4em] text-[#4169E1] mb-4">Archive Gateway</div>
-                    <h2 className="text-6xl font-black tracking-tighter uppercase mb-4">Select Ledger<br />Source</h2>
-                    <p className="text-sm opacity-50 font-medium max-w-sm mx-auto">Choose the model framework to view historical records and performance telemetry.</p>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#3B82F6] mb-2">Archive Gateway</div>
+                    <h2 className="text-3xl lg:text-4xl font-black tracking-tight uppercase mb-2">Select Model</h2>
+                    <p className="text-xs opacity-50 font-medium max-w-sm mx-auto">Choose the model framework to view historical records and performance telemetry.</p>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4 lg:gap-6">
+                  <div className="grid grid-cols-1 gap-4">
                     {[
                       { id: 'pinaka', name: 'Pinaka Framework', desc: 'View high-conviction trade logs', action: () => { setCurrentModel('pinaka'); setActiveView('terminal'); setPrepStep(2); } },
                       { id: 'trishul', name: 'Trishul Synthesis', desc: 'Access neural protocol archives', action: () => { setCurrentModel('trishul'); setActiveView('trishul'); setPrepStep(2); } }
@@ -1003,14 +1072,14 @@ return (
                       <button
                         key={m.id}
                         onClick={m.action}
-                        className="p-6 lg:p-10 rounded-[16px] border-2 border-[var(--border)] bg-[var(--surface)] flex items-center justify-between group hover:border-[#4169E1] hover:shadow-2xl transition-all text-left"
+                        className="p-5 rounded-lg border border-white/[0.03] bg-[#111622] flex items-center justify-between group hover:border-[#3B82F6]/30 transition-all text-left"
                       >
                         <div>
-                          <div className="text-xl lg:text-2xl font-black uppercase tracking-tighter mb-1">{m.name}</div>
-                          <div className="text-[10px] lg:text-[11px] font-bold opacity-40 uppercase tracking-widest">{m.desc}</div>
+                          <div className="text-lg font-bold uppercase tracking-tight mb-0.5">{m.name}</div>
+                          <div className="text-[10px] font-medium opacity-40 uppercase tracking-wider">{m.desc}</div>
                         </div>
-                        <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-full border-2 border-gray-100 flex items-center justify-center group-hover:bg-[#4169E1] group-hover:border-[#4169E1] transition-all">
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-[var(--text-4)] group-hover:text-white transition-all"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                        <div className="w-8 h-8 rounded-full border border-white/[0.05] flex items-center justify-center group-hover:bg-[#3B82F6] group-hover:border-[#3B82F6] transition-all">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-gray-500 group-hover:text-white transition-all"><polyline points="9 18 15 12 9 6"></polyline></svg>
                         </div>
                       </button>
                     ))}
@@ -1150,7 +1219,6 @@ return (
                       <div className="flex justify-between items-center">
                         <div>
                           <h2 className="text-2xl font-black tracking-tighter text-[var(--text-1)] uppercase">Trade Ledger</h2>
-                          <p className="text-[9px] font-bold text-[var(--text-3)] uppercase tracking-widest">Protocol Archive System v4.1</p>
                         </div>
                         <div className="flex gap-3">
                           <button
@@ -1180,7 +1248,7 @@ return (
                             type="text"
                             placeholder="Search archives by ID, Asset, or Mission name..."
                             value={logSearchTerm}
-                            onChange={(e) => setLogSearchTerm(e.target.value)}
+                            onChange={(e) => dispatch(setLogSearchTerm(e.target.value))}
                             className="w-full pl-11 pr-4 py-3 bg-[var(--surface)]/50 border border-[var(--border)] rounded-xl text-[11px] font-black uppercase tracking-wider text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:border-[var(--accent)] outline-none transition-all"
                           />
                         </div>
@@ -1188,7 +1256,7 @@ return (
                         <div className="flex gap-3 w-full md:w-auto">
                           <select
                             value={logFilterOutcome}
-                            onChange={(e) => setLogFilterOutcome(e.target.value)}
+                            onChange={(e) => dispatch(setLogFilterOutcome(e.target.value))}
                             className="flex-1 md:flex-none px-4 py-3 bg-[var(--surface)]/50 border border-[var(--border)] rounded-xl text-[9px] font-black uppercase tracking-widest text-[var(--text-2)] focus:border-[var(--accent)] outline-none cursor-pointer"
                           >
                             <option value="ALL">All Outcomes</option>
@@ -1199,7 +1267,7 @@ return (
 
                           <select
                             value={logSortOrder}
-                            onChange={(e) => setLogSortOrder(e.target.value)}
+                            onChange={(e) => dispatch(setLogSortOrder(e.target.value))}
                             className="flex-1 md:flex-none px-4 py-3 bg-[var(--surface)]/50 border border-[var(--border)] rounded-xl text-[9px] font-black uppercase tracking-widest text-[var(--accent)] focus:border-[var(--accent)] outline-none cursor-pointer"
                           >
                             <option value="DESC">Newest First</option>
@@ -1533,15 +1601,24 @@ return (
               {/* Sidebar Content (NETRA) */}
               <div className="flex-1 flex flex-col h-full relative">
                 {/* ELEVATED CHAT HISTORY */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-4 relative" style={{ background: darkMode ? 'transparent' : '#f8f9fa' }}>
+                <div ref={chatContainerRef} className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-4 relative" style={{ background: darkMode ? 'transparent' : '#f8f9fa' }}>
                   {/* Floating Close Button */}
                   <button onClick={() => setIsAiPaneOpen(false)} style={{ position: 'absolute', top: '16px', right: '16px', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%', color: 'var(--text-3)', cursor: 'pointer', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20 }} className="hover:bg-red-500/20 hover:text-red-500 transition-colors">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                   </button>
 
-                  {/* MAYA Watermark */}
+                  {/* Maya Watermark */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
-                    <span className="text-[120px] font-black opacity-[0.03] tracking-[0.2em] text-[var(--text-1)] dark:text-white uppercase">MAYA</span>
+                    <span style={{ 
+                      fontSize: '48px', 
+                      fontFamily: "'Dancing Script', 'Brush Script MT', cursive", 
+                      color: darkMode ? '#fff' : '#000',
+                      opacity: 0.05,
+                      transform: 'rotate(-10deg)',
+                      letterSpacing: '2px'
+                    }}>
+                      maya
+                    </span>
                   </div>
 
                   {chatHistory.map((msg, idx) => (
@@ -1566,7 +1643,7 @@ return (
                           {msg.role === 'user' ? 'Operator' : 'MAYA'}
                         </div>
                         <div className="prose prose-sm dark:prose-invert max-w-none text-inherit">
-                          <ReactMarkdown children={msg.text} />
+                          <MessageContent text={msg.text} />
                         </div>
                       </div>
                     </div>
@@ -1600,9 +1677,94 @@ return (
                     }}
                     className="group focus-within:border-indigo-500/50 transition-all"
                   >
+                    {isConfigOpen && (
+                      <div className="w-full bg-white/[0.01] border-b border-white/10 p-4 space-y-4 rounded-t-[24px] animate-in slide-in-from-top duration-300">
+                        {/* Model Selector */}
+                        <div className="space-y-1">
+                          <div style={{ fontSize: '9px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Intelligence Model</div>
+                          <select
+                            value={selectedModel}
+                            onChange={(e) => dispatch(setSelectedModel(e.target.value))}
+                            style={{
+                              width: '100%',
+                              background: darkMode ? 'rgba(255,255,255,0.05)' : '#F9F9F9',
+                              border: darkMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid #DDD',
+                              borderRadius: '8px',
+                              padding: '6px',
+                              fontSize: '11px',
+                              color: 'var(--text-1)',
+                              outline: 'none'
+                            }}
+                          >
+                            {AVAILABLE_MODELS.map(m => (
+                              <option key={m.id} value={m.id}>{m.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <details className="mt-2">
+                          <summary className="text-xs font-bold text-indigo-400 cursor-pointer hover:text-indigo-300 transition-colors list-none flex items-center gap-1">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
+                            Advanced Parameters
+                          </summary>
+                          <div className="mt-2 space-y-4 max-h-[200px] overflow-y-auto custom-scrollbar p-1">
+                            {/* Row 1: Temp & Penalty */}
+                            <div className="grid grid-cols-2 gap-4">
+                              {/* Temperature */}
+                              <div className="space-y-1">
+                                <div className="flex justify-between items-center">
+                                  <span style={{ fontSize: '8px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Temp</span>
+                                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#4169E1' }}>{modelConfig.temperature.toFixed(2)}</span>
+                                </div>
+                                <input type="range" min="0" max="1" step="0.05" value={modelConfig.temperature} onChange={(e) => dispatch(setModelConfig({ ...modelConfig, temperature: parseFloat(e.target.value) }))} style={{ width: '100%', accentColor: '#4169E1' }} />
+                              </div>
+
+                              {/* Penalty */}
+                              <div className="space-y-1">
+                                <div className="flex justify-between items-center">
+                                  <span style={{ fontSize: '8px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Penalty</span>
+                                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#4169E1' }}>{(modelConfig.frequency_penalty || 0).toFixed(1)}</span>
+                                </div>
+                                <input type="range" min="0" max="2" step="0.1" value={modelConfig.frequency_penalty || 0} onChange={(e) => dispatch(setModelConfig({ ...modelConfig, frequency_penalty: parseFloat(e.target.value) }))} style={{ width: '100%', accentColor: '#4169E1' }} />
+                              </div>
+                            </div>
+
+                            {/* Row 2: Top P & Max Tokens */}
+                            <div className="grid grid-cols-2 gap-4">
+                              {/* Top P */}
+                              <div className="space-y-1">
+                                <div className="flex justify-between items-center">
+                                  <span style={{ fontSize: '8px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Top P</span>
+                                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#4169E1' }}>{(modelConfig.top_p || 1.0).toFixed(2)}</span>
+                                </div>
+                                <input type="range" min="0" max="1" step="0.05" value={modelConfig.top_p || 1.0} onChange={(e) => dispatch(setModelConfig({ ...modelConfig, top_p: parseFloat(e.target.value) }))} style={{ width: '100%', accentColor: '#4169E1' }} />
+                              </div>
+
+                              {/* Max Tokens */}
+                              <div className="space-y-1">
+                                <div className="flex justify-between items-center">
+                                  <span style={{ fontSize: '8px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Max Tokens</span>
+                                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#4169E1' }}>{modelConfig.max_tokens || 2048}</span>
+                                </div>
+                                <input type="range" min="1" max="4096" step="1" value={modelConfig.max_tokens || 2048} onChange={(e) => dispatch(setModelConfig({ ...modelConfig, max_tokens: parseInt(e.target.value) }))} style={{ width: '100%', accentColor: '#4169E1' }} />
+                              </div>
+                            </div>
+
+                            {/* Row 3: Seed */}
+                            <div className="space-y-1">
+                              <div className="flex justify-between items-center">
+                                <span style={{ fontSize: '8px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Seed</span>
+                                <span style={{ fontSize: '10px', fontWeight: 700, color: '#4169E1' }}>{modelConfig.seed || 42}</span>
+                              </div>
+                              <input type="number" value={modelConfig.seed || 42} onChange={(e) => dispatch(setModelConfig({ ...modelConfig, seed: parseInt(e.target.value) }))} style={{ width: '100%', background: darkMode ? '#050505' : '#F9F9F9', border: darkMode ? '1px solid #222' : '1px solid #DDD', borderRadius: '4px', padding: '4px', fontSize: '11px', color: 'var(--text-1)' }} />
+                            </div>
+                          </div>
+                        </details>
+                      </div>
+                    )}
                     <textarea
                       value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
+                      onChange={(e) => dispatch(setChatInput(e.target.value))}
                       onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
                       placeholder="Synthesize tactical query..."
                       style={{ 
@@ -1622,81 +1784,53 @@ return (
                     <div style={{ padding: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         {/* Stealth AI Controls (Popover) */}
-                        <details className="relative">
-                          <summary className="w-[34px] h-[34px] rounded-[10px] bg-white/5 border border-white/10 text-[var(--text-3)] flex items-center justify-center cursor-pointer hover:bg-indigo-500/20 hover:text-indigo-500 transition-all list-none">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 12h6"/></svg>
-                          </summary>
-                          <div className="absolute bottom-full mb-2 left-0 w-[260px] bg-[#0A0A0A] border border-white/10 rounded-xl p-4 shadow-2xl space-y-4 z-30">
-                            {/* Model Selector */}
-                            <div className="space-y-1">
-                              <div style={{ fontSize: '9px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Intelligence Model</div>
-                              <select
-                                value={selectedModel}
-                                onChange={(e) => setSelectedModel(e.target.value)}
-                                style={{
-                                  width: '100%',
-                                  background: darkMode ? '#050505' : '#F9F9F9',
-                                  border: darkMode ? '1px solid #222' : '1px solid #DDD',
-                                  borderRadius: '8px',
-                                  padding: '6px',
-                                  fontSize: '11px',
-                                  color: 'var(--text-1)',
-                                  outline: 'none'
-                                }}
-                              >
-                                {AVAILABLE_MODELS.map(m => (
-                                  <option key={m.id} value={m.id}>{m.name}</option>
-                                ))}
-                              </select>
-                            </div>
-
-                            {/* Sliders in a compact row */}
-                            <div className="grid grid-cols-2 gap-4">
-                              {/* Temperature */}
-                              <div className="space-y-1">
-                                <div className="flex justify-between items-center">
-                                  <span style={{ fontSize: '8px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Temp</span>
-                                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#4169E1' }}>{modelConfig.temperature.toFixed(2)}</span>
-                                </div>
-                                <input type="range" min="0" max="1" step="0.05" value={modelConfig.temperature} onChange={(e) => setModelConfig({ ...modelConfig, temperature: parseFloat(e.target.value) })} style={{ width: '100%', accentColor: '#4169E1' }} />
-                              </div>
-
-                              {/* Penalty */}
-                              <div className="space-y-1">
-                                <div className="flex justify-between items-center">
-                                  <span style={{ fontSize: '8px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Penalty</span>
-                                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#4169E1' }}>{(modelConfig.frequency_penalty || 0).toFixed(1)}</span>
-                                </div>
-                                <input type="range" min="0" max="2" step="0.1" value={modelConfig.frequency_penalty || 0} onChange={(e) => setModelConfig({ ...modelConfig, frequency_penalty: parseFloat(e.target.value) })} style={{ width: '100%', accentColor: '#4169E1' }} />
-                              </div>
-                            </div>
-                          </div>
-                        </details>
-
-                        <label 
-                          title="Upload Intelligence (Image/Data)"
-                          style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isUploadingImage ? 'wait' : 'pointer' }}
-                          className={`hover:bg-indigo-500/20 hover:text-indigo-500 transition-all ${isUploadingImage ? 'opacity-50 animate-pulse' : ''}`}
+                        <button 
+                          onClick={() => setIsConfigOpen(!isConfigOpen)}
+                          className={`w-[34px] h-[34px] rounded-[10px] ${isConfigOpen ? 'bg-indigo-500/20 text-indigo-500' : 'bg-white/5 text-[var(--text-3)]'} border border-white/10 flex items-center justify-center cursor-pointer hover:bg-indigo-500/20 hover:text-indigo-500 transition-all`}
+                          title="Model Configuration"
                         >
-                          <input 
-                            type="file" 
-                            accept="image/*" 
-                            className="hidden" 
-                            onChange={(e) => {
-                              if (e.target.files && e.target.files[0]) {
-                                uploadAndDescribeImage(e.target.files[0]);
-                              }
-                            }} 
-                            disabled={isUploadingImage} 
-                          />
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                        </label>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 12h6"/></svg>
+                        </button>
+
+                        <div className="relative">
+                          <label 
+                            title="Upload Intelligence (Image/Data)"
+                            style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isUploadingImage ? 'wait' : 'pointer' }}
+                            className={`hover:bg-indigo-500/20 hover:text-indigo-500 transition-all ${isUploadingImage ? 'opacity-50 animate-pulse' : ''}`}
+                          >
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              className="hidden" 
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  setUploadedVisionFiles([e.target.files[0]]);
+                                }
+                              }} 
+                              disabled={isUploadingImage} 
+                            />
+                            {uploadedVisionFiles && uploadedVisionFiles.length > 0 ? (
+                              <img src={URL.createObjectURL(uploadedVisionFiles[0])} className="w-full h-full object-cover rounded-[10px]" alt="Preview" />
+                            ) : (
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                            )}
+                          </label>
+                          {uploadedVisionFiles && uploadedVisionFiles.length > 0 && (
+                            <button 
+                              onClick={() => setUploadedVisionFiles([])} 
+                              className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-xs hover:bg-red-600 transition-colors"
+                              style={{ zIndex: 10 }}
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
 
                         <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.1)', margin: '0 2px' }}></div>
 
                         {/* CONTEXT TOGGLES (INSIDE BOX) */}
                         <button 
-                          onClick={() => setIncludeData(!includeData)} 
+                          onClick={() => dispatch(setIncludeData(!includeData))} 
                           style={{ 
                             height: '34px',
                             padding: '0 12px', 
@@ -1715,7 +1849,7 @@ return (
                           Data
                         </button>
                         <button 
-                          onClick={() => setIncludeDoctrine(!includeDoctrine)} 
+                          onClick={() => dispatch(setIncludeDoctrine(!includeDoctrine))} 
                           style={{ 
                             height: '34px',
                             padding: '0 12px', 
@@ -1788,7 +1922,7 @@ return (
           </button>
           <div className="flex flex-col gap-10 text-center">
             {[
-              { label: 'Home', active: prepStep === 1, action: () => { setPrepStep(1); setActiveSessionId(null); setIsLoggerOpen(false); setIsAiPaneOpen(false); } },
+              { label: 'Home', active: prepStep === 1 && activeView !== 'profile', action: () => { setPrepStep(1); setActiveView('terminal'); setActiveSessionId(null); setIsLoggerOpen(false); setIsAiPaneOpen(false); } },
               { label: 'Pinaka', active: activeView === 'terminal' && (activeSessionId || prepStep === 2), action: () => { setActiveView('terminal'); setPrepStep(2); setActiveSessionId(null); setIsLoggerOpen(false); setIsAiPaneOpen(false); } },
               { label: 'Trishul', active: activeView === 'trishul', action: () => { setActiveView('trishul'); setPrepStep(2); setActiveSessionId(null); setIsLoggerOpen(false); setIsAiPaneOpen(false); } }
             ].map((nav) => (

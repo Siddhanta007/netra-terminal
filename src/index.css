@@ -524,6 +524,7 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
   padding: 10px 0;
   border-bottom: 1px solid var(--border);
   gap: 20px;
+  flex-wrap: wrap;
 }
 .precision-row:last-child { border-bottom: none; }
 
@@ -541,9 +542,10 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 6px;
-  overflow: hidden;
+  overflow-x: auto;
   height: 36px; /* Slightly taller for the underline */
   width: fit-content;
+  max-width: 100%;
 }
 
 .precision-opt {

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useNetra } from '../../context/NetraContext';
 
@@ -24,18 +25,28 @@ export default function NetraAILabs({
     selectedModel, setSelectedModel,
     modelConfig, setModelConfig,
     AVAILABLE_MODELS,
-    uploadedVisionFiles, setUploadedVisionFiles
+    uploadedVisionFiles, setUploadedVisionFiles,
+    darkMode
   } = useNetra();
+
+  const [previews, setPreviews] = useState([]);
 
   const handleFileChange = (e) => {
     if (e.target.files) {
       const files = Array.from(e.target.files);
       setUploadedVisionFiles(prev => [...prev, ...files]);
+      
+      const newPreviews = files.map(file => URL.createObjectURL(file));
+      setPreviews(prev => [...prev, ...newPreviews]);
     }
   };
 
   const removeFile = (index) => {
     setUploadedVisionFiles(prev => prev.filter((_, i) => i !== index));
+    setPreviews(prev => {
+      URL.revokeObjectURL(prev[index]);
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   // Dynamic color calculation for Temperature (Blue -> Green -> Yellow -> Red)
@@ -64,17 +75,16 @@ export default function NetraAILabs({
               backgroundPosition: 'center'
             }}
           >
-            {/* MAYA Watermark */}
+            {/* M Watermark */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
-              <span className="text-[120px] font-black opacity-[0.03] tracking-[0.2em] text-[var(--text-1)] dark:text-white uppercase">MAYA</span>
+              <span className="text-[200px] font-black opacity-[0.03]" style={{ color: darkMode ? '#fff' : '#000', fontFamily: 'sans-serif' }}>M</span>
             </div>
 
             {isEvaluating ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-4">
-                <div className="flex gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce [animation-delay:-0.3s]"></div>
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce [animation-delay:-0.15s]"></div>
-                  <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-bounce"></div>
+                <div className="relative w-12 h-12">
+                  <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-[#4169E1] border-r-[#6366F1] animate-spin"></div>
+                  <div className="absolute inset-1 rounded-full border-2 border-transparent border-t-[#10B981] border-l-[#10B981] animate-spin [animation-duration:1.5s] [animation-direction:reverse]"></div>
                 </div>
                 <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-3)]">Extracting Tactical Visuals...</span>
               </div>
@@ -202,8 +212,23 @@ export default function NetraAILabs({
               </div>
             )}
 
-            {/* Custom Status or Fallback */}
-            {customStatus ? customStatus : (
+            {/* Image Previews or Custom Status or Fallback */}
+            {previews.length > 0 ? (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {previews.map((previewUrl, index) => (
+                  <div key={index} className="relative w-14 h-14">
+                    <img src={previewUrl} className="w-full h-full object-cover rounded-lg border border-[var(--border)]" alt="Preview" />
+                    <button 
+                      onClick={() => removeFile(index)} 
+                      className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-xs hover:bg-red-600 transition-colors"
+                      style={{ zIndex: 10 }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : customStatus ? customStatus : (
               <div className="text-[10px] text-[var(--text-3)] leading-relaxed italic border-l border-[var(--border)] pl-3">
                 Netra AI operates on strict data-driven evaluation. Always cross-verify model outputs with manual structure.
               </div>
@@ -229,7 +254,7 @@ export default function NetraAILabs({
             <button 
               onClick={onAnalyse} 
               disabled={isEvaluating}
-              className={`flex-1 h-10 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${
+              className={`flex-1 h-10 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all duration-200 active:scale-95 active:opacity-90 flex items-center justify-center gap-2 ${
                 !isEvaluating 
                   ? 'bg-gradient-to-r from-[#4169E1] to-[#6366F1] text-white hover:opacity-90 shadow-[0_4px_12px_rgba(65,105,225,0.3)] glow-active' 
                   : 'bg-[var(--surface-2)] text-[var(--text-3)] opacity-40 cursor-not-allowed border border-[var(--border)]'

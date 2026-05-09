@@ -1,98 +1,127 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { loadState, saveState } from '../utils/storage';
+import { useDispatch, useSelector } from 'react-redux';
+import { setSysData as setSysDataAction, setAvailableModels as setAvailableModelsAction } from '../store/slices/modelSlice';
+import { setHighestStep as setHighestStepAction, setSelections as setSelectionsAction, setNotes as setNotesAction, setFinalCommand as setFinalCommandAction, setCommandLocked as setCommandLockedAction, setWeaponLocked as setWeaponLockedAction, setNetraOutput as setNetraOutputAction, setSysRecommendation as setSysRecommendationAction, setInterSelections as setInterSelectionsAction, setStrikeSelections as setStrikeSelectionsAction, setSelectedWeaponId as setSelectedWeaponIdAction, setIsEvaluating as setIsEvaluatingAction, setIsPredictingWeapon as setIsPredictingWeaponAction, setWeaponPrediction as setWeaponPredictionAction } from '../store/slices/analysisSlice';
+import { setAvailableModels as setAvailableModelsRedux, setSelectedModel as setSelectedModelRedux } from '../store/slices/modelSlice';
+import { setIsAiLoading as setIsAiLoadingRedux, setChatHistory as setChatHistoryAction, setChatInput as setChatInputAction, setIncludeData as setIncludeDataAction, setIncludeDoctrine as setIncludeDoctrineAction, appendChatMessage } from '../store/slices/chatSlice';
+import { setIsUploadingImage as setIsUploadingImageRedux, setImageDescription as setImageDescriptionAction } from '../store/slices/analysisSlice';
+import { setTradeName as setTradeNameRedux, setTradeLogs as setTradeLogsRedux, setActiveEditLog as setActiveEditLogRedux, setEditFormData as setEditFormDataRedux, setLogSearchTerm as setLogSearchTermAction, setLogFilterOutcome as setLogFilterOutcomeAction, setLogSortOrder as setLogSortOrderAction, setAuditData as setAuditDataAction, setIsAuditing as setIsAuditingAction } from '../store/slices/logsSlice';
+import { setSession as setSessionAction, setActiveSessionId as setActiveSessionIdAction, setIsLoggingIn as setIsLoggingInAction, setSessionInput as setSessionInputAction } from '../store/slices/sessionSlice';
+import { setIsLoggerOpen as setIsLoggerOpenAction, setDarkMode as setDarkModeAction, setActiveView as setActiveViewAction, setProfileOpen as setProfileOpenAction, setMobileMenuOpen as setMobileMenuOpenAction, setAiPaneOpen as setAiPaneOpenAction, setToast as setToastAction, setConfirmModal as setConfirmModalAction, setPrepStep as setPrepStepAction } from '../store/slices/uiSlice';
+import { setVisionModel as setVisionModelAction, setModelConfig as setModelConfigAction, setCurrentModel as setCurrentModelAction } from '../store/slices/modelSlice';
 import { API_BASE, WEIGHTS, SCORES, STEP_NAMES } from '../utils/constants';
-
-const parseModels = (envStr) => {
-  if (!envStr) return [];
-  return envStr.split(',').map(m => {
-    const [name, id] = m.split('::');
-    return { name: name?.trim(), id: id?.trim() };
-  }).filter(m => m.name && m.id);
-};
-
-export const AVAILABLE_MODELS = parseModels(import.meta.env.VITE_MODELS);
 
 const NetraContext = createContext(null);
 
 export function NetraProvider({ children }) {
+  const dispatch = useDispatch();
   const abortControllerRef = useRef(null);
   const weaponAbortControllerRef = useRef(null);
-  const [sysData, setSysData] = useState(null);
-  const [highestStep, setHighestStep] = useState(() => loadState('highestStep', 1));
-  const [selections, setSelections] = useState(() => {
-    const s = loadState('selections', { bias: {}, auction: {}, liquidity: {}, behaviour: {} });
-    // Sanitize legacy string selections to empty dicts for 2.0 compatibility
-    const sanitized = { ...s };
-    ['bias', 'auction', 'liquidity', 'behaviour'].forEach(key => {
-      if (typeof sanitized[key] !== 'object' || sanitized[key] === null) {
-        sanitized[key] = {};
-      }
-    });
-    return sanitized;
-  });
-  const [notes, setNotes] = useState(() => loadState('notes', { bias: '', auction: '', liquidity: '', behaviour: '', weapon: '' }));
-  const [finalCommand, setFinalCommand] = useState(() => loadState('finalCommand', null));
-  const [commandLocked, setCommandLocked] = useState(() => loadState('commandLocked', false));
-  const [weaponLocked, setWeaponLocked] = useState(() => loadState('weaponLocked', false));
-  const [netraOutput, setNetraOutput] = useState(null);
-  const [sysRecommendation, setSysRecommendation] = useState(null);
-  const [interSelections, setInterSelections] = useState(() => loadState('interSelections', { pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }));
-  const [strikeSelections, setStrikeSelections] = useState(() => loadState('strikeSelections', { imbalance: '', pullback: '', trigger: '' }));
-  const [selectedWeaponId, setSelectedWeaponId] = useState(() => loadState('selectedWeaponId', null));
-  const [isEvaluating, setIsEvaluating] = useState(false);
-  const [isPredictingWeapon, setIsPredictingWeapon] = useState(false);
-  const [weaponPrediction, setWeaponPrediction] = useState(null);
+  const sysData = useSelector(state => state.model.sysData);
+  const availableModels = useSelector(state => state.model.availableModels);
+  const highestStep = useSelector(state => state.analysis.highestStep);
+  const selections = useSelector(state => state.analysis.selections);
+  const notes = useSelector(state => state.analysis.notes);
+  const finalCommand = useSelector(state => state.analysis.finalCommand);
+  const commandLocked = useSelector(state => state.analysis.commandLocked);
+  const weaponLocked = useSelector(state => state.analysis.weaponLocked);
+  const netraOutput = useSelector(state => state.analysis.netraOutput);
+  const sysRecommendation = useSelector(state => state.analysis.sysRecommendation);
+  const interSelections = useSelector(state => state.analysis.interSelections);
+  const strikeSelections = useSelector(state => state.analysis.strikeSelections);
+  const selectedWeaponId = useSelector(state => state.analysis.selectedWeaponId);
+  const isEvaluating = useSelector(state => state.analysis.isEvaluating);
+  const isPredictingWeapon = useSelector(state => state.analysis.isPredictingWeapon);
+  const weaponPrediction = useSelector(state => state.analysis.weaponPrediction);
 
-  const [isLoggerOpen, setIsLoggerOpen] = useState(false);
-  const [tradeLogs, setTradeLogs] = useState([]);
-  const [logSearchTerm, setLogSearchTerm] = useState('');
-  const [logFilterOutcome, setLogFilterOutcome] = useState('ALL');
-  const [logSortOrder, setLogSortOrder] = useState('DESC');
-  const [activeEditLog, setActiveEditLog] = useState(null);
+  const setSysData = (val) => dispatch(setSysDataAction(val));
+  const setAvailableModels = (val) => dispatch(setAvailableModelsAction(val));
+  const setHighestStep = (val) => dispatch(setHighestStepAction(val));
+  const setSelections = (val) => dispatch(setSelectionsAction(val));
+  const setNotes = (val) => dispatch(setNotesAction(val));
+  const setFinalCommand = (val) => dispatch(setFinalCommandAction(val));
+  const setCommandLocked = (val) => dispatch(setCommandLockedAction(val));
+  const setWeaponLocked = (val) => dispatch(setWeaponLockedAction(val));
+  const setNetraOutput = (val) => dispatch(setNetraOutputAction(val));
+  const setSysRecommendation = (val) => dispatch(setSysRecommendationAction(val));
+  const setInterSelections = (val) => dispatch(setInterSelectionsAction(val));
+  const setStrikeSelections = (val) => dispatch(setStrikeSelectionsAction(val));
+  const setSelectedWeaponId = (val) => dispatch(setSelectedWeaponIdAction(val));
+  const setIsEvaluating = (val) => dispatch(setIsEvaluatingAction(val));
+  const setIsPredictingWeapon = (val) => dispatch(setIsPredictingWeaponAction(val));
+  const setWeaponPrediction = (val) => dispatch(setWeaponPredictionAction(val));
 
-  // AI Chat State
-  const [chatHistory, setChatHistory] = useState([
-    { role: 'ai', text: 'Neural Link established. I am NETRA, your Tactical Synthesis Assistant. How can I assist with your mission analysis today?' }
-  ]);
-  const [chatInput, setChatInput] = useState('');
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  const [includeData, setIncludeData] = useState(false);
-  const [includeDoctrine, setIncludeDoctrine] = useState(false);
-  const [editFormData, setEditFormData] = useState({});
-  const [tradeName, setTradeName] = useState('');
-  const [activeSessionId, setActiveSessionId] = useState(() => loadState('activeSessionId', null));
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const isLoggerOpen = useSelector(state => state.ui.isLoggerOpen);
+  const tradeLogs = useSelector(state => state.logs.tradeLogs);
+  const logSearchTerm = useSelector(state => state.logs.logSearchTerm);
+  const logFilterOutcome = useSelector(state => state.logs.logFilterOutcome);
+  const logSortOrder = useSelector(state => state.logs.logSortOrder);
+  const activeEditLog = useSelector(state => state.logs.activeEditLog);
+  const chatHistory = useSelector(state => state.chat.chatHistory);
+  const chatInput = useSelector(state => state.chat.chatInput);
+  const isAiLoading = useSelector(state => state.chat.isAiLoading);
+  const includeData = useSelector(state => state.chat.includeData);
+  const includeDoctrine = useSelector(state => state.chat.includeDoctrine);
+  const editFormData = useSelector(state => state.logs.editFormData);
+  const tradeName = useSelector(state => state.logs.tradeName);
+  const activeSessionId = useSelector(state => state.session.activeSessionId);
 
-  const [session, setSession] = useState(() => loadState('session', null));
-  const [sessionInput, setSessionInput] = useState({ userName: '', password: '', assetName: '', tradeName: '', marketType: 'TRENDING', modelName: 'pinaka' });
-  const [prepStep, setPrepStep] = useState(() => {
-    const s = loadState('session', null);
-    if (!s) return 0;
-    const activeId = loadState('activeSessionId', null);
-    return activeId ? 2 : 1;
-  });
-  const [currentModel, setCurrentModel] = useState('pinaka');
-  const [darkMode, setDarkMode] = useState(() => loadState('darkMode', false));
-  const [stepTimestamps, setStepTimestamps] = useState(() => loadState('stepTimestamps', {}));
-  const [toast, setToast] = useState(null);
-  const [confirmModal, setConfirmModal] = useState(null);
-  const [analyticsData, setAnalyticsData] = useState(null);
-  const [activeView, setActiveView] = useState('terminal');
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isAiPaneOpen, setIsAiPaneOpen] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(() => loadState('selectedModel', AVAILABLE_MODELS[0]?.id || 'anthropic|claude-4.6-sonnet'));
-  const [visionModel, setVisionModel] = useState(() => loadState('visionModel', AVAILABLE_MODELS[0]?.id || 'anthropic|claude-4.6-sonnet'));
-  const [modelConfig, setModelConfig] = useState(() => loadState('modelConfig', {
-    temperature: parseFloat(import.meta.env.VITE_DEFAULT_TEMPERATURE) || 0.2,
-    top_p: 1.0,
-    max_tokens: 2048,
-    seed: 42,
-    frequency_penalty: parseFloat(import.meta.env.VITE_DEFAULT_PENALTY) || 0.0
-  }));
-  const [imageDescription, setImageDescription] = useState(() => loadState('imageDescription', null));
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const setIsLoggerOpen = (val) => dispatch(setIsLoggerOpenAction(val));
+  const setTradeLogs = (val) => dispatch(setTradeLogsRedux(val));
+  const setLogSearchTerm = (val) => dispatch(setLogSearchTermAction(val));
+  const setLogFilterOutcome = (val) => dispatch(setLogFilterOutcomeAction(val));
+  const setLogSortOrder = (val) => dispatch(setLogSortOrderAction(val));
+  const setActiveEditLog = (val) => dispatch(setActiveEditLogRedux(val));
+  const setChatHistory = (val) => dispatch(setChatHistoryAction(val));
+  const setChatInput = (val) => dispatch(setChatInputAction(val));
+  const setIsAiLoading = (val) => dispatch(setIsAiLoadingRedux(val));
+  const setIncludeData = (val) => dispatch(setIncludeDataAction(val));
+  const setIncludeDoctrine = (val) => dispatch(setIncludeDoctrineAction(val));
+  const setEditFormData = (val) => dispatch(setEditFormDataRedux(val));
+  const setTradeName = (val) => dispatch(setTradeNameRedux(val));
+  const setActiveSessionId = (val) => dispatch(setActiveSessionIdAction(val));
+  const isLoggingIn = useSelector(state => state.session.isLoggingIn);
+  const session = useSelector(state => state.session.session);
+  const sessionInput = useSelector(state => state.session.sessionInput);
+  const prepStep = useSelector(state => state.ui.prepStep);
+  const currentModel = useSelector(state => state.model.currentModel);
+  const darkMode = useSelector(state => state.ui.darkMode);
+  const stepTimestamps = useSelector(state => state.analysis.stepTimestamps);
+  const toast = useSelector(state => state.ui.toast);
+  const confirmModal = useSelector(state => state.ui.confirmModal);
+  const analyticsData = useSelector(state => state.analysis.analyticsData);
+  const activeView = useSelector(state => state.ui.activeView);
+  const isProfileOpen = useSelector(state => state.ui.isProfileOpen);
+  const isMobileMenuOpen = useSelector(state => state.ui.isMobileMenuOpen);
+  const isAiPaneOpen = useSelector(state => state.ui.isAiPaneOpen);
+  const selectedModel = useSelector(state => state.model.selectedModel);
+  const visionModel = useSelector(state => state.model.visionModel);
+  const modelConfig = useSelector(state => state.model.modelConfig);
+  const imageDescription = useSelector(state => state.analysis.imageDescription);
+  const isUploadingImage = useSelector(state => state.analysis.isUploadingImage);
+
   const [uploadedVisionFiles, setUploadedVisionFiles] = useState([]);
+
+  const setIsLoggingIn = (val) => dispatch(setIsLoggingInAction(val));
+  const setSession = (val) => dispatch(setSessionAction(val));
+  const setSessionInput = (val) => dispatch(setSessionInputAction(val));
+  const setPrepStep = (val) => dispatch(setPrepStepAction(val));
+  const setCurrentModel = (val) => dispatch(setCurrentModelAction(val));
+  const setDarkMode = (val) => dispatch(setDarkModeAction(val));
+  const setStepTimestamps = (val) => dispatch(setStepTimestampsAction(val));
+  const setToast = (val) => dispatch(setToastAction(val));
+  const setConfirmModal = (val) => dispatch(setConfirmModalAction(val));
+  const setAnalyticsData = (val) => dispatch(setAnalyticsDataAction(val));
+  const setActiveView = (val) => dispatch(setActiveViewAction(val));
+  const setIsProfileOpen = (val) => dispatch(setProfileOpenAction(val));
+  const setIsMobileMenuOpen = (val) => dispatch(setMobileMenuOpenAction(val));
+  const setIsAiPaneOpen = (val) => dispatch(setAiPaneOpenAction(val));
+  const setSelectedModel = (val) => dispatch(setSelectedModelRedux(val));
+  const setVisionModel = (val) => dispatch(setVisionModelAction(val));
+  const setModelConfig = (val) => dispatch(setModelConfigAction(val));
+  const setImageDescription = (val) => dispatch(setImageDescriptionAction(val));
+  const setIsUploadingImage = (val) => dispatch(setIsUploadingImageRedux(val));
 
   const getAuthHeaders = useCallback((extraHeaders = {}) => {
     const token = import.meta.env.VITE_HF_TOKEN;
@@ -125,6 +154,30 @@ export function NetraProvider({ children }) {
   useEffect(() => { saveState('visionModel', visionModel); }, [visionModel]);
   useEffect(() => { saveState('imageDescription', imageDescription); }, [imageDescription]);
   useEffect(() => { saveState('modelConfig', modelConfig); }, [modelConfig]);
+
+  // Helper to get active model and provider safely
+  const getActiveModel = useCallback(() => {
+    const [provider, model_id] = selectedModel.split('|');
+    console.log('getActiveModel trace:', { selectedModel, provider, model_id });
+    if (!model_id) {
+      const fallback = availableModels[0]?.id || 'google|gemini-3.1-flash';
+      const [fProvider, fModelId] = fallback.split('|');
+      console.log('getActiveModel fallback used:', { fallback, fProvider, fModelId });
+      return { provider: fProvider, model_id: fModelId };
+    }
+    return { provider, model_id };
+  }, [selectedModel, availableModels]);
+
+  // Helper to get active vision model safely
+  const getActiveVisionModel = useCallback(() => {
+    const [provider, model_id] = visionModel.split('|');
+    if (!model_id) {
+      const fallback = availableModels[0]?.id || 'google|gemini-3.1-flash-lite';
+      const [fProvider, fModelId] = fallback.split('|');
+      return { provider: fProvider, model_id: fModelId };
+    }
+    return { provider, model_id };
+  }, [visionModel, availableModels]);
 
   // Auto-save log details — debounced 1.5s
   useEffect(() => {
@@ -171,11 +224,11 @@ export function NetraProvider({ children }) {
 
   // Sidebar mutual exclusivity
   const toggleTradeData = () => {
-    setIsLoggerOpen(prev => !prev);
+    setIsLoggerOpen(!isLoggerOpen);
     setIsAiPaneOpen(false);
   };
   const toggleAnalyst = () => {
-    setIsAiPaneOpen(prev => !prev);
+    setIsAiPaneOpen(!isAiPaneOpen);
     setIsLoggerOpen(false);
   };
 
@@ -183,10 +236,34 @@ export function NetraProvider({ children }) {
     if (!chatInput.trim() || isAiLoading) return;
 
     const userMsg = { role: 'user', text: chatInput };
-    const newHistory = [...chatHistory, userMsg];
-    setChatHistory(newHistory);
+    dispatch(appendChatMessage(userMsg));
     setChatInput('');
     setIsAiLoading(true);
+    dispatch(setIsAiLoadingRedux(true));
+
+    let image_base64 = null;
+    let image_type = null;
+
+    if (uploadedVisionFiles.length > 0) {
+      const file = uploadedVisionFiles[0];
+      image_type = file.type;
+      
+      const readAsDataURL = (file) => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      };
+
+      try {
+        const dataUrl = await readAsDataURL(file);
+        image_base64 = dataUrl.split(',')[1];
+      } catch (e) {
+        console.error('Failed to read file as base64:', e);
+      }
+    }
 
     try {
       // Build context object
@@ -199,29 +276,38 @@ export function NetraProvider({ children }) {
         image_description: imageDescription
       } : null;
 
-      const [providerVal, modelIdVal] = selectedModel.split('|');
+      const { provider: providerVal, model_id: modelIdVal } = getActiveModel();
+      console.log('handleSendMessage modelIdVal:', modelIdVal);
+      console.log('handleSendMessage modelConfig:', modelConfig);
       const response = await fetch(`${API_BASE}/api/ai/chat`, {
         method: 'POST',
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
-          messages: newHistory,
+          messages: [...chatHistory, userMsg],
           include_doctrine: includeDoctrine,
           context_data: contextObj,
           provider: providerVal,
-          model_config: { ...modelConfig, model_id: modelIdVal }
+          llm_config: { ...modelConfig, model_id: modelIdVal },
+          image_base64: image_base64,
+          image_type: image_type
         })
       });
 
-      if (!response.ok) throw new Error('Neural Link Timeout');
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Chat Error:', response.status, errorText);
+        throw new Error('Neural Link Timeout');
+      }
       const data = await response.json();
       
-      // Backend returns { role: 'assistant', text: '...' }
-      setChatHistory(prev => [...prev, { role: 'ai', text: data.text }]);
+      dispatch(appendChatMessage({ role: 'ai', text: data.text }));
     } catch (err) {
+      console.error('Chat fetch error:', err);
       showToast('NETRA Neural Link Interrupted', 'error');
-      setChatHistory(prev => [...prev, { role: 'ai', text: "Protocol error: My neural link to the terminal's core was briefly interrupted. Please retry the transmission." }]);
+      dispatch(appendChatMessage({ role: 'ai', text: "Protocol error: My neural link to the terminal's core was briefly interrupted. Please retry the transmission." }));
     } finally {
       setIsAiLoading(false);
+      dispatch(setIsAiLoadingRedux(false));
     }
   };
 
@@ -282,6 +368,7 @@ export function NetraProvider({ children }) {
     setSelectedWeaponId(null);
     setStepTimestamps({});
     setTradeName('');
+    dispatch(setTradeNameRedux(''));
     setEditFormData({});
     setAuditData(null);
     setIsAuditing(false);
@@ -292,7 +379,10 @@ export function NetraProvider({ children }) {
       headers: getAuthHeaders()
     })
       .then(res => res.json())
-      .then(data => setTradeLogs(data))
+      .then(data => {
+        setTradeLogs(data);
+        dispatch(setTradeLogsRedux(data));
+      })
       .catch(() => console.error('Logger offline'));
   };
 
@@ -332,7 +422,9 @@ export function NetraProvider({ children }) {
     setSysRecommendation(state.sysRecommendation || null);
     setSelectedWeaponId(state.selectedWeaponId || null);
     setStepTimestamps(state.stepTimestamps || {});
-    setTradeName(log.name || state.tradeName || '');
+    const name = log.name || state.tradeName || '';
+    setTradeName(name);
+    dispatch(setTradeNameRedux(name));
     const assetName = log.phase2?.trading_asset || state.assetName || log.phase1?.asset_ticker || '';
     setNotes(prev => ({ ...prev, ...(state.notes || {}), bias: log.phase3?.notes || state.notes?.bias || '' }));
     if (window.innerWidth < 1024) setIsLoggerOpen(false);
@@ -370,16 +462,24 @@ export function NetraProvider({ children }) {
       stop_loss: editFormData.stop_loss, take_profit: editFormData.take_profit,
       buying_type: editFormData.buying_type, manual_weapon: editFormData.manual_weapon,
       additional_cost: editFormData.additional_cost, notes: editFormData.notes,
-      _selNotes: selNotes, _stsData: stsData
+      _selNotes: selNotes, _stsData: stsData,
+      vision_data: imageDescription,
+      market_type_analysis: netraOutput?.analysis || null,
+      entry_model_analysis: netraOutput?.reasoning || null,
+      audit_data: null
     };
     fetch(`${API_BASE}/api/logs`, {
       method: 'POST', headers: getAuthHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(payload)
     }).then(res => res.json()).then(data => {
       fetchLogs();
       setActiveEditLog(data);
-      setEditFormData({ ...data.phase2, ...data.phase3, trade_name: data.name, asset_ticker: data.phase2?.asset_ticker || (session?.assetName || ''), notes: data.phase3?.notes || '' });
+      dispatch(setActiveEditLogRedux(data));
+      const formData = { ...data.phase2, ...data.phase3, trade_name: data.name, asset_ticker: data.phase2?.asset_ticker || (session?.assetName || ''), notes: data.phase3?.notes || '' };
+      setEditFormData(formData);
+      dispatch(setEditFormDataRedux(formData));
       setIsLoggerOpen(true);
       setTradeName('');
+      dispatch(setTradeNameRedux(''));
       showToast('Mission Log Committed (FIRED)');
     }).catch(() => showToast('Firing Sequence Failure', 'error'));
   };
@@ -458,13 +558,51 @@ export function NetraProvider({ children }) {
       }).catch(() => showToast('Persistence Failure: Check Schema', 'error'));
   };
 
-  // Fetch system data
+  // Fetch system data and models
   useEffect(() => {
     fetch(`${API_BASE}/api/system-data`, {
       headers: getAuthHeaders()
     })
       .then(res => res.json()).then(data => setSysData(data))
       .catch(() => console.error('Engine Offline'));
+
+    fetch(`${API_BASE}/api/models`)
+      .then(res => res.json())
+      .then(data => {
+        const flatModels = [];
+        (data.providers || []).forEach(provider => {
+          provider.models.forEach(model => {
+            const tagsStr = model.tags.join(' & ');
+            const displayName = `${provider.provider} : ${model.name}, ${model.cost} Cost, ${tagsStr}`;
+            flatModels.push({
+              name: displayName,
+              id: `${provider.provider.toLowerCase()}|${model.id}`,
+              cost: model.cost,
+              tags: model.tags
+            });
+          });
+        });
+        setAvailableModels(flatModels);
+        dispatch(setAvailableModelsRedux(flatModels));
+        
+        const isValid = flatModels.some(m => m.id === selectedModel);
+        let nextModel = selectedModel;
+        
+        if (!isValid) {
+          const defaultProvider = data.tactical_provider || 'google';
+          const providerObj = data.providers?.find(p => p.provider.toLowerCase() === defaultProvider.toLowerCase());
+          if (providerObj && providerObj.models?.length > 0) {
+            const defaultId = `${providerObj.provider.toLowerCase()}|${providerObj.models[0].id}`;
+            const isValidDefault = flatModels.some(m => m.id === defaultId);
+            if (isValidDefault) nextModel = defaultId;
+          } else {
+            nextModel = flatModels.length > 0 ? flatModels[0].id : selectedModel;
+          }
+        }
+        
+        setSelectedModel(nextModel);
+      })
+      .catch((err) => console.error('Failed to load models', err));
   }, []);
 
   // Manually triggered Neural Synthesis
@@ -477,7 +615,7 @@ export function NetraProvider({ children }) {
     if (abortControllerRef.current) abortControllerRef.current.abort();
     abortControllerRef.current = new AbortController();
 
-    const [providerVal, modelIdVal] = selectedModel.split('|');
+    const { provider: providerVal, model_id: modelIdVal } = getActiveModel();
     fetch(`${API_BASE}/api/evaluate-netra`, {
       method: 'POST', 
       headers: getAuthHeaders({ 'Content-Type': 'application/json' }), 
@@ -525,7 +663,7 @@ export function NetraProvider({ children }) {
     if (weaponAbortControllerRef.current) weaponAbortControllerRef.current.abort();
     weaponAbortControllerRef.current = new AbortController();
 
-    const [providerVal, modelIdVal] = selectedModel.split('|');
+    const { provider: providerVal, model_id: modelIdVal } = getActiveModel();
     const payload = {
       bias: selections.bias,
       auction: selections.auction,
@@ -570,8 +708,12 @@ export function NetraProvider({ children }) {
     }
   };
 
-  const [auditData, setAuditData] = useState(null);
-  const [isAuditing, setIsAuditing] = useState(false);
+  const auditData = useSelector(state => state.logs.auditData);
+  const isAuditing = useSelector(state => state.logs.isAuditing);
+
+  const setAuditData = (val) => dispatch(setAuditDataAction(val));
+  const setIsAuditing = (val) => dispatch(setIsAuditingAction(val));
+  
   const auditAbortControllerRef = useRef(null);
 
   const triggerPostTradeAudit = (tradeTelemetry) => {
@@ -582,7 +724,7 @@ export function NetraProvider({ children }) {
     if (auditAbortControllerRef.current) auditAbortControllerRef.current.abort();
     auditAbortControllerRef.current = new AbortController();
 
-    const [providerVal, modelIdVal] = selectedModel.split('|');
+    const { provider: providerVal, model_id: modelIdVal } = getActiveModel();
     fetch(`${API_BASE}/api/ai/post-trade-audit`, {
       method: 'POST',
       headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
@@ -622,7 +764,7 @@ export function NetraProvider({ children }) {
 
 
 
-  const [uploadedVisionFile, setUploadedVisionFile] = useState(null);
+
   const [visionAbortController, setVisionAbortController] = useState(null);
 
   const stopVisualAnalysis = () => {
@@ -635,8 +777,9 @@ export function NetraProvider({ children }) {
   };
 
   const uploadAndDescribeImage = async () => {
-    if (!uploadedVisionFile) return;
+    if (uploadedVisionFiles.length === 0) return;
     setIsUploadingImage(true);
+    dispatch(setIsUploadingImageRedux(true));
     
     const controller = new AbortController();
     setVisionAbortController(controller);
@@ -644,7 +787,7 @@ export function NetraProvider({ children }) {
     const formData = new FormData();
     uploadedVisionFiles.forEach(f => formData.append('files', f));
     
-    const [providerVal, modelIdVal] = visionModel.split('|');
+    const { provider: providerVal, model_id: modelIdVal } = getActiveVisionModel();
     formData.append('provider', providerVal);
     formData.append('model_config', JSON.stringify({ ...modelConfig, model_id: modelIdVal }));
 
@@ -660,7 +803,7 @@ export function NetraProvider({ children }) {
       if (data.description) {
         setImageDescription(data.description);
         showToast('Visual Analysis Cached', 'success');
-        setChatHistory(prev => [...prev, { role: 'ai', text: `**Visual Analysis Cached:**\n\n${data.description}` }]);
+        dispatch(appendChatMessage({ role: 'ai', text: `**Visual Analysis Cached:**\n\n${data.description}` }));
       } else {
         showToast(data.error || 'Failed to analyze image', 'error');
       }
@@ -672,6 +815,7 @@ export function NetraProvider({ children }) {
       }
     } finally {
       setIsUploadingImage(false);
+      dispatch(setIsUploadingImageRedux(false));
       setVisionAbortController(null);
     }
   };
@@ -680,7 +824,7 @@ export function NetraProvider({ children }) {
   useEffect(() => {
     const cmd = finalCommand || (netraOutput ? netraOutput.cmd : null);
     if (highestStep >= 5 && cmd && (cmd === 'STRIKE' || cmd === 'INTERCEPTION')) {
-      const [providerVal, modelIdVal] = selectedModel.split('|');
+      const { provider: providerVal, model_id: modelIdVal } = getActiveModel();
       const endpoint = cmd === 'STRIKE' ? `${API_BASE}/api/evaluate-strike` : `${API_BASE}/api/evaluate-interception`;
       fetch(endpoint, {
         method: 'POST', headers: getAuthHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ ...selections, provider: providerVal, model_config: { ...modelConfig, model_id: modelIdVal } })
@@ -691,7 +835,10 @@ export function NetraProvider({ children }) {
   // Bi-directional binding: Sidebar → Terminal state
   useEffect(() => {
     if (activeSessionId && activeEditLog && activeSessionId === activeEditLog.id) {
-      if (editFormData.trade_name && editFormData.trade_name !== tradeName) setTradeName(editFormData.trade_name);
+      if (editFormData.trade_name && editFormData.trade_name !== tradeName) {
+        setTradeName(editFormData.trade_name);
+        dispatch(setTradeNameRedux(editFormData.trade_name));
+      }
       if (editFormData.notes && editFormData.notes !== notes.bias) setNotes(prev => ({ ...prev, bias: editFormData.notes }));
     }
   }, [editFormData, activeSessionId, activeEditLog]);
@@ -796,7 +943,7 @@ export function NetraProvider({ children }) {
     auditData, setAuditData, isAuditing, setIsAuditing, triggerPostTradeAudit, stopPostTradeAudit,
     selectedModel, setSelectedModel,
     visionModel, setVisionModel,
-    AVAILABLE_MODELS,
+    AVAILABLE_MODELS: availableModels,
     modelConfig, setModelConfig,
     imageDescription, setImageDescription, uploadAndDescribeImage, isUploadingImage,
     uploadedVisionFiles, setUploadedVisionFiles, stopVisualAnalysis

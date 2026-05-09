@@ -1,8 +1,31 @@
-# React + Vite
+# Deployment Guide - Netra Terminal
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This guide explains how to redeploy the Netra Terminal (Frontend) after making changes.
 
-Currently, two official plugins are available:
+## Git Deployment
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### 1. Commit Changes
+Commit your changes to your local git repository:
+```bash
+git add .
+git commit -m "Update netra terminal"
+```
+
+### 2. Push to GitHub
+```bash
+git push origin master
+```
+*(Note: Replace `master` with `main` if that is your default branch name on GitHub).*
+
+## Docker Deployment
+
+### 1. Build Docker Image
+```bash
+docker build -t netra-terminal .
+```
+
+### 2. Run Docker Container Locally
+```bash
+docker run -p 5173:5173 --env-file .env netra-terminal
+```
+This will start the frontend on port 5173, reading environment variables from your `.env` file.

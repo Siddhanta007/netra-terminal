@@ -49,12 +49,6 @@ export default function Phase8WeaponIntel() {
            <div className="text-xl font-black">{weaponPrediction.predictability}</div>
         </div>
       )}
-      
-      <div className="label" style={{ color: 'var(--text-4)' }}>Intelligence Status</div>
-      <div className="flex items-center gap-3 p-3 px-4 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]">
-         <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-         <span className="text-[10px] font-bold tracking-widest text-[var(--text-2)] uppercase">MAYA ENGINE ONLINE</span>
-      </div>
     </div>
   );
 

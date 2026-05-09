@@ -83,16 +83,16 @@ export default function Phase9WeaponArmory() {
                    {activeWeapon.id !== 'MANUAL' && (
                      <div className="mt-auto pt-8">
                         <div className="label text-[9px] mb-4 tracking-[0.3em]">Deployment Parameters</div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="flex flex-col gap-2">
                            {[
                              { label: 'Entry', val: activeWeapon.entry },
                              { label: 'Stop', val: activeWeapon.stop },
                              { label: 'Target', val: activeWeapon.target },
                              { label: 'Misfire', val: activeWeapon.misfire }
                            ].map((p, idx) => (
-                             <div key={idx} className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] text-center">
-                                <span className="text-[7px] font-black uppercase tracking-widest block mb-2 opacity-60">{p.label}</span>
-                                <span className="text-[10px] font-bold whitespace-normal break-words">{p.val}</span>
+                             <div key={idx} className="flex justify-between items-center p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)]/50">
+                                <span className="text-[9px] font-bold uppercase tracking-wider opacity-60">{p.label}</span>
+                                <span className="text-[11px] font-bold">{p.val}</span>
                              </div>
                            ))}
                         </div>
