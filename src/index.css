@@ -8,14 +8,14 @@
 
 :root {
   /* Nuanced HSL-based Surface Palette (Light Mode) */
-  --bg:            hsl(220, 15%, 96%);      /* Soft Studio Grey */
-  --surface:       hsl(220, 20%, 100%);     /* Pure White */
-  --surface-2:     hsl(220, 15%, 98%);      /* Elevated Card */
-  --surface-3:     hsl(220, 12%, 94%);      /* Depth Surface */
+  --bg:            hsl(222, 20%, 89%);      /* Slate Grey — no more near-white */
+  --surface:       hsl(220, 16%, 96%);      /* Off-white card */
+  --surface-2:     hsl(220, 14%, 92%);      /* Visible elevation */
+  --surface-3:     hsl(220, 12%, 87%);      /* Interactive layer */
 
   /* Precise Borders */
-  --border:        hsla(220, 15%, 20%, 0.12);
-  --border-strong: hsla(220, 15%, 20%, 0.25);
+  --border:        hsla(220, 15%, 20%, 0.16);
+  --border-strong: hsla(220, 15%, 20%, 0.30);
 
   /* Tactical Typography */
   --text-1:        hsl(220, 40%, 8%);       /* Midnight Carbon */
@@ -519,12 +519,10 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
 
 .precision-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 0;
+  align-items: flex-start;
+  padding: 8px 0;
   border-bottom: 1px solid var(--border);
   gap: 20px;
-  flex-wrap: wrap;
 }
 .precision-row:last-child { border-bottom: none; }
 
@@ -534,71 +532,64 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--tactical-text);
-  min-width: 130px;
+  width: 200px;
+  flex-shrink: 0;
+  padding-top: 8px;
+}
+
+/* Dark mode: brighter labels, option text, and row borders */
+.dark .precision-label {
+  color: #ffffff;
+}
+.dark .precision-row {
+  border-bottom-color: hsla(222, 20%, 100%, 0.12);
+}
+.dark .precision-opt {
+  color: hsl(210, 20%, 88%);
+  border-color: hsla(222, 20%, 100%, 0.22);
+}
+.dark .precision-opt:hover {
+  color: #ffffff;
+  border-color: hsla(222, 20%, 100%, 0.55);
 }
 
 .precision-selector {
   display: flex;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow-x: auto;
-  height: 36px; /* Slightly taller for the underline */
-  width: fit-content;
-  max-width: 100%;
+  flex-wrap: wrap;
+  flex: 1;
+  gap: 6px;
+  padding: 4px 0;
 }
 
 .precision-opt {
-  flex: 1;
-  min-width: 130px; /* Wider boxes as requested */
+  flex: 0 0 auto;
+  min-width: 110px;
+  height: 32px;
   padding: 0 16px;
   font-size: 10px;
   font-weight: 700;
-  color: var(--text-1); /* Theme-aware text color */
+  color: var(--text-3);
   background: transparent;
-  border: none;
+  border: 1px solid var(--border);
   cursor: pointer;
-  transition: all 150ms;
+  transition: color 120ms, background 120ms, border-color 120ms;
   display: flex;
   align-items: center;
   justify-content: center;
   white-space: nowrap;
-  position: relative;
 }
-
-/* Modern floating divider */
-.precision-opt::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 25%;
-  height: 50%;
-  width: 1px;
-  background: var(--border);
-  opacity: 0.8;
-}
-.precision-opt:first-child::before { display: none; }
 
 .precision-opt:hover {
   color: var(--text-1);
-  background: var(--surface-3);
+  background: var(--surface-2);
+  border-color: var(--border-strong);
 }
 
 .precision-opt.selected {
-  background: transparent;
-  color: var(--phase-accent); /* Phase color on selection */
-  font-weight: 850;
-}
-
-.precision-opt.selected::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 1.5px; /* 1.5px line */
-  background: var(--phase-accent);
-  box-shadow: none;
+  color: var(--phase-accent);
+  background: color-mix(in srgb, var(--phase-accent) 14%, transparent);
+  border-color: var(--phase-accent);
+  font-weight: 800;
 }
 
 /* ── Phase-Specific Interaction Refinements ──────────────── */
@@ -840,14 +831,14 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
 
 .dark {
   /* High-Performance Surface Palette (Dark Mode) */
-  --bg:            hsl(222, 25%, 7%);       /* Carbon Black */
-  --surface:       hsl(222, 22%, 12%);      /* Deep Slate Surface */
-  --surface-2:     hsl(222, 20%, 15%);      /* Card Surface */
-  --surface-3:     hsl(222, 18%, 18%);      /* interactive Layer */
+  --bg:            hsl(224, 30%, 6%);       /* Deep Navy-Black */
+  --surface:       hsl(224, 26%, 12%);      /* Card — visible above bg */
+  --surface-2:     hsl(224, 22%, 17%);      /* Elevated layer */
+  --surface-3:     hsl(224, 20%, 22%);      /* Interactive layer */
 
   /* High-Contrast Borders */
-  --border:        hsla(222, 20%, 100%, 0.12);
-  --border-strong: hsla(222, 20%, 100%, 0.25);
+  --border:        hsla(222, 20%, 100%, 0.16);
+  --border-strong: hsla(222, 20%, 100%, 0.30);
 
   /* Radiant Typography */
   --text-1:        hsl(210, 40%, 98%);      /* Pure Frost */
@@ -1155,4 +1146,60 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
 
 @media (min-width: 769px) {
   .mobile-only { display: none !important; }
+}
+
+/* ── Terminal Responsive Layout ─────────────────────────── */
+
+.terminal-main { padding: 16px 20px; }
+@media (min-width: 768px) { .terminal-main { padding: 24px 40px; } }
+
+.phase-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 60px;
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+}
+@media (min-width: 768px) { .phase-stack { gap: 20px; } }
+
+/* ── Phase Card — Jane Street: sharp, minimal, single border ── */
+.phase-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0;            /* Sharp 90° corners */
+  overflow: visible;
+  position: relative;
+}
+
+.dark .phase-card {
+  border-color: hsla(222, 20%, 100%, 0.1);
+}
+
+/* Active card — left accent + faint background tint */
+.phase-card[data-active="true"] {
+  border-left: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+}
+
+/* Phase card header band */
+.phase-card-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 24px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Phase card content — breathing room so inner components never touch the card edges */
+.phase-card-body {
+  padding: 16px 20px;
+}
+
+@media (max-width: 640px) {
+  .phase-card-body  { padding: 12px; }
+  .phase-card-header { padding: 7px 12px; gap: 10px; }
+  .precision-opt { min-width: 80px !important; font-size: 9px !important; }
 }
