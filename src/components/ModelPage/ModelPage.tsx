@@ -141,12 +141,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
   const stats = computeStats(tradeLogs);
   const { color } = model;
 
-  // Per-model opaque box fills — hero and stats are intentionally different shades
-  const BOX_THEME: Record<string, { hero: { bg: string; border: string }; stats: { bg: string; border: string } }> = {
-    pinaka:  { hero: { bg: '#e4e8f0', border: '#d1d5db' }, stats: { bg: '#ffffff', border: '#d1d5db' } },
-    trishul: { hero: { bg: '#ece8df', border: '#d8d0c4' }, stats: { bg: '#ffffff', border: '#d1d5db' } },
-  };
-  const boxTheme = BOX_THEME[model.id] ?? BOX_THEME.pinaka;
+  const BOX_SHADOW = '0 4px 40px rgba(0,0,0,0.08)';
 
   const handleSort = (col: string) => {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -253,7 +248,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
 
         {/* ── SECTION 1: HERO SLIDER ── */}
         <div style={{ marginBottom: '28px' }}>
-          <div style={{ border: `1px solid ${boxTheme.hero.border}`, background: boxTheme.hero.bg, minHeight: '520px', display: 'flex', overflow: 'hidden' }}>
+          <div style={{ background: '#ffffff', boxShadow: BOX_SHADOW, minHeight: '520px', display: 'flex', overflow: 'hidden' }}>
 
             {/* Left — image with diagonal clip */}
             <div style={{ position: 'relative', flexShrink: 0, width: '42%', clipPath: 'polygon(0 0, 100% 0, 88% 100%, 0 100%)', overflow: 'hidden' }}>
@@ -287,7 +282,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
 
         {/* ── SECTION 2: STATS + PARAMS ── */}
         <div style={{ marginBottom: '28px' }}>
-          <div style={{ border: `1px solid ${boxTheme.stats.border}`, background: boxTheme.stats.bg }}>
+          <div style={{ background: '#ffffff', boxShadow: BOX_SHADOW }}>
             {/* Colored accent strip */}
             <div style={{ height: '4px', background: color }} />
 
@@ -373,7 +368,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
 
         {/* ── SECTION 3: TRADE LEDGER ── */}
         <div>
-          <div style={{ border: '1px solid #d1d5db', background: '#ffffff' }}>
+          <div style={{ background: '#ffffff', boxShadow: BOX_SHADOW }}>
 
             {/* Ledger header */}
             <div style={{ padding: '18px 28px', borderBottom: `1px solid ${color}18` }}>
