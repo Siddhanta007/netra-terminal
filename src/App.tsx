@@ -402,7 +402,7 @@ export default function NetraTerminal() {
           <button
             onClick={() => setIsAiPaneOpen(!isAiPaneOpen)}
             title="Maya AI"
-            style={{ height: '100%', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', borderBottom: isAiPaneOpen ? '2px solid #4169E1' : '2px solid transparent', color: isAiPaneOpen ? '#4169E1' : (darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)'), cursor: 'pointer', transition: 'all 200ms', fontFamily: 'inherit' }}
+            style={{ height: '56px', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', borderBottom: isAiPaneOpen ? '2px solid #4169E1' : '2px solid transparent', color: isAiPaneOpen ? '#4169E1' : (darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)'), cursor: 'pointer', transition: 'all 200ms', fontFamily: 'inherit' }}
             onMouseEnter={e => { if (!isAiPaneOpen) { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.8)' : '#0f172a'; } }}
             onMouseLeave={e => { if (!isAiPaneOpen) { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)'; } }}
           >
@@ -419,10 +419,10 @@ export default function NetraTerminal() {
           )}
 
           {/* Profile — text only, underline when open */}
-          <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'stretch' }}>
+          <div style={{ position: 'relative', height: '56px', display: 'flex', alignItems: 'stretch' }}>
             <button
               onClick={() => setIsProfileOpen(!isProfileOpen)}
-              style={{ height: '100%', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', borderBottom: isProfileOpen ? '2px solid #4169E1' : '2px solid transparent', cursor: 'pointer', outline: 'none', transition: 'all 200ms', color: isProfileOpen ? '#4169E1' : (darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)') }}
+              style={{ height: '56px', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', borderBottom: isProfileOpen ? '2px solid #4169E1' : '2px solid transparent', cursor: 'pointer', outline: 'none', transition: 'all 200ms', color: isProfileOpen ? '#4169E1' : (darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)') }}
               onMouseEnter={e => { if (!isProfileOpen) { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.8)' : '#0f172a'; } }}
               onMouseLeave={e => { if (!isProfileOpen) { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)'; } }}
             >
@@ -479,16 +479,15 @@ export default function NetraTerminal() {
 
           {/* LEFT: ledger toggle + session identity */}
           <div style={{ display: 'flex', alignItems: 'stretch', flexShrink: 0, borderRight: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}` }}>
-            {/* Ledger toggle */}
+            {/* Ledger toggle — icon only */}
             <button
               onClick={() => ctxSetIsLoggerOpen(!isLoggerOpen)}
               title="Operational Ledger"
-              style={{ height: '100%', padding: '0 14px', display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', borderRight: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`, borderBottom: isLoggerOpen ? '2px solid #4169E1' : '2px solid transparent', color: isLoggerOpen ? '#4169E1' : 'var(--text-3)', cursor: 'pointer', transition: 'all 150ms', fontFamily: 'inherit' }}
-              onMouseEnter={e => { if (!isLoggerOpen) { e.currentTarget.style.color = '#4169E1'; } }}
-              onMouseLeave={e => { if (!isLoggerOpen) { e.currentTarget.style.color = 'var(--text-3)'; } }}
+              style={{ width: '36px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', borderRight: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`, color: isLoggerOpen ? '#4169E1' : 'var(--text-3)', cursor: 'pointer', transition: 'color 150ms' }}
+              onMouseEnter={e => { if (!isLoggerOpen) e.currentTarget.style.color = '#4169E1'; }}
+              onMouseLeave={e => { if (!isLoggerOpen) e.currentTarget.style.color = 'var(--text-3)'; }}
             >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-              <span style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Ledger</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             </button>
             {/* Session identity */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 14px' }}>

@@ -324,14 +324,8 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
 
   const isGuest = useSelector((s: RootState) => s.session.isGuest);
 
-  // ─── Boot: load system data + models ──────────────────────────────
+  // ─── Boot: load models (always) + system data (auth only) ──────────
   useEffect(() => {
-    if (isGuest) return;
-    fetch(`${API_BASE}/api/system-data`, { headers: getAuthHeaders() })
-      .then((res) => res.json())
-      .then((data: SysData) => dispatch(setSysDataAction(data)))
-      .catch(() => { if (import.meta.env.DEV) console.error('Engine Offline'); });
-
     fetch(`${API_BASE}/api/models`)
       .then((res) => res.json())
       .then((data: { providers?: Array<{ provider: string; models: Array<{ id: string; name: string; cost: string; tags: string[] }> }>; tactical_provider?: string }) => {
@@ -359,6 +353,12 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
         }
       })
       .catch(() => { if (import.meta.env.DEV) console.error('Failed to load models'); });
+
+    if (isGuest) return;
+    fetch(`${API_BASE}/api/system-data`, { headers: getAuthHeaders() })
+      .then((res) => res.json())
+      .then((data: SysData) => dispatch(setSysDataAction(data)))
+      .catch(() => { if (import.meta.env.DEV) console.error('Engine Offline'); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
