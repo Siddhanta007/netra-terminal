@@ -16,6 +16,7 @@ interface AnalysisState {
   sysRecommendation: unknown;
   interSelections: InterSelections;
   strikeSelections: StrikeSelections;
+  saturationSelections: Record<string, string>;
   selectedWeaponId: string | null;
   isEvaluating: boolean;
   isPredictingWeapon: boolean;
@@ -24,6 +25,17 @@ interface AnalysisState {
   isUploadingImage: boolean;
   analyticsData: unknown;
   stepTimestamps: Record<string, string>;
+  // Mission Control Data
+  rAmount: string;
+  dailyLossLimit: string;
+  dailyLossHit: boolean;
+  dailyTarget: string;
+  dailyTargetHit: boolean;
+  openingWindow: string;
+  sessionCutoff: string;
+  isExpiryDay: boolean;
+  expiryCutoff: string;
+  rulesAcknowledged: boolean[];
 }
 
 const initialState: AnalysisState = {
@@ -37,6 +49,7 @@ const initialState: AnalysisState = {
   sysRecommendation: null,
   interSelections: loadState('interSelections', { pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }),
   strikeSelections: loadState('strikeSelections', { impulseQuality: '', continuationZone: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '' }),
+  saturationSelections: loadState('saturationSelections', { expansionQuality: '', pullbackQuality: '', followThrough: '', structuralFatigue: '', liquidityConsumption: '', emotionalParticipation: '' }),
   selectedWeaponId: loadState('selectedWeaponId', null),
   isEvaluating: false,
   isPredictingWeapon: false,
@@ -45,6 +58,17 @@ const initialState: AnalysisState = {
   isUploadingImage: false,
   analyticsData: null,
   stepTimestamps: loadState('stepTimestamps', {}),
+  // Mission Control Data
+  rAmount: loadState('rAmount', ''),
+  dailyLossLimit: loadState('dailyLossLimit', ''),
+  dailyLossHit: loadState('dailyLossHit', false),
+  dailyTarget: loadState('dailyTarget', ''),
+  dailyTargetHit: loadState('dailyTargetHit', false),
+  openingWindow: loadState('openingWindow', '09:20'),
+  sessionCutoff: loadState('sessionCutoff', '14:30'),
+  isExpiryDay: loadState('isExpiryDay', false),
+  expiryCutoff: loadState('expiryCutoff', '12:00'),
+  rulesAcknowledged: loadState('rulesAcknowledged', new Array(7).fill(false)),
 };
 
 export const analysisSlice = createSlice({
@@ -81,6 +105,9 @@ export const analysisSlice = createSlice({
     setStrikeSelections: (state, action: PayloadAction<StrikeSelections>) => {
       state.strikeSelections = action.payload;
     },
+    setSaturationSelections: (state, action: PayloadAction<Record<string, string>>) => {
+      state.saturationSelections = action.payload;
+    },
     setSelectedWeaponId: (state, action: PayloadAction<string | null>) => {
       state.selectedWeaponId = action.payload;
     },
@@ -105,6 +132,16 @@ export const analysisSlice = createSlice({
     setStepTimestamps: (state, action: PayloadAction<Record<string, string>>) => {
       state.stepTimestamps = action.payload;
     },
+    setRAmount: (state, action: PayloadAction<string>) => { state.rAmount = action.payload; },
+    setDailyLossLimit: (state, action: PayloadAction<string>) => { state.dailyLossLimit = action.payload; },
+    setDailyLossHit: (state, action: PayloadAction<boolean>) => { state.dailyLossHit = action.payload; },
+    setDailyTarget: (state, action: PayloadAction<string>) => { state.dailyTarget = action.payload; },
+    setDailyTargetHit: (state, action: PayloadAction<boolean>) => { state.dailyTargetHit = action.payload; },
+    setOpeningWindow: (state, action: PayloadAction<string>) => { state.openingWindow = action.payload; },
+    setSessionCutoff: (state, action: PayloadAction<string>) => { state.sessionCutoff = action.payload; },
+    setIsExpiryDay: (state, action: PayloadAction<boolean>) => { state.isExpiryDay = action.payload; },
+    setExpiryCutoff: (state, action: PayloadAction<string>) => { state.expiryCutoff = action.payload; },
+    setRulesAcknowledged: (state, action: PayloadAction<boolean[]>) => { state.rulesAcknowledged = action.payload; },
   },
 });
 
@@ -119,6 +156,7 @@ export const {
   setSysRecommendation,
   setInterSelections,
   setStrikeSelections,
+  setSaturationSelections,
   setSelectedWeaponId,
   setIsEvaluating,
   setIsPredictingWeapon,
@@ -127,6 +165,16 @@ export const {
   setIsUploadingImage,
   setAnalyticsData,
   setStepTimestamps,
+  setRAmount,
+  setDailyLossLimit,
+  setDailyLossHit,
+  setDailyTarget,
+  setDailyTargetHit,
+  setOpeningWindow,
+  setSessionCutoff,
+  setIsExpiryDay,
+  setExpiryCutoff,
+  setRulesAcknowledged,
 } = analysisSlice.actions;
 
 export default analysisSlice.reducer;

@@ -15,23 +15,26 @@ export function useTradeLogsCrud() {
   const activeEditLog = useSelector((s: RootState) => s.logs.activeEditLog);
   const editFormData = useSelector((s: RootState) => s.logs.editFormData);
   const session = useSelector((s: RootState) => s.session.session);
+  const isGuest = useSelector((s: RootState) => s.session.isGuest);
   const currentModel = useSelector((s: RootState) => s.model.currentModel);
   const selections = useSelector((s: RootState) => s.analysis.selections);
   const notes = useSelector((s: RootState) => s.analysis.notes);
   const finalCommand = useSelector((s: RootState) => s.analysis.finalCommand);
   const interSelections = useSelector((s: RootState) => s.analysis.interSelections);
   const strikeSelections = useSelector((s: RootState) => s.analysis.strikeSelections);
+  const saturationSelections = useSelector((s: RootState) => s.analysis.saturationSelections);
   const selectedWeaponId = useSelector((s: RootState) => s.analysis.selectedWeaponId);
   const netraOutput = useSelector((s: RootState) => s.analysis.netraOutput);
   const imageDescription = useSelector((s: RootState) => s.analysis.imageDescription);
   const auditData = useSelector((s: RootState) => s.logs.auditData);
 
   const fetchLogs = useCallback((modelId = 'pinaka') => {
+    if (isGuest) return;
     fetch(`${API_BASE}/api/logs?model_id=${modelId}`, { headers: getAuthHeaders() })
       .then((res) => res.json())
       .then((data: TradeLog[]) => dispatch(setTradeLogs(data)))
       .catch(() => { if (import.meta.env.DEV) console.error('Logger offline'); });
-  }, [dispatch, getAuthHeaders]);
+  }, [dispatch, getAuthHeaders, isGuest]);
 
   const commitTradeLog = useCallback((weapon?: string) => {
     const selNotes = [
@@ -45,9 +48,31 @@ export function useTradeLogsCrud() {
       ? Object.entries(interSelections).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(', ')
       : finalCommand === 'STRIKE'
         ? Object.entries(strikeSelections).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(', ')
-        : '';
+        : finalCommand === 'SATURATION'
+          ? Object.entries(saturationSelections).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(', ')
+          : '';
 
     const finalWeapon = (editFormData.manual_weapon as string | undefined) || weapon || selectedWeaponId || 'NONE';
+    
+    // Calculate time spent if both times are present
+    const entryTime = editFormData.entry_time;
+    const exitTime = editFormData.exit_time;
+    let calculatedTimeSpent = "";
+    if (entryTime && exitTime) {
+      const [entryH, entryM] = entryTime.split(':').map(Number);
+      const [exitH, exitM] = exitTime.split(':').map(Number);
+      if (!isNaN(entryH) && !isNaN(entryM) && !isNaN(exitH) && !isNaN(exitM)) {
+        const entryTotal = entryH * 60 + entryM;
+        const exitTotal = exitH * 60 + exitM;
+        const diff = exitTotal - entryTotal;
+        if (diff >= 0) {
+          const hours = Math.floor(diff / 60);
+          const mins = diff % 60;
+          calculatedTimeSpent = `${hours}h ${mins}m`;
+        }
+      }
+    }
+
     const payload = {
       model_id: currentModel, username: session?.userName || 'Unknown',
       ...selections,
@@ -61,6 +86,9 @@ export function useTradeLogsCrud() {
       take_profit: editFormData.take_profit, buying_type: editFormData.buying_type,
       manual_weapon: editFormData.manual_weapon, additional_cost: editFormData.additional_cost,
       notes: editFormData.notes,
+      entry_time: entryTime,
+      exit_time: exitTime,
+      time_spent: calculatedTimeSpent || editFormData.time_spent,
       _selNotes: selNotes, _stsData: stsData,
       vision_data: imageDescription,
       market_type_analysis: netraOutput?.analysis || null,
@@ -85,21 +113,71 @@ export function useTradeLogsCrud() {
         dispatch(setIsLoggerOpen(true));
         dispatch(setTradeName(''));
         showToast('Mission Log Committed (FIRED)');
+
+        // Vectorize the committed log
+        fetch(`${API_BASE}/api/rag/commit_trade_log`, {
+          method: 'POST',
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({
+            text: JSON.stringify(payload, null, 2),
+            date: new Date().toISOString().split('T')[0]
+          })
+        })
+        .then(res => res.json())
+        .then(vecData => {
+          console.log('Vectorized:', vecData);
+          showToast('Mission Log Vectorized');
+        })
+        .catch(e => console.error('Vectorize failure', e));
       })
       .catch(() => showToast('Firing Sequence Failure', 'error'));
   }, [dispatch, getAuthHeaders, fetchLogs, selections, notes, finalCommand, interSelections, strikeSelections, editFormData, selectedWeaponId, currentModel, session, imageDescription, netraOutput, showToast]);
 
-  const updateTradeLog = useCallback((tradeId: number) => {
+  const updateTradeLog = useCallback(async (tradeId: number) => {
     if (!tradeId) return;
     const entry = parseFloat(String(editFormData.entry_price)) || 0;
     const cost = parseFloat(String(editFormData.additional_cost)) || 0;
     const exit = parseFloat(String(editFormData.exit_price)) || 0;
-    const be = entry + cost;
-    let outcome = 'Breakeven';
-    if (exit > be) outcome = 'Win';
-    if (exit > 0 && exit < be) outcome = 'Loss';
-    if (exit === 0) outcome = 'Open';
-    const updatedData = { ...editFormData, outcome, audit_data: auditData, vision_data: imageDescription };
+
+    let outcome = 'Open';
+    try {
+      const outcomeRes = await fetch(`${API_BASE}/api/decision/trade-outcome`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ entry_price: entry, exit_price: exit, additional_cost: cost }),
+      });
+      const outcomeData = await outcomeRes.json();
+      outcome = outcomeData.outcome || 'Open';
+    } catch {
+      // silent fallback
+    }
+
+    // Calculate time spent if both times are present
+    const entryTime = editFormData.entry_time;
+    const exitTime = editFormData.exit_time;
+    let calculatedTimeSpent = "";
+    if (entryTime && exitTime) {
+      const [entryH, entryM] = entryTime.split(':').map(Number);
+      const [exitH, exitM] = exitTime.split(':').map(Number);
+      if (!isNaN(entryH) && !isNaN(entryM) && !isNaN(exitH) && !isNaN(exitM)) {
+        const entryTotal = entryH * 60 + entryM;
+        const exitTotal = exitH * 60 + exitM;
+        const diff = exitTotal - entryTotal;
+        if (diff >= 0) {
+          const hours = Math.floor(diff / 60);
+          const mins = diff % 60;
+          calculatedTimeSpent = `${hours}h ${mins}m`;
+        }
+      }
+    }
+
+    const updatedData = { 
+      ...editFormData, 
+      outcome, 
+      audit_data: auditData, 
+      vision_data: imageDescription,
+      time_spent: calculatedTimeSpent || editFormData.time_spent
+    };
     fetch(`${API_BASE}/api/logs/${encodeURIComponent(tradeId)}`, {
       method: 'PUT',
       headers: getAuthHeaders({ 'Content-Type': 'application/json' }),

@@ -11,7 +11,6 @@ export default function Phase2Auction() {
 
   const htfGate  = useHTFGate();
   const isStop   = htfGate === 'STOP';
-  const isReduce = htfGate === 'REDUCE';
   const isLocked = highestStep > 2;
 
   const htf  = (selections.htfStructure || {}) as Record<string, string>;
@@ -32,20 +31,10 @@ export default function Phase2Auction() {
   return (
     <div className="flex flex-col fade-up phase-theme-2">
 
-      {/* ── REDUCE FLAG ── */}
-      {isReduce && !isStop && !isLocked && (
-        <div className="flex items-center gap-3 px-4 py-2.5 mb-3" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)' }}>
-          <span style={{ fontSize: '9px', fontWeight: 900, color: '#f59e0b', letterSpacing: '0.2em', textTransform: 'uppercase' }}>
-            ⚠ REDUCE FLAG ACTIVE — Half R · First Target Only · No Trailing
-          </span>
-        </div>
-      )}
-
-      {/* ── DIMENSIONS ── */}
       {dims.map((dim) => (
-        <div key={dim.id} className="precision-row">
+        <div key={dim.id} className="precision-row flex items-center">
           <div className="precision-label">{dim.name}</div>
-          <div className="precision-selector">
+          <div className="precision-selector flex-1">
             {(dim.options || []).map(opt => {
               const isSelected = htf[dim.id] === opt;
               return (
@@ -58,10 +47,32 @@ export default function Phase2Auction() {
               );
             })}
           </div>
+          {dim.id === 'maturity' && (
+            <div className="flex gap-2 ml-4">
+              <input type="text" placeholder="Avg No Of Legs" value={htf['avgNoOfLegs'] || ''} onChange={e => setHtf('avgNoOfLegs', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded-none text-[var(--text-1)] w-24 outline-none focus:border-[var(--accent)]" />
+              <input type="text" placeholder="Current Leg No" value={htf['currentLegNo'] || ''} onChange={e => setHtf('currentLegNo', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded-none text-[var(--text-1)] w-24 outline-none focus:border-[var(--accent)]" />
+            </div>
+          )}
+          {dim.id === 'rotation' && (
+            <div className="flex gap-2 ml-4">
+              <input type="text" placeholder="Avg" value={htf['avgRotation'] || ''} onChange={e => setHtf('avgRotation', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded-none text-[var(--text-1)] w-16 outline-none focus:border-[var(--accent)]" />
+              <input type="text" placeholder="curr" value={htf['currRotation'] || ''} onChange={e => setHtf('currRotation', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded-none text-[var(--text-1)] w-16 outline-none focus:border-[var(--accent)]" />
+            </div>
+          )}
+          {dim.id === 'compression' && (
+            <div className="flex gap-2 ml-4">
+              <input type="text" placeholder="Avg Height" value={htf['avgHeight'] || ''} onChange={e => setHtf('avgHeight', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded-none text-[var(--text-1)] w-20 outline-none focus:border-[var(--accent)]" />
+              <input type="text" placeholder="Current Height" value={htf['currentHeight'] || ''} onChange={e => setHtf('currentHeight', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded-none text-[var(--text-1)] w-24 outline-none focus:border-[var(--accent)]" />
+            </div>
+          )}
+          {dim.name === 'HTF Imbalance' && (
+            <div className="flex gap-2 ml-4">
+              <input type="text" placeholder="Filling percentage" value={htf['fillingPercentage'] || ''} onChange={e => setHtf('fillingPercentage', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded-none text-[var(--text-1)] w-32 outline-none focus:border-[var(--accent)]" />
+            </div>
+          )}
         </div>
       ))}
 
-      {/* ── STOP GATE ── */}
       {isStop && !isLocked && (
         <div className="flex flex-col gap-1.5 px-4 py-3 mt-3" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.4)' }}>
           <span style={{ fontSize: '9px', fontWeight: 900, color: '#ef4444', letterSpacing: '0.2em', textTransform: 'uppercase' }}>⛔ NO ENGAGEMENT — Session Ends Here</span>
@@ -70,7 +81,6 @@ export default function Phase2Auction() {
         </div>
       )}
 
-      {/* ── NOTES + ACTIONS ── */}
       <div className="flex gap-4 items-start pt-4 mt-2">
         <textarea
           value={notes.htfStructure || ''}
@@ -96,7 +106,6 @@ export default function Phase2Auction() {
           Locked: {stepTimestamps.htfStructure}
         </div>
       )}
-
     </div>
   );
 }

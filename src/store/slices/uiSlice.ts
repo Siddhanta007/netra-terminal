@@ -1,10 +1,12 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { loadState } from '../../utils/storage';
+import { loadState, saveState } from '../../utils/storage';
 import { Toast, ConfirmModal, ActiveView } from '../../types';
 
 const getInitialPrepStep = (): number => {
   const s = loadState('session', null);
   if (!s) return 0;
+  const persisted = loadState<number | null>('prepStep', null);
+  if (persisted !== null && persisted >= 1) return persisted;
   const activeId = loadState('activeSessionId', null);
   return activeId ? 2 : 1;
 };
@@ -60,6 +62,7 @@ export const uiSlice = createSlice({
     },
     setPrepStep: (state, action: PayloadAction<number>) => {
       state.prepStep = action.payload;
+      saveState('prepStep', action.payload);
     },
     setIsLoggerOpen: (state, action: PayloadAction<boolean>) => {
       state.isLoggerOpen = action.payload;

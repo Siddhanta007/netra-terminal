@@ -7,7 +7,7 @@ import { useNetraUtils } from './useNetraUtils';
 
 export function useChatPanel() {
   const dispatch = useDispatch<AppDispatch>();
-  const { getAuthHeaders, showToast, getActiveModel } = useNetraUtils();
+  const { getAuthHeaders, showToast, getActiveModel, checkGuestLimit, markGuestAiUsed } = useNetraUtils();
 
   const [uploadedVisionFiles, setUploadedVisionFiles] = useState<File[]>([]);
 
@@ -26,6 +26,7 @@ export function useChatPanel() {
 
   const handleSendMessage = useCallback(async () => {
     if (!chatInput.trim() || isAiLoading) return;
+    if (!checkGuestLimit()) { showToast('Guest limit reached — sign in to continue', 'error'); return; }
 
     const userMsg = { role: 'user' as const, text: chatInput };
     dispatch(appendChatMessage(userMsg));
@@ -81,6 +82,7 @@ export function useChatPanel() {
       const envelope = await response.json() as { data?: { text: string }; text?: string };
       const text = envelope?.data?.text ?? envelope?.text ?? 'No response';
       dispatch(appendChatMessage({ role: 'ai', text }));
+      markGuestAiUsed();
     } catch {
       showToast('NETRA Neural Link Interrupted', 'error');
       dispatch(appendChatMessage({ role: 'ai', text: 'Protocol error: My neural link was interrupted. Please retry.' }));

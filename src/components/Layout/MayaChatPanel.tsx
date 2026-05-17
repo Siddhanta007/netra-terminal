@@ -2,11 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import ReactMarkdown from 'react-markdown';
 import { useNetra } from '../../context/NetraContext';
-import { setChatInput, setIncludeData, setIncludeDoctrine } from '../../store/slices/chatSlice';
+import { setChatInput, setIncludeData } from '../../store/slices/chatSlice';
 import { setSelectedModel, setModelConfig } from '../../store/slices/modelSlice';
 import { RootState, AppDispatch } from '../../store';
 
-function MessageContent({ text }: { text: string | unknown }) {
+function MessageContent({ text, dark }: { text: string | unknown; dark: boolean }) {
   const str = typeof text === 'string' ? text : JSON.stringify(text);
   const thinkRegex = /<think>([\s\S]*?)<\/think>/;
   const match = str.match(thinkRegex);
@@ -15,11 +15,9 @@ function MessageContent({ text }: { text: string | unknown }) {
     const response = str.replace(thinkRegex, '').trim();
     return (
       <>
-        <details className="mb-2 bg-white/5 rounded-lg p-2 border border-white/10">
-          <summary className="text-xs font-bold text-indigo-400 cursor-pointer hover:text-indigo-300 transition-colors">
-            Thoughts
-          </summary>
-          <div className="mt-1 text-xs text-white/70 whitespace-pre-wrap">{thinking}</div>
+        <details style={{ marginBottom: '8px', background: dark ? 'rgba(65,105,225,0.08)' : '#eff6ff', border: `1px solid ${dark ? 'rgba(65,105,225,0.2)' : 'rgba(65,105,225,0.2)'}`, padding: '8px 10px' }}>
+          <summary style={{ fontSize: '10px', fontWeight: 700, color: '#4169E1', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Thinking</summary>
+          <div style={{ marginTop: '6px', fontSize: '11px', color: dark ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.6)', whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>{thinking}</div>
         </details>
         <ReactMarkdown>{response}</ReactMarkdown>
       </>
@@ -37,7 +35,6 @@ export default function MayaChatPanel() {
   const chatInput = useSelector((s: RootState) => s.chat.chatInput);
   const isAiLoading = useSelector((s: RootState) => s.chat.isAiLoading);
   const includeData = useSelector((s: RootState) => s.chat.includeData);
-  const includeDoctrine = useSelector((s: RootState) => s.chat.includeDoctrine);
   const selectedModel = useSelector((s: RootState) => s.model.selectedModel);
   const modelConfig = useSelector((s: RootState) => s.model.modelConfig);
   const darkMode = useSelector((s: RootState) => s.ui.darkMode);
@@ -51,21 +48,77 @@ export default function MayaChatPanel() {
     }
   }, [chatHistory]);
 
+  // Theme tokens
+  const t = darkMode ? {
+    panelBg: '#0d0d14',
+    headerBg: '#0d0d14',
+    headerBorder: 'rgba(65,105,225,0.2)',
+    chatBg: 'transparent',
+    aiBubbleBg: 'rgba(255,255,255,0.05)',
+    aiBubbleBorder: 'rgba(255,255,255,0.08)',
+    aiBubbleText: '#e2e8f0',
+    inputAreaBg: 'rgba(255,255,255,0.02)',
+    inputBoxBg: 'rgba(255,255,255,0.03)',
+    inputBoxBorder: 'rgba(255,255,255,0.1)',
+    inputText: '#ffffff',
+    inputPlaceholder: 'rgba(255,255,255,0.35)',
+    toolbarBorder: 'rgba(255,255,255,0.06)',
+    toolbarText: 'rgba(255,255,255,0.4)',
+    toolbarHoverBg: 'rgba(255,255,255,0.06)',
+    closeHoverBg: 'rgba(239,68,68,0.12)',
+    paramsBg: 'rgba(255,255,255,0.02)',
+    paramsBorder: 'rgba(255,255,255,0.08)',
+    paramsText: 'rgba(255,255,255,0.4)',
+    watermark: '#ffffff',
+    emptyIcon: 'rgba(65,105,225,0.15)',
+    emptyTitle: 'rgba(255,255,255,0.7)',
+    emptyBody: 'rgba(255,255,255,0.3)',
+    sepColor: 'rgba(255,255,255,0.08)',
+  } : {
+    panelBg: '#ffffff',
+    headerBg: '#ffffff',
+    headerBorder: 'rgba(65,105,225,0.15)',
+    chatBg: '#f8fafc',
+    aiBubbleBg: '#ffffff',
+    aiBubbleBorder: 'rgba(15,23,42,0.1)',
+    aiBubbleText: '#0f172a',
+    inputAreaBg: '#ffffff',
+    inputBoxBg: '#f8fafc',
+    inputBoxBorder: 'rgba(65,105,225,0.2)',
+    inputText: '#0f172a',
+    inputPlaceholder: 'rgba(15,23,42,0.35)',
+    toolbarBorder: 'rgba(65,105,225,0.12)',
+    toolbarText: 'rgba(15,23,42,0.4)',
+    toolbarHoverBg: 'rgba(65,105,225,0.06)',
+    closeHoverBg: 'rgba(239,68,68,0.08)',
+    paramsBg: '#f8fafc',
+    paramsBorder: 'rgba(65,105,225,0.15)',
+    paramsText: 'rgba(15,23,42,0.5)',
+    watermark: '#0f172a',
+    emptyIcon: 'rgba(65,105,225,0.08)',
+    emptyTitle: '#0f172a',
+    emptyBody: 'rgba(15,23,42,0.45)',
+    sepColor: 'rgba(15,23,42,0.1)',
+  };
+
   return (
-    <div className="flex-1 flex flex-col h-full relative">
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', background: t.panelBg, position: 'relative', transition: 'background 300ms' }}>
+
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-[var(--border)] bg-[var(--surface-2)]/50">
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-black uppercase tracking-widest text-[var(--text-1)]">MAYA</span>
-          <span className="text-[8px] text-[var(--text-3)] font-mono opacity-60">UPLINK</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', height: '48px', borderBottom: `1px solid ${t.headerBorder}`, background: t.headerBg, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} className="animate-pulse" />
+          <span style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.18em', color: darkMode ? '#ffffff' : '#0f172a' }}>Maya</span>
+          <span style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: darkMode ? 'rgba(255,255,255,0.25)' : 'rgba(15,23,42,0.35)' }}>AI Uplink</span>
         </div>
         <button
           onClick={() => setIsAiPaneOpen(false)}
-          style={{ background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%', color: 'var(--text-3)', cursor: 'pointer', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          className="hover:bg-red-500/20 hover:text-red-500 transition-colors"
+          style={{ width: '26px', height: '26px', border: `1px solid ${t.aiBubbleBorder}`, background: 'none', color: t.toolbarText, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 150ms' }}
+          onMouseEnter={e => { e.currentTarget.style.background = t.closeHoverBg; e.currentTarget.style.color = '#ef4444'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = t.toolbarText; }}
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         </button>
       </div>
@@ -73,233 +126,171 @@ export default function MayaChatPanel() {
       {/* Chat History */}
       <div
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-4 relative"
-        style={{ background: darkMode ? 'transparent' : '#f8f9fa' }}
+        style={{ flex: 1, overflowY: 'auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '12px', background: t.chatBg, position: 'relative' }}
+        className="custom-scrollbar"
       >
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
-          <span style={{
-            fontSize: '48px',
-            fontFamily: "'Dancing Script', 'Brush Script MT', cursive",
-            color: darkMode ? '#fff' : '#000',
-            opacity: 0.05,
-            transform: 'rotate(-10deg)',
-            letterSpacing: '2px',
-          }}>maya</span>
+        {/* Watermark */}
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', overflow: 'hidden' }}>
+          <span style={{ fontSize: '52px', fontFamily: "'Dancing Script', cursive", color: t.watermark, opacity: 0.04, transform: 'rotate(-8deg)', letterSpacing: '4px', userSelect: 'none' }}>maya</span>
         </div>
 
+        {chatHistory.length === 0 && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', textAlign: 'center', opacity: 0.8 }}>
+            <div style={{ width: '40px', height: '40px', background: t.emptyIcon, border: `1px solid ${darkMode ? 'rgba(65,105,225,0.2)' : 'rgba(65,105,225,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M4 18V9L12 15L20 9V18" stroke="#4169E1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="12" cy="5" r="2" fill="#4169E1"/>
+              </svg>
+            </div>
+            <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', color: t.emptyTitle, marginBottom: '6px' }}>Maya is ready</div>
+            <div style={{ fontSize: '10px', color: t.emptyBody, lineHeight: 1.55 }}>Ask about market conditions, trade setups, or get analysis on your data.</div>
+          </div>
+        )}
+
         {chatHistory.map((msg, idx) => (
-          <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} w-full mb-3`}>
+          <div key={idx} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', width: '100%' }}>
+            {msg.role !== 'user' && (
+              <div style={{ width: '24px', height: '24px', background: '#4169E1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: '8px', alignSelf: 'flex-end' }}>
+                <svg width="10" height="10" viewBox="0 0 14 14" fill="none"><polygon points="7,1 13,4 13,10 7,13 1,10 1,4" fill="none" stroke="white" strokeWidth="1.5"/><circle cx="7" cy="7" r="2" fill="white"/></svg>
+              </div>
+            )}
             <div
               style={{
-                maxWidth: '80%',
-                padding: '12px 20px',
-                background: msg.role === 'user'
-                  ? 'linear-gradient(135deg, #4169E1 0%, #6366F1 100%)'
-                  : 'rgba(255,255,255,0.05)',
-                color: '#FFFFFF',
-                borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                maxWidth: '82%',
+                padding: '10px 14px',
+                background: msg.role === 'user' ? '#4169E1' : t.aiBubbleBg,
+                color: msg.role === 'user' ? '#ffffff' : t.aiBubbleText,
+                border: msg.role === 'user' ? 'none' : `1px solid ${t.aiBubbleBorder}`,
+                borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '2px 12px 12px 12px',
                 fontSize: '13px',
-                lineHeight: '1.6',
-                fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+                lineHeight: 1.6,
+                fontFamily: 'Inter, system-ui, sans-serif',
               }}
-              className="animate-in fade-in slide-in-from-bottom-1 duration-300 markdown-content"
+              className="animate-in fade-in slide-in-from-bottom-1 duration-200 markdown-content"
             >
-              <div className="prose prose-sm dark:prose-invert max-w-none text-inherit" style={{ fontFamily: 'inherit' }}>
-                <MessageContent text={msg.text} />
+              <div className={`prose prose-sm max-w-none ${darkMode ? 'prose-invert' : ''}`} style={{ fontFamily: 'inherit', color: 'inherit' }}>
+                <MessageContent text={msg.text} dark={darkMode} />
               </div>
             </div>
           </div>
         ))}
 
         {isAiLoading && (
-          <div className="flex justify-start">
-            <div
-              style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '20px 20px 20px 4px', padding: '16px', border: '1px solid rgba(255,255,255,0.05)' }}
-              className="animate-pulse"
-            >
-              <div className="flex gap-1.5">
-                <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" />
-                <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce delay-100" />
-                <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce delay-200" />
-              </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: '24px', height: '24px', background: '#4169E1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="10" height="10" viewBox="0 0 14 14" fill="none"><polygon points="7,1 13,4 13,10 7,13 1,10 1,4" fill="none" stroke="white" strokeWidth="1.5"/><circle cx="7" cy="7" r="2" fill="white"/></svg>
+            </div>
+            <div style={{ background: t.aiBubbleBg, border: `1px solid ${t.aiBubbleBorder}`, padding: '12px 16px', borderRadius: '2px 12px 12px 12px', display: 'flex', gap: '5px', alignItems: 'center' }}>
+              {[0, 0.1, 0.2].map((delay, i) => (
+                <div key={i} className="animate-bounce" style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4169E1', animationDelay: `${delay}s` }} />
+              ))}
             </div>
           </div>
         )}
       </div>
 
       {/* Input Area */}
-      <div className="p-4 border-t border-white/5 bg-white/[0.02] flex flex-col">
-        <div
-          style={{
-            background: darkMode ? 'rgba(255,255,255,0.03)' : '#ffffff',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '24px',
-            padding: '4px',
-            boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.05)',
-            position: 'relative',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-          className="group focus-within:border-indigo-500/50 transition-all"
-        >
-          {/* Advanced Parameters Panel */}
-          {isConfigOpen && (
-            <div className="w-full bg-white/[0.01] border-b border-white/10 p-4 space-y-4 rounded-t-[24px] animate-in slide-in-from-top duration-300">
-              <div style={{ fontSize: '9px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Advanced Parameters</div>
-              <div className="space-y-4 max-h-[200px] overflow-y-auto custom-scrollbar p-1">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-center">
-                      <span style={{ fontSize: '8px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Temp</span>
-                      <span style={{ fontSize: '10px', fontWeight: 700, color: '#4169E1' }}>{modelConfig.temperature.toFixed(2)}</span>
-                    </div>
-                    <input type="range" min="0" max="1" step="0.05" value={modelConfig.temperature}
-                      onChange={(e) => dispatch(setModelConfig({ ...modelConfig, temperature: parseFloat(e.target.value) }))}
-                      style={{ width: '100%', accentColor: '#4169E1' }} />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-center">
-                      <span style={{ fontSize: '8px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Penalty</span>
-                      <span style={{ fontSize: '10px', fontWeight: 700, color: '#4169E1' }}>{(modelConfig.frequency_penalty || 0).toFixed(1)}</span>
-                    </div>
-                    <input type="range" min="0" max="2" step="0.1" value={modelConfig.frequency_penalty || 0}
-                      onChange={(e) => dispatch(setModelConfig({ ...modelConfig, frequency_penalty: parseFloat(e.target.value) }))}
-                      style={{ width: '100%', accentColor: '#4169E1' }} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-center">
-                      <span style={{ fontSize: '8px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Top P</span>
-                      <span style={{ fontSize: '10px', fontWeight: 700, color: '#4169E1' }}>{(modelConfig.top_p || 1.0).toFixed(2)}</span>
-                    </div>
-                    <input type="range" min="0" max="1" step="0.05" value={modelConfig.top_p || 1.0}
-                      onChange={(e) => dispatch(setModelConfig({ ...modelConfig, top_p: parseFloat(e.target.value) }))}
-                      style={{ width: '100%', accentColor: '#4169E1' }} />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-center">
-                      <span style={{ fontSize: '8px', fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>Max Tokens</span>
-                      <span style={{ fontSize: '10px', fontWeight: 700, color: '#4169E1' }}>{modelConfig.max_tokens || 2048}</span>
-                    </div>
-                    <input type="range" min="1" max="4096" step="1" value={modelConfig.max_tokens || 2048}
-                      onChange={(e) => dispatch(setModelConfig({ ...modelConfig, max_tokens: parseInt(e.target.value) }))}
-                      style={{ width: '100%', accentColor: '#4169E1' }} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+      <div style={{ padding: '12px 16px', borderTop: `1px solid ${t.headerBorder}`, background: t.inputAreaBg, flexShrink: 0 }}>
 
-          {/* Image Previews */}
-          {uploadedVisionFiles.length > 0 && (
-            <div className="flex gap-2 p-2 border-b border-[var(--border)]">
-              {uploadedVisionFiles.map((file, idx) => (
-                <div key={idx} className="relative w-12 h-12">
-                  <img src={URL.createObjectURL(file)} className="w-full h-full object-cover rounded-md" alt="Preview" />
-                  <button
-                    onClick={() => setUploadedVisionFiles([])}
-                    className="absolute -top-1 -right-1 w-4 h-4 bg-[var(--surface)] border border-[var(--border)] rounded-full flex items-center justify-center text-[var(--text-1)] text-xs hover:bg-red-500/20 hover:text-red-500 transition-colors"
-                  >×</button>
+        {/* Advanced Params Panel */}
+        {isConfigOpen && (
+          <div style={{ background: t.paramsBg, border: `1px solid ${t.paramsBorder}`, padding: '14px 16px', marginBottom: '10px' }}>
+            <div style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', color: '#4169E1', marginBottom: '12px' }}>Model Parameters</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 20px' }}>
+              {[
+                { label: 'Temperature', key: 'temperature' as const, min: 0, max: 1, step: 0.05, val: modelConfig.temperature },
+                { label: 'Freq Penalty', key: 'frequency_penalty' as const, min: 0, max: 2, step: 0.1, val: modelConfig.frequency_penalty || 0 },
+                { label: 'Top P', key: 'top_p' as const, min: 0, max: 1, step: 0.05, val: modelConfig.top_p || 1.0 },
+                { label: 'Max Tokens', key: 'max_tokens' as const, min: 1, max: 4096, step: 1, val: modelConfig.max_tokens || 2048 },
+              ].map(p => (
+                <div key={p.key}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: t.paramsText }}>{p.label}</span>
+                    <span style={{ fontSize: '10px', fontWeight: 700, color: '#4169E1', fontFamily: 'monospace' }}>{p.val}</span>
+                  </div>
+                  <input type="range" min={p.min} max={p.max} step={p.step} value={p.val}
+                    onChange={e => dispatch(setModelConfig({ ...modelConfig, [p.key]: p.key === 'max_tokens' ? parseInt(e.target.value) : parseFloat(e.target.value) }))}
+                    style={{ width: '100%', accentColor: '#4169E1' }} />
                 </div>
               ))}
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Textarea */}
+        {/* Image Previews */}
+        {uploadedVisionFiles.length > 0 && (
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+            {uploadedVisionFiles.map((file, idx) => (
+              <div key={idx} style={{ position: 'relative', width: '48px', height: '48px' }}>
+                <img src={URL.createObjectURL(file)} style={{ width: '100%', height: '100%', objectFit: 'cover', border: `1px solid ${t.aiBubbleBorder}` }} alt="Preview" />
+                <button
+                  onClick={() => setUploadedVisionFiles([])}
+                  style={{ position: 'absolute', top: '-6px', right: '-6px', width: '16px', height: '16px', background: darkMode ? '#0d0d14' : '#ffffff', border: `1px solid ${t.aiBubbleBorder}`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '10px', color: '#ef4444' }}
+                >×</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Textarea container */}
+        <div style={{ background: t.inputBoxBg, border: `1px solid ${t.inputBoxBorder}`, display: 'flex', flexDirection: 'column' }}>
           <textarea
             value={chatInput}
-            onChange={(e) => dispatch(setChatInput(e.target.value))}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
-            placeholder="Ask anything about the market..."
-            style={{
-              width: '100%',
-              background: 'transparent',
-              border: 'none',
-              padding: '12px 14px',
-              fontSize: '13px',
-              color: 'var(--text-1)',
-              outline: 'none',
-              resize: 'none',
-              height: '60px',
-            }}
+            onChange={e => dispatch(setChatInput(e.target.value))}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+            placeholder="Ask Maya anything about the market..."
+            style={{ width: '100%', background: 'transparent', border: 'none', padding: '12px 14px', fontSize: '13px', color: t.inputText, outline: 'none', resize: 'none', height: '64px', fontFamily: 'inherit' }}
             className="custom-scrollbar"
           />
 
           {/* Toolbar */}
-          <div className="flex items-center justify-between p-2 border-t border-[var(--border)]">
-            <div className="flex items-center gap-2">
-              {/* Config */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderTop: `1px solid ${t.toolbarBorder}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+
+              {/* Config toggle */}
               <button
                 onClick={() => setIsConfigOpen(!isConfigOpen)}
-                className={`w-7 h-7 rounded-sm ${isConfigOpen ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30' : 'bg-transparent text-[var(--text-3)] border-[var(--border)]'} border flex items-center justify-center cursor-pointer hover:bg-indigo-500/10 hover:text-indigo-400 transition-all`}
                 title="Model Configuration"
+                style={{ width: '26px', height: '26px', border: `1px solid ${isConfigOpen ? '#4169E1' : t.aiBubbleBorder}`, background: isConfigOpen ? 'rgba(65,105,225,0.1)' : 'none', color: isConfigOpen ? '#4169E1' : t.toolbarText, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 150ms' }}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 12h6" />
-                </svg>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 12h6"/></svg>
               </button>
 
-              {/* Upload */}
-              <label className="w-7 h-7 flex items-center justify-center rounded-sm border border-[var(--border)] cursor-pointer text-[var(--text-3)] hover:text-[var(--text-1)] transition-colors">
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                  if (e.target.files?.[0]) setUploadedVisionFiles([e.target.files[0]]);
-                }} />
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
+              {/* Upload image */}
+              <label
+                style={{ width: '26px', height: '26px', border: `1px solid ${t.aiBubbleBorder}`, background: 'none', color: t.toolbarText, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 150ms' }}
+                title="Attach image"
+              >
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) setUploadedVisionFiles([e.target.files[0]]); }} />
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               </label>
 
-              <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.1)', margin: '0 2px' }} />
+              {/* Separator */}
+              <div style={{ width: '1px', height: '16px', background: t.sepColor, margin: '0 2px' }} />
 
-              {/* Model Selector */}
-              <div className="relative flex items-center gap-1 cursor-pointer text-[11px] font-medium text-[var(--text-2)] hover:text-[var(--text-1)] transition-colors">
-                <span>{AVAILABLE_MODELS.find(m => m.id === selectedModel)?.name.split(',')[0] || 'Select Model'}</span>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6" /></svg>
+              {/* Model selector */}
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                <span style={{ fontSize: '10px', fontWeight: 600, color: t.toolbarText }}>{AVAILABLE_MODELS.find(m => m.id === selectedModel)?.name.split(',')[0] || 'Model'}</span>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke={t.toolbarText} strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
                 <select
                   value={selectedModel}
-                  onChange={(e) => dispatch(setSelectedModel(e.target.value))}
-                  className="absolute inset-0 opacity-0 cursor-pointer"
+                  onChange={e => dispatch(setSelectedModel(e.target.value))}
+                  style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', fontSize: '10px' }}
                 >
                   {AVAILABLE_MODELS.map(m => (
-                    <option key={m.id} value={m.id} className="bg-[var(--surface)] text-[var(--text-1)]">{m.name.split(',')[0]}</option>
+                    <option key={m.id} value={m.id}>{m.name.split(',')[0]}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Include Data */}
+              {/* Include Data toggle */}
               <button
                 onClick={() => dispatch(setIncludeData(!includeData))}
-                style={{
-                  height: '24px', width: '24px', borderRadius: '2px',
-                  background: includeData ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
-                  border: `1px solid ${includeData ? '#6366f1' : 'var(--border)'}`,
-                  color: includeData ? '#818cf8' : 'var(--text-3)',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-                className="transition-all hover:border-indigo-500/50"
-                title="Include Trade Data"
+                title="Include trade data"
+                style={{ width: '26px', height: '26px', border: `1px solid ${includeData ? '#6366f1' : t.aiBubbleBorder}`, background: includeData ? 'rgba(99,102,241,0.1)' : 'none', color: includeData ? '#6366f1' : t.toolbarText, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 150ms' }}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" /><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-                </svg>
-              </button>
-
-              {/* Include Doctrine */}
-              <button
-                onClick={() => dispatch(setIncludeDoctrine(!includeDoctrine))}
-                style={{
-                  height: '24px', width: '24px', borderRadius: '2px',
-                  background: includeDoctrine ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
-                  border: `1px solid ${includeDoctrine ? '#6366f1' : 'var(--border)'}`,
-                  color: includeDoctrine ? '#818cf8' : 'var(--text-3)',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-                className="transition-all hover:border-indigo-500/50"
-                title="Include Doctrine"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z" />
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
                 </svg>
               </button>
             </div>
@@ -308,18 +299,21 @@ export default function MayaChatPanel() {
             <button
               onClick={handleSendMessage}
               disabled={!chatInput.trim() || isAiLoading}
-              className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
-                (!chatInput.trim() || isAiLoading)
-                  ? 'bg-[var(--surface-3)] text-[var(--text-3)] cursor-not-allowed'
-                  : 'bg-gradient-to-r from-[#4169E1] to-[#6366F1] text-white hover:opacity-90 active:scale-95'
-              }`}
+              style={{
+                height: '28px', padding: '0 14px', border: 'none',
+                background: (!chatInput.trim() || isAiLoading) ? (darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.08)') : '#4169E1',
+                color: (!chatInput.trim() || isAiLoading) ? t.toolbarText : '#ffffff',
+                cursor: (!chatInput.trim() || isAiLoading) ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 150ms', fontFamily: 'inherit',
+              }}
             >
               {isAiLoading ? (
-                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <div style={{ width: '12px', height: '12px', border: `2px solid ${darkMode ? 'rgba(255,255,255,0.15)' : 'rgba(15,23,42,0.15)'}`, borderTopColor: '#4169E1', borderRadius: '50%' }} className="animate-spin" />
               ) : (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                  <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
-                </svg>
+                <>
+                  <span style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Send</span>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                </>
               )}
             </button>
           </div>

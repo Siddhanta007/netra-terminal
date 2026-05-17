@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { loadState } from '../../utils/storage';
+import { loadState, saveState } from '../../utils/storage';
 import { AvailableModel, ModelConfig, SysData } from '../../types';
 
 interface ModelState {
@@ -22,7 +22,7 @@ const initialState: ModelState = {
     seed: 42,
     frequency_penalty: 0.0,
   }),
-  currentModel: 'pinaka',
+  currentModel: loadState('currentModel', 'pinaka'),
   sysData: null,
 };
 
@@ -44,6 +44,7 @@ export const modelSlice = createSlice({
     },
     setCurrentModel: (state, action: PayloadAction<string>) => {
       state.currentModel = action.payload;
+      saveState('currentModel', action.payload);
     },
     setSysData: (state, action: PayloadAction<SysData | null>) => {
       state.sysData = action.payload;

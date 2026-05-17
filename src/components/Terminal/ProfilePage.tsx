@@ -1,140 +1,159 @@
 import { useNetra } from '../../context/NetraContext';
 
-export default function ProfilePage() {
-  const { session, tradeLogs, darkMode } = useNetra();
+function PageCorners() {
+  const radii = [80, 150, 220, 295, 370, 445, 520];
+  const sw = [5, 3.5, 2.5, 2, 1.5, 1, 0.7];
+  const so = [1, 0.7, 0.5, 0.35, 0.22, 0.14, 0.08];
+  return (
+    <>
+      <div style={{ position: 'fixed', top: 0, right: 0, width: '560px', height: '560px', pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+        <svg width="560" height="560" viewBox="0 0 560 560" fill="none">
+          {radii.map((r, i) => {
+            const pts = Array.from({ length: 7 }, (_, k) => { const a = (-90 + k * 360 / 7) * Math.PI / 180; return `${(560 + r * Math.cos(a)).toFixed(1)},${(r * Math.sin(a)).toFixed(1)}`; }).join(' ');
+            return <polygon key={r} points={pts} stroke="#2563eb" strokeWidth={sw[i]} strokeOpacity={so[i]} fill={i < 3 ? `rgba(37,99,235,${[0.1, 0.05, 0.02][i]})` : 'none'} strokeDasharray={i === 3 || i === 5 ? '10 7' : 'none'} />;
+          })}
+          <circle cx="560" cy="0" r="9" fill="#2563eb" fillOpacity="0.9" />
+          <circle cx="560" cy="0" r="18" fill="none" stroke="#2563eb" strokeWidth="1.5" strokeOpacity="0.4" />
+        </svg>
+      </div>
+      <div style={{ position: 'fixed', bottom: 0, left: 0, width: '500px', height: '500px', pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+        <svg width="500" height="500" viewBox="0 0 500 500" fill="none">
+          {radii.map((r, i) => {
+            const pts = Array.from({ length: 7 }, (_, k) => { const a = (90 + k * 360 / 7) * Math.PI / 180; return `${(r * Math.cos(a)).toFixed(1)},${(500 + r * Math.sin(a)).toFixed(1)}`; }).join(' ');
+            return <polygon key={r} points={pts} stroke="#f59e0b" strokeWidth={sw[i]} strokeOpacity={so[i]} fill={i < 3 ? `rgba(245,158,11,${[0.1, 0.05, 0.02][i]})` : 'none'} strokeDasharray={i === 3 || i === 5 ? '10 7' : 'none'} />;
+          })}
+          <circle cx="0" cy="500" r="9" fill="#f59e0b" fillOpacity="0.9" />
+          <circle cx="0" cy="500" r="18" fill="none" stroke="#f59e0b" strokeWidth="1.5" strokeOpacity="0.4" />
+        </svg>
+      </div>
+    </>
+  );
+}
 
-  const totalMissions = tradeLogs ? tradeLogs.length : 0;
-  const wins = tradeLogs ? tradeLogs.filter(log => log.phase4?.outcome === 'WIN').length : 0;
-  const winRate = totalMissions > 0 ? ((wins / totalMissions) * 100).toFixed(1) : '0.0';
+export default function ProfilePage() {
+  const { session, tradeLogs } = useNetra();
+
+  const total = tradeLogs?.length ?? 0;
+  const wins = tradeLogs?.filter(l => l.phase4?.outcome?.toLowerCase() === 'win').length ?? 0;
+  const losses = tradeLogs?.filter(l => l.phase4?.outcome?.toLowerCase() === 'loss').length ?? 0;
+  const settled = wins + losses;
+  const winRate = settled > 0 ? ((wins / settled) * 100).toFixed(1) : '—';
+
+  const totalPL = tradeLogs?.reduce((sum, l) => {
+    const pl = parseFloat(String(l.phase4?.pl ?? ''));
+    return isNaN(pl) ? sum : sum + pl;
+  }, 0) ?? 0;
+  const hasPL = tradeLogs?.some(l => !isNaN(parseFloat(String(l.phase4?.pl ?? '')))) ?? false;
+
+  const weapMap: Record<string, number> = {};
+  tradeLogs?.forEach(l => {
+    const w = l.phase3?.manual_weapon || l.weapon || '';
+    if (w) weapMap[w] = (weapMap[w] ?? 0) + 1;
+  });
+  const topWeapon = Object.entries(weapMap).sort((a, b) => b[1] - a[1])[0] ?? null;
+
+  const initial = (session?.userName || 'O')[0].toUpperCase();
+
+  const statRow = (label: string, value: string, color?: string) => (
+    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: '1px solid rgba(15,23,42,0.06)' }}>
+      <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(15,23,42,0.45)' }}>{label}</span>
+      <span style={{ fontSize: '18px', fontWeight: 950, color: color || '#0f172a', fontFamily: 'monospace', letterSpacing: '-0.03em' }}>{value}</span>
+    </div>
+  );
 
   return (
-    <div className="flex-1 flex flex-col gap-8 animate-in fade-in zoom-in-95 duration-700 p-8 relative overflow-hidden">
+    <div style={{ background: '#ffffff', flex: 1, minHeight: '100%', position: 'relative', overflow: 'auto' }}>
+      <PageCorners />
 
-      {/* Dynamic Grid Background */}
-      <div
-        className="absolute inset-0 pointer-events-none opacity-10 dark:opacity-20"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M 40 0 L 0 0 0 40' fill='none' stroke='currentColor' stroke-width='0.5'/%3E%3C/svg%3E")`,
-          backgroundPosition: 'center',
-          color: darkMode ? '#fff' : '#4169E1',
-        }}
-      />
+      <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '48px', position: 'relative', zIndex: 1 }}>
 
-      <div className="absolute top-[-100px] right-[-100px] w-80 h-80 bg-[#4169E1]/20 dark:bg-[#4169E1]/10 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-[-100px] left-[-100px] w-80 h-80 bg-[#6366F1]/20 dark:bg-[#6366F1]/10 rounded-full blur-[100px] pointer-events-none" />
+        {/* Main opaque box */}
+        <div style={{ background: '#f7fbff', border: '1px solid rgba(65,105,225,0.18)' }}>
+          <div style={{ height: '4px', background: '#4169E1' }} />
+          <div style={{ padding: '40px' }}>
 
-      {/* Header */}
-      <div className="relative z-10">
-        <div className="text-[9px] font-black uppercase tracking-[0.4em] text-[#4169E1] mb-2">Neural Identity Matrix</div>
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#4169E1] to-[#6366F1] flex items-center justify-center text-white text-2xl font-black shadow-[0_8px_24px_rgba(65,105,225,0.3)]">
-            {(session?.userName || 'O')[0].toUpperCase()}
-          </div>
-          <div>
-            <h2 className="text-[36px] font-black tracking-tight text-[var(--text-1)] dark:text-white uppercase leading-none">
-              {session?.userName || 'Operator'}
-            </h2>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--accent)] dark:text-white/40">
-                Clearance: Standard Operator
-              </span>
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch relative z-10">
-
-        {/* Left: Stats */}
-        <div className="lg:col-span-4 flex flex-col gap-6">
-          <div className="p-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/60 backdrop-blur-md flex flex-col gap-2 relative overflow-hidden group hover:border-[#4169E1]/50 transition-all duration-300 shadow-sm">
-            <div className="absolute top-0 left-0 w-1 h-full bg-[#4169E1]" />
-            <span className="text-[8px] font-black uppercase tracking-widest opacity-60">Total Missions Executed</span>
-            <div className="text-4xl font-black tabular-nums tracking-tighter">{totalMissions}</div>
-            <div className="text-[9px] font-bold uppercase text-[#4169E1] mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Telemetry Synced</div>
-          </div>
-
-          <div className="p-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/60 backdrop-blur-md flex flex-col gap-2 relative overflow-hidden group hover:border-emerald-500/50 transition-all duration-300 shadow-sm">
-            <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500" />
-            <span className="text-[8px] font-black uppercase tracking-widest opacity-60">Quantum Win Rate</span>
-            <div className="text-4xl font-black text-emerald-500 tabular-nums tracking-tighter">{winRate}%</div>
-            <div className="text-[9px] font-bold uppercase text-emerald-500 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Edge Verified</div>
-          </div>
-
-          <div className="p-6 rounded-2xl border border-[var(--border)] bg-black/[0.02] dark:bg-white/[0.02] flex flex-col gap-4">
-            <span className="text-[8px] font-black uppercase tracking-widest opacity-60">Neural Node Status</span>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">MAYA Engine</span>
-                <span className="text-[10px] font-bold uppercase text-emerald-500">Online</span>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '36px', paddingBottom: '28px', borderBottom: '1px solid rgba(65,105,225,0.15)' }}>
+              <div style={{ width: '68px', height: '68px', background: '#4169E1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span style={{ fontSize: '26px', fontWeight: 900, color: '#ffffff', fontFamily: 'monospace' }}>{initial}</span>
               </div>
-              <div className="h-1 w-full bg-[var(--border)] rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 w-[100%] animate-pulse" />
-              </div>
-              <div className="flex justify-between items-center pt-1">
-                <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">RAG Library</span>
-                <span className="text-[10px] font-bold uppercase text-emerald-500">Synced</span>
-              </div>
-              <div className="h-1 w-full bg-[var(--border)] rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 w-[94%]" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Details */}
-        <div className="lg:col-span-8 flex flex-col">
-          <div className="p-8 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/60 backdrop-blur-md h-full flex flex-col">
-
-            <div className="flex justify-between items-center mb-6 pb-2 border-b border-[var(--border)]">
-              <h3 className="text-xs font-black uppercase tracking-widest">Tactical Parameters</h3>
-              <span className="text-[9px] font-mono opacity-40">LOC: 0x7FF8D9</span>
-            </div>
-
-            <div className="space-y-8 flex-1">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                <div className="flex flex-col gap-1">
-                  <span className="text-[8px] font-black uppercase tracking-widest opacity-50">Operator ID</span>
-                  <span className="text-[11px] font-bold font-mono">{session?.userName || '—'}</span>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-[8px] font-black uppercase tracking-widest opacity-50">Assigned Asset</span>
-                  <span className="text-[11px] font-bold font-mono text-[#4169E1]">{session?.assetName || '—'}</span>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-[8px] font-black uppercase tracking-widest opacity-50">Current Session</span>
-                  <span className="text-[11px] font-bold font-mono text-emerald-500">Active</span>
+              <div>
+                <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#4169E1', marginBottom: '5px' }}>Operator Profile</div>
+                <h2 style={{ fontSize: '32px', fontWeight: 950, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '-0.03em', margin: 0, lineHeight: 1 }}>{session?.userName || 'Operator'}</h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} />
+                  <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em', color: '#10b981' }}>Active · Standard Operator</span>
                 </div>
               </div>
+            </div>
 
-              <div className="pt-6 border-t border-[var(--border)]">
-                <div className="text-[8px] font-black uppercase tracking-widest opacity-50 mb-3">Authorized Protocols</div>
-                <div className="flex gap-3">
-                  <div className="p-3 px-4 rounded-xl border border-[#4169E1]/30 bg-[#4169E1]/5 flex flex-col gap-1 flex-1">
-                    <span className="text-[10px] font-black text-[#4169E1]">PINAKA 2.5</span>
-                    <span className="text-[8px] font-bold opacity-60 uppercase">Full Execution Access</span>
+            {/* 3-column grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+
+              {/* Performance */}
+              <div style={{ background: '#ffffff', border: '1px solid rgba(65,105,225,0.15)' }}>
+                <div style={{ height: '3px', background: '#4169E1' }} />
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(15,23,42,0.06)' }}>
+                  <div style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.25em', color: '#4169E1' }}>Performance</div>
+                </div>
+                {statRow('Total Missions', total > 0 ? String(total) : '—')}
+                {statRow('Confirmed Wins', wins > 0 ? String(wins) : '—', '#10b981')}
+                {statRow('Confirmed Losses', losses > 0 ? String(losses) : '—', '#ef4444')}
+                {statRow('Win Rate', winRate !== '—' ? `${winRate}%` : '—', '#4169E1')}
+                {statRow('Total P&L', hasPL ? (totalPL >= 0 ? `+${totalPL.toFixed(0)}` : String(totalPL.toFixed(0))) : '—', hasPL ? (totalPL >= 0 ? '#10b981' : '#ef4444') : undefined)}
+              </div>
+
+              {/* Model Access */}
+              <div style={{ background: '#ffffff', border: '1px solid rgba(65,105,225,0.15)' }}>
+                <div style={{ height: '3px', background: '#6366f1' }} />
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(15,23,42,0.06)' }}>
+                  <div style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.25em', color: '#6366f1' }}>Model Access</div>
+                </div>
+                {[
+                  { id: 'PINAKA', desc: 'AI-Assisted Retail · Strike + Interception', color: '#3b82f6', status: 'Live', statusColor: '#10b981' },
+                  { id: 'TRISHUL', desc: 'Quant-Institutional Swing · Planning Phase', color: '#f59e0b', status: 'Planning', statusColor: '#d97706' },
+                ].map(m => (
+                  <div key={m.id} style={{ padding: '16px 20px', borderBottom: '1px solid rgba(15,23,42,0.06)', borderLeft: `3px solid ${m.color}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 900, color: '#0f172a', letterSpacing: '0.05em' }}>{m.id}</span>
+                      <span style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: m.statusColor }}>{m.status}</span>
+                    </div>
+                    <div style={{ fontSize: '10px', color: 'rgba(15,23,42,0.45)', fontWeight: 500 }}>{m.desc}</div>
                   </div>
-                  <div className="p-3 px-4 rounded-xl border border-[var(--border)] bg-transparent flex flex-col gap-1 flex-1 opacity-50">
-                    <span className="text-[10px] font-black">TRISHUL 1.0</span>
-                    <span className="text-[8px] font-bold opacity-60 uppercase">Awaiting Activation</span>
+                ))}
+                {topWeapon && (
+                  <div style={{ padding: '16px 20px' }}>
+                    <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgba(15,23,42,0.45)', marginBottom: '6px' }}>Top Weapon</div>
+                    <div style={{ fontSize: '20px', fontWeight: 950, color: '#6366f1', fontFamily: 'monospace', letterSpacing: '-0.02em' }}>{topWeapon[0]}</div>
+                    <div style={{ fontSize: '10px', color: 'rgba(15,23,42,0.45)', marginTop: '3px' }}>{topWeapon[1]} missions</div>
                   </div>
-                </div>
+                )}
               </div>
 
-              <div className="mt-auto pt-6 border-t border-[var(--border)] flex justify-between items-center">
-                <div>
-                  <div className="text-[8px] font-black uppercase tracking-widest opacity-50">Doctrine Version</div>
-                  <span className="text-[10px] font-mono font-bold">NETRA.AI.2.5.0</span>
+              {/* System Status */}
+              <div style={{ background: '#ffffff', border: '1px solid rgba(65,105,225,0.15)' }}>
+                <div style={{ height: '3px', background: '#10b981' }} />
+                <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(15,23,42,0.06)' }}>
+                  <div style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.25em', color: '#10b981' }}>System Status</div>
                 </div>
-                <div className="text-right">
-                  <div className="text-[8px] font-black uppercase tracking-widest opacity-50">Last Sync</div>
-                  <span className="text-[10px] font-mono font-bold uppercase">{new Date().toLocaleTimeString()}</span>
-                </div>
+                {[
+                  { label: 'MAYA Engine', value: 'Online', color: '#10b981' },
+                  { label: 'RAG Library', value: 'Synced', color: '#10b981' },
+                  { label: 'Doctrine Version', value: 'NETRA v2.0', color: '#0f172a' },
+                  { label: 'Last Sync', value: new Date().toLocaleTimeString(), color: '#0f172a' },
+                  { label: 'Operator ID', value: session?.userName || '—', color: '#4169E1' },
+                ].map(item => (
+                  <div key={item.label} style={{ padding: '14px 20px', borderBottom: '1px solid rgba(15,23,42,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(15,23,42,0.45)' }}>{item.label}</span>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: item.color, fontFamily: 'monospace' }}>{item.value}</span>
+                  </div>
+                ))}
               </div>
+
             </div>
           </div>
         </div>
+
       </div>
     </div>
   );

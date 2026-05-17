@@ -5,7 +5,7 @@ import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { API_BASE } from '../../utils/constants';
 
 export default function Login() {
-  const { sessionInput, setSessionInput, handleAuth, isLoggingIn } = useNetra();
+  const { sessionInput, setSessionInput, handleAuth, handleGuestLogin, isLoggingIn } = useNetra();
   const [showPassword, setShowPassword] = useState(false);
 
   const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
@@ -151,6 +151,17 @@ export default function Login() {
                 {isLoggingIn ? (
                   <><div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />Authenticating</>
                 ) : 'Authenticate'}
+              </button>
+
+              {/* Guest / Demo */}
+              <button
+                onClick={handleGuestLogin}
+                style={{ width: '100%', height: '40px', background: 'transparent', color: 'rgba(255,255,255,0.35)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer', transition: 'all 150ms', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.2)'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.6)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.35)'; }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                Try Demo Mode
               </button>
 
               {/* Divider */}

@@ -29,14 +29,7 @@ export default function Phase9WeaponArmory() {
   return (
     <div className="flex flex-col fade-up">
 
-      {/* REDUCE FLAG */}
-      {reduceFlag && (
-        <div className="flex items-center gap-3 px-4 py-2.5 mb-3" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)' }}>
-          <span style={{ fontSize: '9px', fontWeight: 900, color: '#f59e0b', letterSpacing: '0.2em', textTransform: 'uppercase' }}>
-            ⚠ REDUCE FLAG ACTIVE — Half R · First Target Only · No Trailing
-          </span>
-        </div>
-      )}
+
 
       {/* WEAPON SELECTION */}
       <div className="precision-row">
@@ -63,14 +56,7 @@ export default function Phase9WeaponArmory() {
       {/* WEAPON DETAILS */}
       {activeWeapon ? (
         <>
-          <div className="precision-row items-start">
-            <div className="precision-label pt-1">Logic Analysis</div>
-            <div className="flex-1 text-[11px] font-bold leading-relaxed text-[var(--text-2)] py-2">{activeWeapon.logic}</div>
-          </div>
-          <div className="precision-row items-start">
-            <div className="precision-label pt-1">Activation Protocol</div>
-            <div className="flex-1 text-[11px] font-medium leading-relaxed text-[var(--text-2)] py-2">{activeWeapon.activation}</div>
-          </div>
+
           {activeWeapon.id !== 'MANUAL' && (
             <>
               {[
@@ -104,13 +90,13 @@ export default function Phase9WeaponArmory() {
           className="flex-1 bg-transparent outline-none resize-none text-[12px] text-[var(--text-2)] placeholder:text-[var(--text-4)] leading-relaxed min-h-[56px]"
         />
         <div className="flex gap-2 shrink-0">
-          <button onClick={() => { setWeaponLocked(false); editStep(6); }} className="btn-reset w-24" disabled={!weaponLocked}>Edit</button>
+          <button onClick={() => { setWeaponLocked(false); editStep(5); }} className="btn-reset w-24" disabled={!weaponLocked}>Edit</button>
           <button
-            onClick={() => { setWeaponLocked(true); confirmStep(6); }}
-            className={`${highestStep > 6 ? 'btn-confirmed' : 'btn-confirm'} w-40`}
-            disabled={highestStep > 6 || !selectedWeaponId}
+            onClick={() => { setWeaponLocked(true); confirmStep(5); }}
+            className={`${weaponLocked ? 'btn-confirmed' : 'btn-confirm'} w-40`}
+            disabled={weaponLocked || !selectedWeaponId}
           >
-            {highestStep > 6 ? '✓ Armed' : 'Confirm Deployment'}
+            {weaponLocked ? '✓ Armed' : 'Confirm Deployment'}
           </button>
         </div>
       </div>

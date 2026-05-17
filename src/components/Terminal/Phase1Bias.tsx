@@ -238,7 +238,7 @@ export default function Phase1Bias() {
     stepTimestamps,
   } = useNetra();
 
-  const [showTree, setShowTree] = useState(false);
+  const [activeTab, setActiveTab] = useState<'tree' | 'logic' | 'rules' | null>(null);
 
   const dims        = SYSTEM_DATA.realBias?.dimensions || [];
   const rb          = (selections.realBias || {}) as Record<string, string>;
@@ -254,7 +254,7 @@ export default function Phase1Bias() {
 
   const handleReset = () => {
     doResetStep(1);
-    setShowTree(false);
+    setActiveTab(null);
   };
 
   return (
@@ -282,42 +282,68 @@ export default function Phase1Bias() {
         </div>
       ))}
 
-      {/* ── DOCTRINE TREE TOGGLE ROW ── */}
-      <div style={{ marginTop: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
-        <button
-          onClick={() => setShowTree(s => !s)}
-          style={{
-            padding: '7px 18px',
-            border: `1px solid ${showTree ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)'}`,
-            background: showTree ? 'rgba(255,255,255,0.06)' : 'transparent',
-            color: '#ffffff',
-            cursor: 'pointer',
-            fontFamily: 'JetBrains Mono, monospace',
-            fontSize: '9px',
-            fontWeight: 700,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            transition: 'all 140ms',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            flexShrink: 0,
-          }}
-        >
-          <span style={{ fontSize: '8px', opacity: 0.7 }}>{showTree ? '▼' : '▶'}</span>
-          Doctrine Tree Analysis
-        </button>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
-          <DocSection label="Combination Logic" items={COMBO_LOGIC}    accent="rgba(255,255,255,0.5)" />
-          <DocSection label="Critical Rules"    items={CRITICAL_RULES} accent="rgba(255,255,255,0.5)" />
-        </div>
+      {/* ── TABS ── */}
+      <div style={{ marginTop: '16px', display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.02)', padding: '2px', borderRadius: '4px' }}>
+        {[
+          { id: 'tree', label: 'Doctrine Tree' },
+          { id: 'logic', label: 'Combination Logic' },
+          { id: 'rules', label: 'Critical Rules' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(activeTab === tab.id ? null : tab.id as any)}
+            style={{
+              flex: 1,
+              padding: '6px 12px',
+              background: activeTab === tab.id ? 'rgba(255,255,255,0.1)' : 'transparent',
+              color: activeTab === tab.id ? '#ffffff' : 'rgba(255,255,255,0.5)',
+              border: 'none',
+              cursor: 'pointer',
+              fontFamily: 'JetBrains Mono, monospace',
+              fontSize: '9px',
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              transition: 'all 140ms',
+              textAlign: 'center',
+              borderRadius: '2px',
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* ── DOCTRINE TREE PANEL (toggled) ── */}
-      {showTree && (
-        <div style={{ marginTop: '8px' }}>
+      {/* ── TAB CONTENT ── */}
+      {activeTab === 'tree' && (
+        <div style={{ marginTop: '12px' }}>
           <DoctrineTreeInline rb={rb} dims={dims} />
+        </div>
+      )}
+      {activeTab === 'logic' && (
+        <div style={{ marginTop: '12px', padding: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)' }}>
+          <div style={{ fontSize: '10px', fontWeight: 900, color: '#ffffff', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '10px' }}>Combination Logic</div>
+          <div className="space-y-2">
+            {COMBO_LOGIC.map((item, i) => (
+              <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', color: 'rgba(255,255,255,0.5)' }}>[{i + 1}]</span>
+                <span style={{ fontSize: '11px', color: '#ffffff', opacity: 0.8 }}>{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {activeTab === 'rules' && (
+        <div style={{ marginTop: '12px', padding: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)' }}>
+          <div style={{ fontSize: '10px', fontWeight: 900, color: '#ffffff', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '10px' }}>Critical Rules</div>
+          <div className="space-y-2">
+            {CRITICAL_RULES.map((item, i) => (
+              <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', color: 'rgba(255,255,255,0.5)' }}>[{i + 1}]</span>
+                <span style={{ fontSize: '11px', color: '#ffffff', opacity: 0.8 }}>{item}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

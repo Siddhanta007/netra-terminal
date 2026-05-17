@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useCallback } from 'react';
+import { createContext, useContext, useEffect, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '../store';
 import {
@@ -12,9 +12,20 @@ import {
   setSysRecommendation as setSysRecommendationAction,
   setInterSelections as setInterSelectionsAction,
   setStrikeSelections as setStrikeSelectionsAction,
+  setSaturationSelections as setSaturationSelectionsAction,
   setSelectedWeaponId as setSelectedWeaponIdAction,
   setStepTimestamps as setStepTimestampsAction,
   setAnalyticsData as setAnalyticsDataAction,
+  setRAmount as setRAmountAction,
+  setDailyLossLimit as setDailyLossLimitAction,
+  setDailyLossHit as setDailyLossHitAction,
+  setDailyTarget as setDailyTargetAction,
+  setDailyTargetHit as setDailyTargetHitAction,
+  setOpeningWindow as setOpeningWindowAction,
+  setSessionCutoff as setSessionCutoffAction,
+  setIsExpiryDay as setIsExpiryDayAction,
+  setExpiryCutoff as setExpiryCutoffAction,
+  setRulesAcknowledged as setRulesAcknowledgedAction,
 } from '../store/slices/analysisSlice';
 import {
   setAvailableModels as setAvailableModelsAction,
@@ -76,8 +87,21 @@ export interface NetraContextValue {
   confirmStep: (step: number) => void;
   editStep: (step: number) => void;
   doResetStep: (step: number) => void;
+  confirmMarketPulse: () => void;
+  editMarketPulse: () => void;
   stepTimestamps: Record<string, string>;
   setStepTimestamps: (v: Record<string, string>) => void;
+  // Mission Control Data
+  rAmount: string; setRAmount: (v: string) => void;
+  dailyLossLimit: string; setDailyLossLimit: (v: string) => void;
+  dailyLossHit: boolean; setDailyLossHit: (v: boolean) => void;
+  dailyTarget: string; setDailyTarget: (v: string) => void;
+  dailyTargetHit: boolean; setDailyTargetHit: (v: boolean) => void;
+  openingWindow: string; setOpeningWindow: (v: string) => void;
+  sessionCutoff: string; setSessionCutoff: (v: string) => void;
+  isExpiryDay: boolean; setIsExpiryDay: (v: boolean) => void;
+  expiryCutoff: string; setExpiryCutoff: (v: string) => void;
+  rulesAcknowledged: boolean[]; setRulesAcknowledged: (v: boolean[]) => void;
   // Selections & notes
   selections: Selections;
   setSelections: (v: Selections) => void;
@@ -87,6 +111,8 @@ export interface NetraContextValue {
   setInterSelections: (v: InterSelections) => void;
   strikeSelections: StrikeSelections;
   setStrikeSelections: (v: StrikeSelections) => void;
+  saturationSelections: Record<string, string>;
+  setSaturationSelections: (v: Record<string, string>) => void;
   // Command flow
   finalCommand: string | null;
   setFinalCommand: (v: string | null) => void;
@@ -116,9 +142,13 @@ export interface NetraContextValue {
   setCurrentModel: (v: string) => void;
   tradeName: string;
   setTradeName: (v: string) => void;
+  isGuest: boolean;
   handleAuth: () => void;
+  handleGuestLogin: () => void;
   initializeMission: () => void;
   resumeSession: (log: TradeLog) => void;
+  forkSession: (log: TradeLog, newName: string) => void;
+  forkCurrentSession: (phaseNum: number, newName: string) => void;
   saveSession: () => void;
   resetTerminalState: () => void;
   logout: () => void;
@@ -205,13 +235,14 @@ export interface NetraContextValue {
 const NetraContext = createContext<NetraContextValue | null>(null);
 
 const EMPTY_SYS_DATA: SysData = {
-  weapons: { strike: [], interception: [] },
+  weapons: { strike: [], interception: [], saturation: [] },
   realBias: { dimensions: [] },
   htfStructure: { dimensions: [] },
   marketPulse: { dimensions: [] },
   liquidityContext: { dimensions: [] },
   strikeDimensions: [],
   interceptionDimensions: [],
+  saturationDimensions: [],
 };
 
 export function NetraProvider({ children }: { children: React.ReactNode }) {
@@ -240,9 +271,20 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
   const sysRecommendation = useSelector((s: RootState) => s.analysis.sysRecommendation);
   const interSelections = useSelector((s: RootState) => s.analysis.interSelections);
   const strikeSelections = useSelector((s: RootState) => s.analysis.strikeSelections);
+  const saturationSelections = useSelector((s: RootState) => s.analysis.saturationSelections);
   const selectedWeaponId = useSelector((s: RootState) => s.analysis.selectedWeaponId);
   const stepTimestamps = useSelector((s: RootState) => s.analysis.stepTimestamps);
   const analyticsData = useSelector((s: RootState) => s.analysis.analyticsData);
+  const rAmount = useSelector((s: RootState) => s.analysis.rAmount);
+  const dailyLossLimit = useSelector((s: RootState) => s.analysis.dailyLossLimit);
+  const dailyLossHit = useSelector((s: RootState) => s.analysis.dailyLossHit);
+  const dailyTarget = useSelector((s: RootState) => s.analysis.dailyTarget);
+  const dailyTargetHit = useSelector((s: RootState) => s.analysis.dailyTargetHit);
+  const openingWindow = useSelector((s: RootState) => s.analysis.openingWindow);
+  const sessionCutoff = useSelector((s: RootState) => s.analysis.sessionCutoff);
+  const isExpiryDay = useSelector((s: RootState) => s.analysis.isExpiryDay);
+  const expiryCutoff = useSelector((s: RootState) => s.analysis.expiryCutoff);
+  const rulesAcknowledged = useSelector((s: RootState) => s.analysis.rulesAcknowledged);
   const isLoggerOpen = useSelector((s: RootState) => s.ui.isLoggerOpen);
   const isAiPaneOpen = useSelector((s: RootState) => s.ui.isAiPaneOpen);
   const isProfileOpen = useSelector((s: RootState) => s.ui.isProfileOpen);
@@ -280,8 +322,11 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highestStep, activeSessionId]);
 
+  const isGuest = useSelector((s: RootState) => s.session.isGuest);
+
   // ─── Boot: load system data + models ──────────────────────────────
   useEffect(() => {
+    if (isGuest) return;
     fetch(`${API_BASE}/api/system-data`, { headers: getAuthHeaders() })
       .then((res) => res.json())
       .then((data: SysData) => dispatch(setSysDataAction(data)))
@@ -398,13 +443,17 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
   }, [dispatch, getAuthHeaders]);
 
   // ─── Step management ───────────────────────────────────────────────
+  // Ref keeps highestStep fresh inside confirmStep without stale closures.
+  const highestStepRef = useRef(highestStep);
+  highestStepRef.current = highestStep;
+
   const confirmStep = useCallback((stepLevel: number) => {
-    if (highestStep === stepLevel) {
+    if (highestStepRef.current === stepLevel) {
       dispatch(setHighestStepAction(stepLevel + 1));
       dispatch(setStepTimestampsAction({ ...stepTimestamps, [STEP_NAMES[stepLevel]]: new Date().toLocaleTimeString('en-IN') }));
       showToast(`Step ${stepLevel} confirmed`);
     }
-  }, [dispatch, highestStep, stepTimestamps, showToast]);
+  }, [dispatch, stepTimestamps, showToast]);
 
   const editStep = useCallback((stepLevel: number) => {
     dispatch(setHighestStepAction(stepLevel));
@@ -415,9 +464,8 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
       dispatch(setSelectedWeaponIdAction(null));
       dispatch(setCommandLockedAction(false));
     }
-    if (stepLevel <= 5) { dispatch(setFinalCommandAction(null)); dispatch(setCommandLockedAction(false)); }
-    if (stepLevel <= 6) { dispatch(setSelectedWeaponIdAction(null)); dispatch(setWeaponLockedAction(false)); }
-    if (stepLevel <= 7) dispatch(setWeaponLockedAction(false));
+    // Always unlock weapon; only clear selectedWeaponId when going back past the weapon step
+    dispatch(setWeaponLockedAction(false));
   }, [dispatch]);
 
   const doResetStep = useCallback((stepLevel: number) => {
@@ -439,6 +487,30 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     showToast('Step reset');
   }, [dispatch, selections, notes, showToast]);
 
+  const confirmMarketPulse = useCallback(() => {
+    const time = new Date().toLocaleTimeString('en-IN');
+    dispatch(setHighestStepAction(4));
+    dispatch(setStepTimestampsAction({
+      ...stepTimestamps,
+      marketPulse: time,
+      liquidityContext: time,
+    }));
+    showToast('Market Pulse confirmed');
+  }, [dispatch, stepTimestamps, showToast]);
+
+  const editMarketPulse = useCallback(() => {
+    dispatch(setHighestStepAction(3));
+    dispatch(setSelectionsAction({ ...selections, marketPulse: {}, liquidityContext: {} }));
+    dispatch(setNotesAction({ ...notes, marketPulse: '', liquidityContext: '' }));
+    dispatch(setFinalCommandAction(null));
+    dispatch(setNetraOutputAction(null));
+    dispatch(setSysRecommendationAction(null));
+    dispatch(setSelectedWeaponIdAction(null));
+    dispatch(setCommandLockedAction(false));
+    dispatch(setWeaponLockedAction(false));
+    showToast('Market Pulse reset');
+  }, [dispatch, selections, notes, showToast]);
+
   // ─── Context value ─────────────────────────────────────────────────
   const value: NetraContextValue = {
     // System
@@ -447,7 +519,7 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     // Step
     highestStep,
     setHighestStep: (v) => dispatch(setHighestStepAction(v)),
-    confirmStep, editStep, doResetStep,
+    confirmStep, editStep, doResetStep, confirmMarketPulse, editMarketPulse,
     stepTimestamps,
     setStepTimestamps: (v) => dispatch(setStepTimestampsAction(v)),
     // Selections
@@ -459,6 +531,8 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     setInterSelections: (v) => dispatch(setInterSelectionsAction(v)),
     strikeSelections,
     setStrikeSelections: (v) => dispatch(setStrikeSelectionsAction(v)),
+    saturationSelections,
+    setSaturationSelections: (v) => dispatch(setSaturationSelectionsAction(v)),
     // Command
     finalCommand,
     setFinalCommand: (v) => dispatch(setFinalCommandAction(v)),
@@ -488,9 +562,13 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     setCurrentModel: (v) => dispatch(setCurrentModelAction(v)),
     tradeName,
     setTradeName: (v) => dispatch(setTradeNameAction(v)),
+    isGuest,
     handleAuth: session_.handleAuth,
+    handleGuestLogin: session_.handleGuestLogin,
     initializeMission: session_.initializeMission,
     resumeSession: session_.resumeSession,
+    forkSession: session_.forkSession,
+    forkCurrentSession: session_.forkCurrentSession,
     saveSession: session_.saveSession,
     resetTerminalState: session_.resetTerminalState,
     logout: session_.logout,
@@ -542,6 +620,27 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     setIsMobileMenuOpen: (v) => dispatch(setMobileMenuOpenAction(v)),
     isLoggingIn,
     toggleTradeData, toggleAnalyst,
+    // Mission Control Data
+    rAmount,
+    setRAmount: (v) => dispatch(setRAmountAction(v)),
+    dailyLossLimit,
+    setDailyLossLimit: (v) => dispatch(setDailyLossLimitAction(v)),
+    dailyLossHit,
+    setDailyLossHit: (v) => dispatch(setDailyLossHitAction(v)),
+    dailyTarget,
+    setDailyTarget: (v) => dispatch(setDailyTargetAction(v)),
+    dailyTargetHit,
+    setDailyTargetHit: (v) => dispatch(setDailyTargetHitAction(v)),
+    openingWindow,
+    setOpeningWindow: (v) => dispatch(setOpeningWindowAction(v)),
+    sessionCutoff,
+    setSessionCutoff: (v) => dispatch(setSessionCutoffAction(v)),
+    isExpiryDay,
+    setIsExpiryDay: (v) => dispatch(setIsExpiryDayAction(v)),
+    expiryCutoff,
+    setExpiryCutoff: (v) => dispatch(setExpiryCutoffAction(v)),
+    rulesAcknowledged,
+    setRulesAcknowledged: (v) => dispatch(setRulesAcknowledgedAction(v)),
     // Utilities
     showToast,
     getNCSBreakdown,

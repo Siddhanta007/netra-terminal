@@ -1,4 +1,4 @@
-import { useState, ReactNode } from 'react';
+import { useState, ReactNode, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNetra } from '../../context/NetraContext';
 import { setSelectedModel, setModelConfig } from '../../store/slices/modelSlice';
@@ -119,11 +119,51 @@ function AuditAccordion({ review, label = 'Audit Notes' }: {
   );
 }
 
+function TraceDisplay({ trace }: { trace: Array<{agent: string, content: string}> }) {
+  const [open, setOpen] = useState(false);
+  if (!trace || trace.length === 0) return null;
+  return (
+    <div className="border border-[var(--border)] overflow-hidden mt-2">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-2.5 text-left bg-[var(--surface-2)]/60 hover:bg-[var(--surface-2)] transition-colors"
+      >
+        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--accent)' }}>
+          MULTI-AGENT TRACE ({trace.length} STEPS)
+        </span>
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+          className={`text-[var(--text-4)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {open && (
+        <div className="px-4 py-3 space-y-4 border-t border-[var(--border)] bg-[var(--surface-2)]/30 max-h-[300px] overflow-y-auto custom-scrollbar">
+          {trace.map((step, idx) => (
+            <div key={idx} className="border-l-2 border-[var(--border)] pl-3 ml-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-1)]">{step.agent}</span>
+                <span className="text-[8px] font-bold text-[var(--text-4)]">STEP {idx + 1}</span>
+              </div>
+              <p className="text-[11px] text-[var(--text-2)] whitespace-pre-wrap font-mono leading-relaxed">
+                {Array.isArray(step.content) && step.content[0]?.type === 'text' 
+                  ? step.content[0].text 
+                  : typeof step.content === 'object' 
+                    ? JSON.stringify(step.content, null, 2) 
+                    : step.content}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OutputDisplay({ output: rawOutput }: { output: unknown }) {
   if (typeof rawOutput === 'string') {
     return <p className="text-[12px] text-[var(--text-1)] leading-[1.8] font-mono">{rawOutput}</p>;
   }
-  const output = rawOutput as AIOutput;
+  const output = rawOutput as AIOutput & { agent_trace?: Array<{agent: string, content: string}> };
   const mainText = output.analysis || output.reasoning || output.description || output.synthesis || '';
   const command = output.cmd || output.weapon || null;
   const plan = output.plan || null;
@@ -132,6 +172,7 @@ function OutputDisplay({ output: rawOutput }: { output: unknown }) {
   const thinking = (output.thinking || '') as string;
   const criticReview = output.critic_review as AIOutput['critic_review'] | null;
   const riskAudit = output.risk_audit as AIOutput['risk_audit'] | null;
+  const agentTrace = output.agent_trace || null;
 
   return (
     <div className="flex flex-col gap-4 h-full overflow-y-auto custom-scrollbar pr-1">
@@ -151,9 +192,8 @@ function OutputDisplay({ output: rawOutput }: { output: unknown }) {
       {mainText && (
         <p className="text-[12px] text-[var(--text-1)] leading-[1.8]">{mainText}</p>
       )}
-      <ThinkingAccordion thinking={thinking} />
-      <AuditAccordion review={criticReview} label="Critic Review" />
       <AuditAccordion review={riskAudit} label="Risk Audit" />
+      <TraceDisplay trace={agentTrace || []} />
     </div>
   );
 }
@@ -236,19 +276,50 @@ export default function NetraAILabs({
   // Left panel content
   const leftContent = (() => {
     if (isEvaluating) {
-      return (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3">
-          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '11px', fontWeight: 700, letterSpacing: '0.3em', color: 'var(--text-4)', textTransform: 'uppercase' }} className="animate-pulse">
-            PROCESSING
-          </div>
-          <div className="flex gap-1.5">
-            {[0, 1, 2, 3].map(i => (
-              <div key={i} className="w-1 h-1 rounded-full bg-[var(--accent)]"
-                style={{ animationName: 'pulse', animationDuration: '1.2s', animationDelay: `${i * 0.2}s`, animationIterationCount: 'infinite' }} />
+      const TerminalScroller = () => {
+        const [lines, setLines] = useState<string[]>([]);
+        const scrollRef = useRef<HTMLDivElement>(null);
+        
+        const allLines = [
+          "[SYSTEM] Booting specialized agents...",
+          "[DOCTRINE] Analyzing execution rules...",
+          "[HISTORIAN] Querying past trade logs...",
+          "[INFO] Gathering market context...",
+          "[SUGGESTION] Synthesizing master plan...",
+          "[CRITIQUE] Auditing plan for risk...",
+          "[SYSTEM] Finalizing intelligence output...",
+          "[MAYA] Finalizing audit score..."
+        ];
+
+        useEffect(() => {
+          let i = 0;
+          const interval = setInterval(() => {
+            setLines(prev => {
+              const nextLines = [...prev, allLines[i % allLines.length]];
+              i++;
+              return nextLines;
+            });
+          }, 400);
+          return () => clearInterval(interval);
+        }, []);
+
+        useEffect(() => {
+          if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+          }
+        }, [lines]);
+
+        return (
+          <div ref={scrollRef} className="flex-1 flex flex-col font-mono text-[10px] text-[var(--text-2)] leading-relaxed overflow-y-auto max-h-[250px] p-2">
+            {lines.map((line, idx) => (
+              <div key={idx} className="opacity-70">{line}</div>
             ))}
+            <div className="animate-pulse text-[var(--accent)]">_</div>
           </div>
-        </div>
-      );
+        );
+      };
+      
+      return <TerminalScroller />;
     }
     if (customStatus) return <div className="flex-1 overflow-y-auto custom-scrollbar pr-1">{customStatus}</div>;
     if (output != null) return <OutputDisplay output={output} />;
@@ -296,7 +367,7 @@ export default function NetraAILabs({
             MAYA · ANALYSIS ENGINE
           </div>
           <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '11px', fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-1)' }}>
-            Visual Intelligence Interface
+            NETRA Intelligence Interface
           </div>
         </div>
 

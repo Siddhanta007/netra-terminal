@@ -4,17 +4,35 @@ import { RootState, AppDispatch } from '../store';
 import { setToast as setToastAction } from '../store/slices/uiSlice';
 import { ToastType } from '../types';
 
+const GUEST_AI_KEY = 'netra_guest_ai_count';
+const GUEST_AI_LIMIT = 5;
+
 export function useNetraUtils() {
   const dispatch = useDispatch<AppDispatch>();
   const selectedModel = useSelector((s: RootState) => s.model.selectedModel);
   const availableModels = useSelector((s: RootState) => s.model.availableModels);
+  const session = useSelector((s: RootState) => s.session.session);
+  const isGuest = useSelector((s: RootState) => s.session.isGuest);
 
   const getAuthHeaders = useCallback((extraHeaders: Record<string, string> = {}): Record<string, string> => {
     const token = import.meta.env.VITE_HF_TOKEN as string | undefined;
     const headers: Record<string, string> = { ...extraHeaders };
     if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (session) headers['x-user'] = session;
     return headers;
-  }, []);
+  }, [session]);
+
+  const checkGuestLimit = useCallback((): boolean => {
+    if (!isGuest) return true;
+    const count = parseInt(sessionStorage.getItem(GUEST_AI_KEY) || '0', 10);
+    return count < GUEST_AI_LIMIT;
+  }, [isGuest]);
+
+  const markGuestAiUsed = useCallback(() => {
+    if (!isGuest) return;
+    const count = parseInt(sessionStorage.getItem(GUEST_AI_KEY) || '0', 10);
+    sessionStorage.setItem(GUEST_AI_KEY, String(count + 1));
+  }, [isGuest]);
 
   const showToast = useCallback((msg: string, type: ToastType = 'success') => {
     dispatch(setToastAction({ msg, type }));
@@ -44,5 +62,5 @@ export function useNetraUtils() {
     return { provider: parts[0], model_id };
   }, [selectedModel, availableModels]);
 
-  return { getAuthHeaders, showToast, getActiveModel, getActiveVisionModel };
+  return { getAuthHeaders, showToast, getActiveModel, getActiveVisionModel, checkGuestLimit, markGuestAiUsed };
 }

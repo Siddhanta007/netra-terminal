@@ -30,6 +30,7 @@ export interface InterSelections {
   response: string;
   reversion: string;
   flip: string;
+  detectedTraps?: string;
 }
 
 export interface StrikeSelections {
@@ -278,4 +279,4 @@ export interface AIOutput {
 }
 
 export type FinalCommand = 'STRIKE' | 'INTERCEPTION' | 'NO_ENGAGEMENT' | null;
-export type ActiveView = 'terminal' | 'trishul' | 'profile';
+export type ActiveView = 'terminal' | 'trishul' | 'profile' | 'about';

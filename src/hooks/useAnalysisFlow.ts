@@ -10,7 +10,7 @@ import { useNetraUtils } from './useNetraUtils';
 
 export function useAnalysisFlow() {
   const dispatch = useDispatch<AppDispatch>();
-  const { getAuthHeaders, showToast, getActiveModel } = useNetraUtils();
+  const { getAuthHeaders, showToast, getActiveModel, checkGuestLimit, markGuestAiUsed } = useNetraUtils();
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const weaponAbortControllerRef = useRef<AbortController | null>(null);
@@ -36,36 +36,35 @@ export function useAnalysisFlow() {
     };
   }, []);
 
-  // STS recommendation — runs automatically when conditions are met.
-  // modelConfig is included so a model change re-triggers this.
-  useEffect(() => {
+  // STS recommendation — converted to manual callback to save tokens
+  const triggerSTSEvaluation = useCallback(() => {
     const cmd = finalCommand || (netraOutput ? netraOutput.cmd : null);
-    if (highestStep >= 5 && cmd && (cmd === 'STRIKE' || cmd === 'INTERCEPTION')) {
-      const { provider: providerVal, model_id: modelIdVal } = getActiveModel();
-      const endpoint = cmd === 'STRIKE'
-        ? `${API_BASE}/api/evaluate-strike`
-        : `${API_BASE}/api/evaluate-interception`;
-      fetch(endpoint, {
-        method: 'POST',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({
-          realBias: selections.realBias,
-          htfStructure: selections.htfStructure,
-          marketPulse: selections.marketPulse,
-          liquidityContext: selections.liquidityContext,
-          provider: providerVal,
-          model_config: { ...modelConfig, model_id: modelIdVal },
-        }),
-      })
-        .then((res) => res.json())
-        .then((data) => dispatch(setSysRecommendation(data)))
-        .catch(console.error);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [highestStep, finalCommand, netraOutput, selections, modelConfig]);
+    if (!cmd || (cmd !== 'STRIKE' && cmd !== 'INTERCEPTION')) return;
+
+    const { provider: providerVal, model_id: modelIdVal } = getActiveModel();
+    const endpoint = cmd === 'STRIKE'
+      ? `${API_BASE}/api/evaluate-strike`
+      : `${API_BASE}/api/evaluate-interception`;
+
+    fetch(endpoint, {
+      method: 'POST',
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        realBias: selections.realBias,
+        htfStructure: selections.htfStructure,
+        marketPulse: selections.marketPulse,
+        provider: providerVal,
+        llm_config: { ...modelConfig, model_id: modelIdVal },
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => dispatch(setSysRecommendation(data)))
+      .catch(console.error);
+  }, [finalCommand, netraOutput, getActiveModel, getAuthHeaders, selections, modelConfig, dispatch]);
 
   const triggerNeuralSynthesis = useCallback(() => {
     if (isEvaluating) return;
+    if (!checkGuestLimit()) { showToast('Guest limit reached — sign in to continue', 'error'); return; }
     dispatch(setIsEvaluating(true));
     dispatch(setNetraOutput(null));
 
@@ -82,7 +81,6 @@ export function useAnalysisFlow() {
       realBias: selections.realBias || {},
       htfStructure: selections.htfStructure || {},
       marketPulse: selections.marketPulse || {},
-      liquidityContext: selections.liquidityContext || {},
       provider: providerVal,
       llm_config: { ...modelConfig, model_id: modelIdVal },
       image_description: imageDescStr,
@@ -99,6 +97,7 @@ export function useAnalysisFlow() {
         const result = { ...(envelope?.data ?? envelope), thinking: envelope?.thinking ?? '' };
         dispatch(setNetraOutput(result as Parameters<typeof setNetraOutput>[0]));
         dispatch(setIsEvaluating(false));
+        markGuestAiUsed();
         showToast('Neural Synthesis Complete');
       })
       .catch((err: Error) => {
@@ -117,6 +116,7 @@ export function useAnalysisFlow() {
 
   const triggerWeaponPrediction = useCallback(() => {
     if (isPredictingWeapon) return;
+    if (!checkGuestLimit()) { showToast('Guest limit reached — sign in to continue', 'error'); return; }
     dispatch(setIsPredictingWeapon(true));
     dispatch(setWeaponPrediction(null));
 
@@ -128,7 +128,6 @@ export function useAnalysisFlow() {
       realBias: selections.realBias,
       htfStructure: selections.htfStructure,
       marketPulse: selections.marketPulse,
-      liquidityContext: selections.liquidityContext,
       command: finalCommand,
       sts_dims: finalCommand === 'STRIKE' ? strikeSelections : interSelections,
       notes: notes.command,
@@ -168,5 +167,6 @@ export function useAnalysisFlow() {
     isEvaluating, isPredictingWeapon, weaponPrediction, netraOutput,
     triggerNeuralSynthesis, stopSynthesis,
     triggerWeaponPrediction, stopWeaponPrediction,
+    triggerSTSEvaluation,
   };
 }

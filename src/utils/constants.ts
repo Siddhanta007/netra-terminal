@@ -27,7 +27,7 @@ export const SCORES: Record<string, Record<string, number>> = {
     'Fully Balanced': 10, 'Partially Filled': 7, 'Unfilled': 3,
   },
   marketPulse: {
-    'Relocation (In Bias)': 10, 'Transitional': 6, 'Balance': 4, 'Relocation (Against Bias)': 7,
+    'Relocation (In Bias)': 10, 'Transitional': 6, 'Balance': 4, 'Relocation (Against HTF)': 7,
     'Boundary Interaction': 8, 'Mid Range': 2, 'Break Rejecting': 7, 'Break Confirming': 3,
     'Slicing': 10, 'Constant': 7, 'Grinding': 3,
     'Efficient': 10, 'Absorbed': 2,
