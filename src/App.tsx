@@ -478,52 +478,55 @@ export default function NetraTerminal() {
 
       {/* MISSION TELEMETRY SUB-HEADER */}
       {activeSessionId && (
-        <div style={{ height: '42px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'stretch', zIndex: 90, animation: 'slide-down 0.4s cubic-bezier(0.4,0,0.2,1)', flexShrink: 0 }} className="desktop-only">
+        <div style={{ height: '48px', background: darkMode ? '#0a0a12' : '#f8fafc', borderBottom: `1px solid ${darkMode ? 'rgba(65,105,225,0.15)' : 'rgba(65,105,225,0.12)'}`, display: 'flex', alignItems: 'stretch', zIndex: 90, animation: 'slide-down 0.4s cubic-bezier(0.4,0,0.2,1)', flexShrink: 0 }} className="desktop-only">
 
           {/* LEFT: session identity */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '0 20px', flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4169E1', boxShadow: '0 0 8px rgba(65,105,225,0.7)' }} className="animate-pulse" />
-              <span style={{ fontSize: '8px', fontWeight: 900, color: '#4169E1', textTransform: 'uppercase', letterSpacing: '0.18em' }}>Active Mission</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 20px', flexShrink: 0, borderRight: `1px solid ${darkMode ? 'rgba(65,105,225,0.15)' : 'rgba(65,105,225,0.12)'}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '3px 10px', background: 'rgba(65,105,225,0.08)', border: '1px solid rgba(65,105,225,0.2)' }}>
+              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} className="animate-pulse" />
+              <span style={{ fontSize: '8px', fontWeight: 900, color: '#4169E1', textTransform: 'uppercase', letterSpacing: '0.2em' }}>
+                {session?.assetName || activeEditLog?.phase1?.asset_ticker || '—'}
+              </span>
             </div>
-            <div style={{ width: '1px', height: '14px', background: 'var(--border)', opacity: 0.5 }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <span style={{ fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Strategy:</span>
-                <span style={{ fontSize: '10px', fontWeight: 950, color: 'var(--text-1)', textTransform: 'uppercase' }}>{tradeName || 'Tactical_Alpha'}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <span style={{ fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Asset:</span>
-                <span style={{ fontSize: '10px', fontWeight: 950, color: 'var(--accent)', textTransform: 'uppercase' }}>{session?.assetName || activeEditLog?.phase1?.asset_ticker || 'Awaiting'}</span>
-              </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+              <span style={{ fontSize: '7px', fontWeight: 700, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Strategy</span>
+              <span style={{ fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{tradeName || 'Tactical_Alpha'}</span>
             </div>
           </div>
 
-          <div style={{ width: '1px', background: 'var(--border)', flexShrink: 0 }} />
-
-          {/* CENTRE: phase progress tabs */}
+          {/* CENTRE: phase progress steps */}
           {prepStep >= 2 && (activeView === 'terminal' || activeView === 'trishul') && (
-            <div style={{ display: 'flex', alignItems: 'stretch', flex: 1, overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}>
+            <div style={{ display: 'flex', alignItems: 'center', flex: 1, overflowX: 'auto', padding: '0 20px', gap: '0', scrollbarWidth: 'none' } as React.CSSProperties}>
               {([
-                { id: 'P0', label: 'VISION', step: 0 },
-                { id: 'P1', label: 'BIAS', step: 1 },
-                { id: 'P2', label: 'HTF STRUCTURE', step: 2 },
-                { id: 'P3', label: 'MARKET PULSE', step: 3 },
-                { id: 'P4', label: 'SYNTHESIS', step: 4 },
-                { id: 'P5', label: 'COMMAND', step: 5 },
-                { id: 'P6', label: 'MISSION INTEL', step: 6 },
-                { id: 'P7', label: 'WEAPON ARMORY', step: 7 },
-                { id: 'P8', label: 'MISSION CONTROL', step: 8 },
-                { id: 'P9', label: 'MAYA AUDIT', step: 9 },
-              ] as Array<{ id: string; label: string; step: number }>).map(m => {
+                { label: 'Vision', step: 0 },
+                { label: 'Bias', step: 1 },
+                { label: 'HTF', step: 2 },
+                { label: 'Pulse', step: 3 },
+                { label: 'Synthesis', step: 4 },
+                { label: 'Command', step: 5 },
+                { label: 'Intel', step: 6 },
+                { label: 'Armory', step: 7 },
+                { label: 'Control', step: 8 },
+                { label: 'Audit', step: 9 },
+              ] as Array<{ label: string; step: number }>).map((m, idx, arr) => {
                 const isComplete = highestStep > m.step;
                 const isCurrent = highestStep === m.step;
+                const dotColor = isComplete ? '#10b981' : isCurrent ? '#4169E1' : (darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)');
+                const lineColor = isComplete ? '#10b981' : (darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.1)');
                 return (
-                  <div key={m.label} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0 12px', borderRight: '1px solid var(--border)', flexShrink: 0, borderBottom: isCurrent ? '2px solid var(--accent)' : '2px solid transparent', background: isCurrent ? 'rgba(65,105,225,0.1)' : 'transparent', transition: 'all 200ms' }}>
-                    <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', fontWeight: 700, color: isComplete ? 'var(--green)' : isCurrent ? 'var(--accent)' : 'var(--text-4)', opacity: isCurrent || isComplete ? 1 : 0.3, letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
-                      {isComplete ? '✓' : '·'} {m.id}
-                    </span>
-                    <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: isComplete ? 'var(--text-3)' : isCurrent ? 'var(--text-1)' : 'var(--text-4)', opacity: isCurrent || isComplete ? 1 : 0.22, whiteSpace: 'nowrap' }}>{m.label}</span>
+                  <div key={m.label} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+                      <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: isComplete ? '#10b981' : isCurrent ? '#4169E1' : 'transparent', border: `2px solid ${dotColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 200ms', flexShrink: 0 }}>
+                        {isComplete
+                          ? <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>
+                          : <span style={{ fontSize: '7px', fontWeight: 900, color: isCurrent ? '#fff' : (darkMode ? 'rgba(255,255,255,0.25)' : 'rgba(15,23,42,0.25)'), fontFamily: 'monospace' }}>{m.step}</span>
+                        }
+                      </div>
+                      <span style={{ fontSize: '7px', fontWeight: isCurrent ? 900 : 700, color: isComplete ? 'var(--text-3)' : isCurrent ? '#4169E1' : 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap', opacity: isCurrent || isComplete ? 1 : 0.4 }}>{m.label}</span>
+                    </div>
+                    {idx < arr.length - 1 && (
+                      <div style={{ width: '28px', height: '2px', background: lineColor, margin: '0 4px', marginBottom: '14px', transition: 'background 300ms', flexShrink: 0 }} />
+                    )}
                   </div>
                 );
               })}
@@ -1237,7 +1240,7 @@ export default function NetraTerminal() {
                     resumeSession={resumeSession}
                     forkSession={forkSession}
                     onView={log => { dispatch({ type: 'logs/setActiveEditLog', payload: log }); ctxSetIsLoggerOpen(true); }}
-                    initializeMission={initializeMission}
+                    initializeMission={() => { dispatch(setSessionInput({ ...sessionInput, assetName: '', tradeName: '', modelName: currentModel || 'pinaka' })); ctxSetPrepStep(3); }}
                     deleteTradeLog={deleteTradeLog}
                     downloadCSV={downloadCSV}
                     isDownloading={isDownloading}
@@ -1253,7 +1256,7 @@ export default function NetraTerminal() {
                     resumeSession={resumeSession}
                     forkSession={forkSession}
                     onView={log => { dispatch({ type: 'logs/setActiveEditLog', payload: log }); ctxSetIsLoggerOpen(true); }}
-                    initializeMission={initializeMission}
+                    initializeMission={() => { dispatch(setSessionInput({ ...sessionInput, assetName: '', tradeName: '', modelName: currentModel || 'pinaka' })); ctxSetPrepStep(3); }}
                     deleteTradeLog={deleteTradeLog}
                     downloadCSV={downloadCSV}
                     isDownloading={isDownloading}
@@ -1269,7 +1272,7 @@ export default function NetraTerminal() {
                     resumeSession={resumeSession}
                     forkSession={forkSession}
                     onView={log => { dispatch({ type: 'logs/setActiveEditLog', payload: log }); ctxSetIsLoggerOpen(true); }}
-                    initializeMission={initializeMission}
+                    initializeMission={() => { dispatch(setSessionInput({ ...sessionInput, assetName: '', tradeName: '', modelName: 'trishul' })); ctxSetPrepStep(3); }}
                     deleteTradeLog={deleteTradeLog}
                     downloadCSV={downloadCSV}
                     isDownloading={isDownloading}

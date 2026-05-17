@@ -358,14 +358,6 @@ export default function Phase10MissionControl() {
   const handleConfirmExit = () => {
     const ef = !editFormData.exit_time ? { ...editFormData, exit_time: autoTime() } : editFormData;
     setEditFormData(ef as typeof editFormData);
-    triggerPostTradeAudit({
-      context: selections, protocol: finalCommand, weapon: selectedWeaponId,
-      entry: pc.wPrice, stop: pc.latestSl, exit: exitA,
-      quantity: pc.totalQty, pnl: netPnL.toFixed(2),
-      rrr: rrrA.toFixed(2),
-      narrative: String(editFormData.notes || ''),
-      rating: editFormData.execution_rating || 0,
-    });
     confirmStep(6);
   };
 

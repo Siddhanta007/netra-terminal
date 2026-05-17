@@ -161,34 +161,30 @@ export default function Phase3MarketPulse() {
       )}
 
       {/* ── COMPONENT 2: PRICE BEHAVIOUR ── */}
-      {showApproach && (
-        <>
-          <div style={{ height: '1px', background: 'var(--border)', margin: '14px 0 12px 0' }} />
-          {subLabel('Component 2 — Price Behaviour · The Approach')}
-          <div className="precision-row">
-            <div className="precision-label">Displacement</div>
-            <div className="precision-selector">
-              {['Impulsive', 'Sustained', 'Opposed'].map(opt => (
-                <button key={opt} onClick={() => setMp('displacement', opt)} disabled={isLocked}
-                  className={`precision-opt ${displacement === opt ? 'selected' : ''} ${isLocked && displacement !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
-                  style={displacement === opt ? { borderColor: '#f59e0b', background: 'rgba(245,158,11,0.1)', color: '#f59e0b' } : {}}
-                >{opt}</button>
-              ))}
-            </div>
-          </div>
-          <div className="precision-row">
-            <div className="precision-label">Absorption</div>
-            <div className="precision-selector">
-              {['Efficient', 'Absorbed', 'Exhausted'].map(opt => (
-                <button key={opt} onClick={() => setMp('absorption', opt)} disabled={isLocked}
-                  className={`precision-opt ${absorption === opt ? 'selected' : ''} ${isLocked && absorption !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
-                  style={absorption === opt ? { borderColor: '#f59e0b', background: 'rgba(245,158,11,0.1)', color: '#f59e0b' } : {}}
-                >{opt}</button>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
+      <div style={{ height: '1px', background: 'var(--border)', margin: '14px 0 12px 0' }} />
+      {subLabel('Component 2 — Price Behaviour · The Approach')}
+      <div className="precision-row">
+        <div className="precision-label">Displacement</div>
+        <div className="precision-selector">
+          {['Impulsive', 'Sustained', 'Opposed'].map(opt => (
+            <button key={opt} onClick={() => setMp('displacement', opt)} disabled={isLocked}
+              className={`precision-opt ${displacement === opt ? 'selected' : ''} ${isLocked && displacement !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
+              style={displacement === opt ? { borderColor: '#f59e0b', background: 'rgba(245,158,11,0.1)', color: '#f59e0b' } : {}}
+            >{opt}</button>
+          ))}
+        </div>
+      </div>
+      <div className="precision-row">
+        <div className="precision-label">Absorption</div>
+        <div className="precision-selector">
+          {['Efficient', 'Absorbed', 'Exhausted'].map(opt => (
+            <button key={opt} onClick={() => setMp('absorption', opt)} disabled={isLocked}
+              className={`precision-opt ${absorption === opt ? 'selected' : ''} ${isLocked && absorption !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
+              style={absorption === opt ? { borderColor: '#f59e0b', background: 'rgba(245,158,11,0.1)', color: '#f59e0b' } : {}}
+            >{opt}</button>
+          ))}
+        </div>
+      </div>
 
       {isCompressionTrap && (
         <div className="flex items-center gap-2 mt-3 px-4 py-3" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.4)' }}>
