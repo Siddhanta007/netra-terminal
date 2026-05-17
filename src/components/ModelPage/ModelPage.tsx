@@ -143,7 +143,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
 
   // Per-model opaque box fills — hero and stats are intentionally different shades
   const BOX_THEME: Record<string, { hero: { bg: string; border: string }; stats: { bg: string; border: string } }> = {
-    pinaka:  { hero: { bg: '#e4e8f0', border: '#c8d0e0' }, stats: { bg: '#ffffff', border: '#d1d5db' } },
+    pinaka:  { hero: { bg: '#e4e8f0', border: '#d1d5db' }, stats: { bg: '#ffffff', border: '#d1d5db' } },
     trishul: { hero: { bg: '#ece8df', border: '#d8d0c4' }, stats: { bg: '#ffffff', border: '#d1d5db' } },
   };
   const boxTheme = BOX_THEME[model.id] ?? BOX_THEME.pinaka;
@@ -373,7 +373,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
 
         {/* ── SECTION 3: TRADE LEDGER ── */}
         <div>
-          <div style={{ border: `1px solid ${color}28`, background: '#ffffff' }}>
+          <div style={{ border: '1px solid #d1d5db', background: '#ffffff' }}>
 
             {/* Ledger header */}
             <div style={{ padding: '18px 28px', borderBottom: `1px solid ${color}18` }}>
