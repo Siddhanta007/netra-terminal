@@ -396,41 +396,41 @@ export default function NetraTerminal() {
         </div>
 
         {/* RIGHT: OPERATOR CONTROLS */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
 
-          {/* MAYA toggle */}
+          {/* MAYA toggle — text only, underline when active */}
           <button
             onClick={() => setIsAiPaneOpen(!isAiPaneOpen)}
             title="Maya AI"
-            style={{ height: '34px', padding: '0 14px', display: 'flex', alignItems: 'center', gap: '7px', background: isAiPaneOpen ? '#4169E1' : (darkMode ? 'rgba(65,105,225,0.1)' : 'rgba(65,105,225,0.06)'), border: `1px solid ${isAiPaneOpen ? '#4169E1' : (darkMode ? 'rgba(65,105,225,0.3)' : 'rgba(65,105,225,0.22)')}`, color: isAiPaneOpen ? '#ffffff' : '#4169E1', cursor: 'pointer', transition: 'all 200ms', fontFamily: 'inherit' }}
+            style={{ height: '100%', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', borderBottom: isAiPaneOpen ? '2px solid #4169E1' : '2px solid transparent', color: isAiPaneOpen ? '#4169E1' : (darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)'), cursor: 'pointer', transition: 'all 200ms', fontFamily: 'inherit' }}
+            onMouseEnter={e => { if (!isAiPaneOpen) { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.8)' : '#0f172a'; } }}
+            onMouseLeave={e => { if (!isAiPaneOpen) { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)'; } }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M4 18V9L12 15L20 9V18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-              <circle cx="12" cy="5" r="2" fill="currentColor"/>
-            </svg>
-            <span style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Maya</span>
-            {isAiPaneOpen && <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#ffffff', opacity: 0.8 }} className="animate-pulse" />}
+            {isAiPaneOpen && <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#10b981' }} className="animate-pulse" />}
+            <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Maya</span>
           </button>
 
           {/* Demo badge */}
           {isGuest && (
-            <div style={{ padding: '4px 10px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.35)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#f59e0b', boxShadow: '0 0 6px #f59e0b' }} />
-              <span style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', color: '#f59e0b' }}>Demo</span>
+            <div style={{ padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#f59e0b' }} />
+              <span style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.2em', color: '#f59e0b' }}>Demo</span>
             </div>
           )}
 
-          {/* Profile */}
-          <div style={{ position: 'relative' }}>
+          {/* Profile — text only, underline when open */}
+          <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'stretch' }}>
             <button
               onClick={() => setIsProfileOpen(!isProfileOpen)}
-              style={{ height: '34px', padding: '0 12px', display: 'flex', alignItems: 'center', gap: '8px', background: isProfileOpen ? '#4169E1' : (darkMode ? 'rgba(65,105,225,0.1)' : 'rgba(65,105,225,0.06)'), border: `1px solid ${isProfileOpen ? '#4169E1' : (darkMode ? 'rgba(65,105,225,0.3)' : 'rgba(65,105,225,0.22)')}`, cursor: 'pointer', outline: 'none', transition: 'all 200ms' }}
+              style={{ height: '100%', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', borderBottom: isProfileOpen ? '2px solid #4169E1' : '2px solid transparent', cursor: 'pointer', outline: 'none', transition: 'all 200ms', color: isProfileOpen ? '#4169E1' : (darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)') }}
+              onMouseEnter={e => { if (!isProfileOpen) { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.8)' : '#0f172a'; } }}
+              onMouseLeave={e => { if (!isProfileOpen) { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)'; } }}
             >
-              <div style={{ width: '22px', height: '22px', background: isProfileOpen ? 'rgba(255,255,255,0.25)' : '#4169E1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', color: '#ffffff' }}>{(session?.userName || 'O')[0]}</span>
+              <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#4169E1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span style={{ fontSize: '9px', fontWeight: 900, color: '#ffffff' }}>{(session?.userName || 'O')[0].toUpperCase()}</span>
               </div>
-              <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: isProfileOpen ? '#ffffff' : (darkMode ? 'rgba(255,255,255,0.8)' : '#0f172a') }} className="desktop-only">{session?.userName || 'Operator'}</span>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={isProfileOpen ? '#ffffff' : (darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.4)')} strokeWidth="2.5" className="desktop-only"><polyline points="6 9 12 15 18 9"/></svg>
+              <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }} className="desktop-only">{session?.userName || 'Operator'}</span>
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="desktop-only"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
 
             {isProfileOpen && (
@@ -477,16 +477,30 @@ export default function NetraTerminal() {
       {activeSessionId && (
         <div style={{ height: '36px', background: darkMode ? '#0d1117' : '#f8fafc', borderBottom: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`, display: 'flex', alignItems: 'stretch', zIndex: 90, animation: 'slide-down 0.4s cubic-bezier(0.4,0,0.2,1)', flexShrink: 0 }} className="desktop-only">
 
-          {/* LEFT: session identity — clean inline */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 16px', flexShrink: 0, borderRight: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}` }}>
-            <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 5px rgba(16,185,129,0.8)' }} className="animate-pulse" />
-            <span style={{ fontSize: '10px', fontWeight: 800, color: '#4169E1', textTransform: 'uppercase', letterSpacing: '0.14em', fontFamily: 'JetBrains Mono, monospace' }}>
-              {session?.assetName || activeEditLog?.phase1?.asset_ticker || '—'}
-            </span>
-            <div style={{ width: '1px', height: '12px', background: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.1)' }} />
-            <span style={{ fontSize: '9px', fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono, monospace', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {tradeName || '—'}
-            </span>
+          {/* LEFT: ledger toggle + session identity */}
+          <div style={{ display: 'flex', alignItems: 'stretch', flexShrink: 0, borderRight: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}` }}>
+            {/* Ledger toggle */}
+            <button
+              onClick={() => ctxSetIsLoggerOpen(!isLoggerOpen)}
+              title="Operational Ledger"
+              style={{ height: '100%', padding: '0 14px', display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', borderRight: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`, borderBottom: isLoggerOpen ? '2px solid #4169E1' : '2px solid transparent', color: isLoggerOpen ? '#4169E1' : 'var(--text-3)', cursor: 'pointer', transition: 'all 150ms', fontFamily: 'inherit' }}
+              onMouseEnter={e => { if (!isLoggerOpen) { e.currentTarget.style.color = '#4169E1'; } }}
+              onMouseLeave={e => { if (!isLoggerOpen) { e.currentTarget.style.color = 'var(--text-3)'; } }}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              <span style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Ledger</span>
+            </button>
+            {/* Session identity */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 14px' }}>
+              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 5px rgba(16,185,129,0.8)' }} className="animate-pulse" />
+              <span style={{ fontSize: '10px', fontWeight: 800, color: '#4169E1', textTransform: 'uppercase', letterSpacing: '0.14em', fontFamily: 'JetBrains Mono, monospace' }}>
+                {session?.assetName || activeEditLog?.phase1?.asset_ticker || '—'}
+              </span>
+              <div style={{ width: '1px', height: '12px', background: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.1)' }} />
+              <span style={{ fontSize: '9px', fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono, monospace', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {tradeName || '—'}
+              </span>
+            </div>
           </div>
 
           {/* CENTRE: phase steps — inline text breadcrumb */}
@@ -525,59 +539,42 @@ export default function NetraTerminal() {
             </div>
           )}
 
-          <div style={{ width: '1px', background: darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)', flexShrink: 0 }} />
-
-          {/* RIGHT: mission controls */}
+          {/* RIGHT: action icons — no borders, just ghost icons */}
           {prepStep >= 2 && (activeView === 'terminal' || activeView === 'trishul') && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0 14px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'stretch', marginLeft: 'auto', borderLeft: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}` }}>
 
-              {/* Ledger toggle */}
-              <button
-                onClick={() => ctxSetIsLoggerOpen(!isLoggerOpen)}
-                title="Operational Ledger"
-                style={{ height: '26px', padding: '0 10px', display: 'flex', alignItems: 'center', gap: '5px', background: isLoggerOpen ? 'rgba(65,105,225,0.12)' : 'transparent', border: `1px solid ${isLoggerOpen ? 'rgba(65,105,225,0.4)' : 'var(--border)'}`, color: isLoggerOpen ? '#4169E1' : 'var(--text-3)', cursor: 'pointer', transition: 'all 150ms', fontFamily: 'inherit' }}
-                onMouseEnter={e => { if (!isLoggerOpen) { e.currentTarget.style.borderColor = 'rgba(65,105,225,0.35)'; e.currentTarget.style.color = '#4169E1'; } }}
-                onMouseLeave={e => { if (!isLoggerOpen) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-3)'; } }}
-              >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                <span style={{ fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Ledger</span>
-              </button>
-
-              <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
-
-              {/* Scrub — icon only */}
+              {/* Scrub */}
               <button
                 onClick={() => { resetTerminalState(); showToast('Mission Scrubbed — State Purged', 'warning'); }}
                 title="Scrub mission data"
-                style={{ width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer', transition: 'all 150ms' }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(245,158,11,0.5)'; e.currentTarget.style.color = '#f59e0b'; e.currentTarget.style.background = 'rgba(245,158,11,0.06)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.background = 'transparent'; }}
+                style={{ width: '36px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', borderLeft: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`, color: darkMode ? 'rgba(255,255,255,0.25)' : 'rgba(15,23,42,0.25)', cursor: 'pointer', transition: 'color 150ms' }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#f59e0b'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.25)' : 'rgba(15,23,42,0.25)'; }}
               >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
               </button>
 
-              {/* Commit — primary action */}
+              {/* Commit */}
               <button
                 onClick={() => commitTradeLog()}
                 disabled={isAiLoading}
                 title="Commit & Vectorize"
-                style={{ height: '26px', padding: '0 12px', display: 'flex', alignItems: 'center', gap: '5px', background: '#10b981', border: 'none', color: '#ffffff', cursor: isAiLoading ? 'not-allowed' : 'pointer', opacity: isAiLoading ? 0.5 : 1, transition: 'all 150ms', fontFamily: 'inherit' }}
-                onMouseEnter={e => { if (!isAiLoading) e.currentTarget.style.background = '#059669'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = '#10b981'; }}
+                style={{ width: '36px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', borderLeft: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`, color: isAiLoading ? 'rgba(16,185,129,0.3)' : '#10b981', cursor: isAiLoading ? 'not-allowed' : 'pointer', transition: 'color 150ms' }}
+                onMouseEnter={e => { if (!isAiLoading) e.currentTarget.style.color = '#059669'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = isAiLoading ? 'rgba(16,185,129,0.3)' : '#10b981'; }}
               >
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>
-                <span style={{ fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Commit</span>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>
               </button>
 
-              {/* Abort — icon only */}
+              {/* Abort */}
               <button
                 onClick={() => { setActiveSessionId(null); dispatch({ type: 'logs/setActiveEditLog', payload: null }); dispatch({ type: 'analysis/setHighestStep', payload: 0 }); dispatch({ type: 'analysis/setWeaponLocked', payload: false }); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); showToast('Protocol Aborted — State Purged'); }}
                 title="Abort protocol"
-                style={{ width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer', transition: 'all 150ms' }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(239,68,68,0.5)'; e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = 'rgba(239,68,68,0.06)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.background = 'transparent'; }}
+                style={{ width: '36px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', borderLeft: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`, color: darkMode ? 'rgba(255,255,255,0.25)' : 'rgba(15,23,42,0.25)', cursor: 'pointer', transition: 'color 150ms' }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.25)' : 'rgba(15,23,42,0.25)'; }}
               >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
 
             </div>
