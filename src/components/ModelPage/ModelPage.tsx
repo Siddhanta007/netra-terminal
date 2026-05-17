@@ -143,8 +143,8 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
 
   // Per-model opaque box fills — hero and stats are intentionally different shades
   const BOX_THEME: Record<string, { hero: { bg: string; border: string }; stats: { bg: string; border: string } }> = {
-    pinaka:  { hero:  { bg: '#e4e8f0', border: '#c8d0e0' }, stats: { bg: '#e9e6ee', border: '#d4cedf' } },
-    trishul: { hero:  { bg: '#ece8df', border: '#d8d0c4' }, stats: { bg: '#e5ebe5', border: '#c8d4c8' } },
+    pinaka:  { hero: { bg: '#e4e8f0', border: '#c8d0e0' }, stats: { bg: '#ffffff', border: '#d1d5db' } },
+    trishul: { hero: { bg: '#ece8df', border: '#d8d0c4' }, stats: { bg: '#ffffff', border: '#d1d5db' } },
   };
   const boxTheme = BOX_THEME[model.id] ?? BOX_THEME.pinaka;
 
