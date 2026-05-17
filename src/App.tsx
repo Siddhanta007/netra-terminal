@@ -374,9 +374,6 @@ export default function NetraTerminal() {
 
           {/* Logo */}
           <button onClick={() => { if (session) { ctxSetPrepStep(1); setActiveSessionId(null); } }} style={{ background: 'none', border: 'none', padding: '0 4px', cursor: session ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '28px', height: '28px', background: '#4169E1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><polygon points="7,1 13,4 13,10 7,13 1,10 1,4" fill="none" stroke="white" strokeWidth="1.5"/><circle cx="7" cy="7" r="2" fill="white"/></svg>
-            </div>
             <h1 style={{ fontSize: '16px', fontWeight: 950, letterSpacing: '0.14em', color: darkMode ? '#ffffff' : '#0f172a', lineHeight: 1, margin: 0, textTransform: 'uppercase', transition: 'color 300ms' }}>NETRA</h1>
           </button>
 
@@ -600,14 +597,20 @@ export default function NetraTerminal() {
           {(activeSessionId || activeEditLog) && (
             <aside className={`sidebar-transition flex flex-col z-[150] ${isLoggerOpen ? 'w-[400px] max-w-[100vw] opacity-100 translate-x-0' : 'w-0 opacity-0 -translate-x-full overflow-hidden'}`} style={{ background: darkMode ? '#1C2128' : '#FFFFFF', borderRight: isLoggerOpen ? '1px solid rgba(65,105,225,0.18)' : 'none', boxShadow: isLoggerOpen ? '20px 0 60px rgba(0,0,0,0.3)' : 'none', position: 'relative', height: '100%', transition: 'all 500ms cubic-bezier(0.23,1,0.32,1)' }}>
               <div style={{ minWidth: '400px', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.02)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                    <span style={{ fontSize: '11px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'var(--text-1)' }}>Operational Intelligence</span>
+                <div style={{ borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ height: '3px', background: 'linear-gradient(90deg, #4169E1, #7c3aed)' }} />
+                  <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      <span style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#4169E1' }}>Netra Ledger</span>
+                      <span style={{ fontSize: '13px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-1)', lineHeight: 1 }}>Operational Intelligence</span>
+                    </div>
+                    <button onClick={() => ctxSetIsLoggerOpen(false)} style={{ width: '28px', height: '28px', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 150ms' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(65,105,225,0.08)'; e.currentTarget.style.borderColor = 'rgba(65,105,225,0.4)'; e.currentTarget.style.color = '#4169E1'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-3)'; }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+                    </button>
                   </div>
-                  <button onClick={() => ctxSetIsLoggerOpen(false)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-3)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-                  </button>
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-1">
                   {/* Seven Rules — collapsible */}
