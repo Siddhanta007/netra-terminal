@@ -717,60 +717,71 @@ export default function NetraTerminal() {
                 <div className="flex-1 overflow-y-auto" style={{ background: '#ffffff', position: 'relative' }}>
 
                   {/* ── CORNER: TOP-RIGHT — Heptagonal ── */}
+                  {/* ── CORNER: TOP-RIGHT — Scattered heptagons ── */}
                   <div style={{ position: 'fixed', top: 0, right: 0, width: '620px', height: '620px', pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
                     <svg width="620" height="620" viewBox="0 0 620 620" fill="none">
-                      {[80, 150, 220, 295, 370, 445, 520].map((r, i) => {
-                        const pts = Array.from({ length: 7 }, (_, k) => {
-                          const a = (-90 + k * (360 / 7)) * Math.PI / 180;
-                          return `${(620 + r * Math.cos(a)).toFixed(1)},${(r * Math.sin(a)).toFixed(1)}`;
+                      {([
+                        { cx: 598, cy: 22,  r: 52, color: '#2563eb' },
+                        { cx: 508, cy: 15,  r: 40, color: '#7c3aed' },
+                        { cx: 618, cy: 100, r: 44, color: '#d97706' },
+                        { cx: 428, cy: 32,  r: 34, color: '#2563eb' },
+                        { cx: 532, cy: 102, r: 46, color: '#7c3aed' },
+                        { cx: 358, cy: 12,  r: 28, color: '#d97706' },
+                        { cx: 455, cy: 118, r: 32, color: '#2563eb' },
+                        { cx: 615, cy: 178, r: 36, color: '#7c3aed' },
+                        { cx: 372, cy: 98,  r: 26, color: '#d97706' },
+                        { cx: 525, cy: 182, r: 38, color: '#2563eb' },
+                        { cx: 298, cy: 55,  r: 24, color: '#7c3aed' },
+                        { cx: 442, cy: 198, r: 30, color: '#d97706' },
+                        { cx: 615, cy: 252, r: 32, color: '#2563eb' },
+                        { cx: 348, cy: 168, r: 24, color: '#7c3aed' },
+                        { cx: 272, cy: 132, r: 20, color: '#2563eb' },
+                        { cx: 498, cy: 258, r: 28, color: '#d97706' },
+                        { cx: 388, cy: 248, r: 24, color: '#7c3aed' },
+                        { cx: 228, cy: 88,  r: 18, color: '#2563eb' },
+                        { cx: 445, cy: 308, r: 26, color: '#d97706' },
+                        { cx: 322, cy: 295, r: 20, color: '#7c3aed' },
+                      ] as {cx:number;cy:number;r:number;color:string}[]).map((s, i) => {
+                        const pts = Array.from({ length: 6 }, (_, k) => {
+                          const a = (k * 60 - 90) * Math.PI / 180;
+                          return `${(s.cx + s.r * Math.cos(a)).toFixed(1)},${(s.cy + s.r * Math.sin(a)).toFixed(1)}`;
                         }).join(' ');
-                        const sw = [5, 3.5, 2.5, 2, 1.5, 1, 0.7][i];
-                        const so = [1, 0.7, 0.5, 0.35, 0.22, 0.14, 0.08][i];
-                        const fills = [
-                          'rgba(37,99,235,0.13)',
-                          'rgba(37,99,235,0.07)',
-                          'rgba(37,99,235,0.03)',
-                          'none','none','none','none'
-                        ];
-                        return <polygon key={r} points={pts} stroke="#2563eb" strokeWidth={sw} strokeOpacity={so} fill={fills[i]} strokeDasharray={i === 3 || i === 5 ? '10 7' : 'none'} />;
+                        return <polygon key={i} points={pts} fill="none" stroke={s.color} strokeWidth="4" strokeOpacity="0.4" />;
                       })}
-                      <line x1="620" y1="0" x2="220" y2="360" stroke="#2563eb" strokeWidth="2" strokeOpacity="0.25"/>
-                      <line x1="620" y1="0" x2="380" y2="500" stroke="#2563eb" strokeWidth="1" strokeOpacity="0.12"/>
-                      <line x1="620" y1="140" x2="480" y2="0" stroke="#2563eb" strokeWidth="1.5" strokeOpacity="0.18"/>
-                      <circle cx="620" cy="0" r="9" fill="#2563eb" fillOpacity="0.9"/>
-                      <circle cx="620" cy="0" r="18" fill="none" stroke="#2563eb" strokeWidth="1.5" strokeOpacity="0.4"/>
-                      <circle cx="510" cy="110" r="5" fill="#2563eb" fillOpacity="0.5"/>
-                      <circle cx="400" cy="220" r="3.5" fill="#2563eb" fillOpacity="0.3"/>
-                      <circle cx="290" cy="330" r="2.5" fill="#2563eb" fillOpacity="0.18"/>
                     </svg>
                   </div>
 
-                  {/* ── CORNER: BOTTOM-LEFT — Heptagonal ── */}
+                  {/* ── CORNER: BOTTOM-LEFT — Scattered heptagons ── */}
                   <div style={{ position: 'fixed', bottom: 0, left: 0, width: '560px', height: '560px', pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
                     <svg width="560" height="560" viewBox="0 0 560 560" fill="none">
-                      {[80, 150, 220, 295, 370, 445, 520].map((r, i) => {
-                        const pts = Array.from({ length: 7 }, (_, k) => {
-                          const a = (90 + k * (360 / 7)) * Math.PI / 180;
-                          return `${(r * Math.cos(a)).toFixed(1)},${(560 + r * Math.sin(a)).toFixed(1)}`;
+                      {([
+                        { cx: 18,  cy: 538, r: 52, color: '#2563eb' },
+                        { cx: 112, cy: 552, r: 40, color: '#059669' },
+                        { cx: 8,   cy: 452, r: 44, color: '#d97706' },
+                        { cx: 188, cy: 522, r: 34, color: '#2563eb' },
+                        { cx: 98,  cy: 455, r: 46, color: '#059669' },
+                        { cx: 205, cy: 445, r: 28, color: '#d97706' },
+                        { cx: 18,  cy: 375, r: 32, color: '#2563eb' },
+                        { cx: 148, cy: 372, r: 36, color: '#059669' },
+                        { cx: 282, cy: 505, r: 26, color: '#d97706' },
+                        { cx: 68,  cy: 292, r: 38, color: '#2563eb' },
+                        { cx: 258, cy: 415, r: 24, color: '#059669' },
+                        { cx: 178, cy: 302, r: 30, color: '#d97706' },
+                        { cx: 335, cy: 455, r: 22, color: '#2563eb' },
+                        { cx: 15,  cy: 218, r: 28, color: '#059669' },
+                        { cx: 145, cy: 225, r: 22, color: '#d97706' },
+                        { cx: 285, cy: 332, r: 24, color: '#2563eb' },
+                        { cx: 75,  cy: 172, r: 20, color: '#059669' },
+                        { cx: 225, cy: 205, r: 20, color: '#d97706' },
+                        { cx: 355, cy: 372, r: 20, color: '#2563eb' },
+                        { cx: 165, cy: 138, r: 18, color: '#059669' },
+                      ] as {cx:number;cy:number;r:number;color:string}[]).map((s, i) => {
+                        const pts = Array.from({ length: 6 }, (_, k) => {
+                          const a = (k * 60 - 90) * Math.PI / 180;
+                          return `${(s.cx + s.r * Math.cos(a)).toFixed(1)},${(s.cy + s.r * Math.sin(a)).toFixed(1)}`;
                         }).join(' ');
-                        const sw = [5, 3.5, 2.5, 2, 1.5, 1, 0.7][i];
-                        const so = [1, 0.7, 0.5, 0.35, 0.22, 0.14, 0.08][i];
-                        const fills = [
-                          'rgba(245,158,11,0.14)',
-                          'rgba(245,158,11,0.07)',
-                          'rgba(245,158,11,0.03)',
-                          'none','none','none','none'
-                        ];
-                        return <polygon key={r} points={pts} stroke="#f59e0b" strokeWidth={sw} strokeOpacity={so} fill={fills[i]} strokeDasharray={i === 3 || i === 5 ? '10 7' : 'none'} />;
+                        return <polygon key={i} points={pts} fill="none" stroke={s.color} strokeWidth="4" strokeOpacity="0.4" />;
                       })}
-                      <line x1="0" y1="560" x2="320" y2="180" stroke="#f59e0b" strokeWidth="2" strokeOpacity="0.25"/>
-                      <line x1="0" y1="560" x2="220" y2="440" stroke="#f59e0b" strokeWidth="1" strokeOpacity="0.12"/>
-                      <line x1="0" y1="420" x2="140" y2="560" stroke="#f59e0b" strokeWidth="1.5" strokeOpacity="0.18"/>
-                      <circle cx="0" cy="560" r="9" fill="#f59e0b" fillOpacity="0.9"/>
-                      <circle cx="0" cy="560" r="18" fill="none" stroke="#f59e0b" strokeWidth="1.5" strokeOpacity="0.4"/>
-                      <circle cx="110" cy="450" r="5" fill="#f59e0b" fillOpacity="0.5"/>
-                      <circle cx="220" cy="340" r="3.5" fill="#f59e0b" fillOpacity="0.3"/>
-                      <circle cx="330" cy="230" r="2.5" fill="#f59e0b" fillOpacity="0.18"/>
                     </svg>
                   </div>
 
@@ -798,37 +809,50 @@ export default function NetraTerminal() {
                     {/* AUTO-SLIDING CAROUSEL */}
                     {(() => {
                       const slides = [
-                        { label: 'On discipline', quote: 'Structure before direction. Conviction before entry. The market does not reward eagerness — it punishes it.', accent: '#2563eb', bg: '#eef3ff' },
-                        { label: 'On patience', quote: 'The edge is not in the setup. It is in the patience to wait for one that is undeniable. Most sessions end without a trade. That is the correct outcome.', accent: '#059669', bg: '#ecfdf5' },
-                        { label: 'On capital', quote: 'Capital lost cannot analyse. Capital preserved can deploy again. Survival is the precondition for every future trade.', accent: '#d97706', bg: '#fffbeb' },
-                        { label: 'On confluence', quote: 'One signal is noise. Two signals are coincidence. Five aligned structural signals is a command. Deploy only at command level.', accent: '#7c3aed', bg: '#f5f3ff' },
+                        { label: 'On discipline', quote: 'Structure before direction. Conviction before entry. The market does not reward eagerness — it punishes it.', accent: '#2563eb', bg: '#e4e8f0', image: '/image_1.avif' },
+                        { label: 'On patience', quote: 'The edge is not in the setup. It is in the patience to wait for one that is undeniable. Most sessions end without a trade. That is the correct outcome.', accent: '#059669', bg: '#e5ebe5', image: '/image_2.jpg' },
+                        { label: 'On capital', quote: 'Capital lost cannot analyse. Capital preserved can deploy again. Survival is the precondition for every future trade.', accent: '#d97706', bg: '#ece8df', image: '/image_3.jpg' },
+                        { label: 'On confluence', quote: 'One signal is noise. Two signals are coincidence. Five aligned structural signals is a command. Deploy only at command level.', accent: '#7c3aed', bg: '#e9e6ee', image: '/image_4.jpg' },
                       ];
                       const slide = slides[slideIdx];
                       return (
                         <div style={{ position: 'relative', marginBottom: '48px' }}>
-                          <div
-                            style={{ width: '100%', minHeight: '320px', border: `2px solid ${slide.accent}22`, padding: '56px 64px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', background: slide.bg, transition: 'all 500ms ease', position: 'relative', overflow: 'hidden' }}
-                          >
-                            {/* Slide number */}
-                            <div style={{ fontSize: '120px', fontWeight: 950, color: slide.accent, opacity: 0.18, position: 'absolute', right: '40px', top: '20px', lineHeight: 1, fontFamily: 'monospace', userSelect: 'none' }}>
-                              {String(slideIdx + 1).padStart(2, '0')}
+                          <div style={{ width: '100%', minHeight: '520px', display: 'flex', overflow: 'hidden', background: slide.bg, transition: 'background 500ms ease' }}>
+
+                            {/* LEFT — image */}
+                            <div style={{ width: '42%', flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
+                              <img
+                                src={slide.image}
+                                alt={slide.label}
+                                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', transition: 'opacity 400ms ease' }}
+                              />
+                              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.18)' }} />
                             </div>
-                            <div>
-                              <div style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: slide.accent, marginBottom: '28px' }}>{slide.label}</div>
-                              <p style={{ fontSize: '28px', fontWeight: 700, color: '#0f172a', lineHeight: 1.35, maxWidth: '780px', margin: 0, letterSpacing: '-0.02em' }}>
-                                "{slide.quote}"
-                              </p>
+
+                            {/* RIGHT — quote */}
+                            <div style={{ flex: 1, padding: '72px 72px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative' }}>
+                              {/* Ghost number */}
+                              <div style={{ fontSize: '120px', fontWeight: 950, color: slide.accent, opacity: 0.12, position: 'absolute', right: '40px', top: '20px', lineHeight: 1, fontFamily: 'monospace', userSelect: 'none' }}>
+                                {String(slideIdx + 1).padStart(2, '0')}
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: slide.accent, marginBottom: '28px' }}>{slide.label}</div>
+                                <p style={{ fontSize: '26px', fontWeight: 700, color: '#0f172a', lineHeight: 1.4, margin: 0, letterSpacing: '-0.02em' }}>
+                                  "{slide.quote}"
+                                </p>
+                              </div>
+                              {/* Dots */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '40px' }}>
+                                {slides.map((_, i) => (
+                                  <button
+                                    key={i}
+                                    onClick={() => setSlideIdx(i)}
+                                    style={{ width: i === slideIdx ? '28px' : '6px', height: '4px', borderRadius: '2px', background: i === slideIdx ? slide.accent : `${slide.accent}40`, border: 'none', cursor: 'pointer', padding: 0, transition: 'all 400ms ease' }}
+                                  />
+                                ))}
+                              </div>
                             </div>
-                            {/* Dots */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '40px' }}>
-                              {slides.map((sl, i) => (
-                                <button
-                                  key={i}
-                                  onClick={() => setSlideIdx(i)}
-                                  style={{ width: i === slideIdx ? '28px' : '6px', height: '4px', borderRadius: '2px', background: i === slideIdx ? slide.accent : `${slide.accent}40`, border: 'none', cursor: 'pointer', padding: 0, transition: 'all 400ms ease' }}
-                                />
-                              ))}
-                            </div>
+
                           </div>
                         </div>
                       );
@@ -836,7 +860,7 @@ export default function NetraTerminal() {
 
                     {/* ── BOX 1: WHAT THIS IS ── */}
                     <div className="home-slide-up" style={{ animationDelay: '150ms', marginBottom: '20px' }}>
-                      <div style={{ border: '2px solid rgba(225,29,72,0.18)', background: '#fff0f3', padding: '56px 60px' }}>
+                      <div style={{ background: '#ece5e6', padding: '56px 60px' }}>
                         <div style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#e11d48', marginBottom: '32px' }}>The system</div>
                         <p style={{ fontSize: '26px', fontWeight: 700, color: '#0f172a', lineHeight: 1.45, margin: '0 0 28px 0', letterSpacing: '-0.02em', maxWidth: '820px' }}>
                           NETRA is not a signal generator. It is a <span style={{ color: '#e11d48' }}>decision enforcement system</span> — a structured process that removes emotion and forces every assumption about the market to be verified before capital is deployed.
@@ -898,7 +922,7 @@ export default function NetraTerminal() {
                             <span style={{ fontSize: '8px', fontWeight: 700, fontFamily: 'monospace', color: 'rgba(15,23,42,0.5)', letterSpacing: '0.15em' }}>{m.idx}</span>
                           </div>
 
-                          <div style={{ border: `2px solid ${m.color}33`, background: '#ffffff', boxShadow: '0 4px 40px rgba(0,0,0,0.08)', minHeight: '560px', display: 'flex', overflow: 'hidden' }}>
+                          <div style={{ background: '#ffffff', boxShadow: '0 4px 40px rgba(0,0,0,0.08)', minHeight: '560px', display: 'flex', overflow: 'hidden' }}>
 
                             {/* LEFT — Model image panel */}
                             <div style={{ position: 'relative', flexShrink: 0, width: '44%', clipPath: 'polygon(0 0, 100% 0, 88% 100%, 0 100%)', overflow: 'hidden' }}>
@@ -1003,7 +1027,7 @@ export default function NetraTerminal() {
 
                     {/* ── BOX 2: THREE PILLARS ── */}
                     <div className="home-slide-up" style={{ animationDelay: '220ms', marginBottom: '20px' }}>
-                      <div style={{ border: '2px solid rgba(217,119,6,0.2)', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', background: '#fffbeb' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', background: '#ece8df' }}>
                         {([
                           { n: '01', title: 'Read the market first.', body: 'No directional bias is valid without structural confirmation. The market\'s current state — whether it is in balance, relocation, or transition — determines which trades are even available today.' },
                           { n: '02', title: 'Risk is decided at the start.', body: 'R is fixed before entry. Position size is derived from it. The stop is never moved to save a trade. When the stop is hit, the analysis was wrong. That is the correct conclusion every time.' },
@@ -1020,7 +1044,7 @@ export default function NetraTerminal() {
 
                     {/* ── BOX 3: LARGE QUOTE ── */}
                     <div className="home-slide-up" style={{ animationDelay: '300ms', marginBottom: '48px' }}>
-                      <div style={{ border: '2px solid rgba(13,148,136,0.2)', background: '#f0fdfa', padding: '64px 60px', position: 'relative', overflow: 'hidden' }}>
+                      <div style={{ background: '#e4eae8', padding: '64px 60px', position: 'relative', overflow: 'hidden' }}>
                         <div style={{ fontSize: '200px', fontWeight: 950, color: '#0d9488', opacity: 0.07, position: 'absolute', right: '-20px', bottom: '-40px', lineHeight: 1, fontFamily: 'monospace', userSelect: 'none', letterSpacing: '-0.05em' }}>"</div>
                         <div style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#0d9488', marginBottom: '28px' }}>Trading is a discipline problem, not an information problem</div>
                         <p style={{ fontSize: '32px', fontWeight: 700, color: '#0f172a', lineHeight: 1.35, margin: '0 0 32px 0', letterSpacing: '-0.03em', maxWidth: '860px' }}>

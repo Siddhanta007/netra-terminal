@@ -13,7 +13,7 @@ interface ModelState {
 
 const initialState: ModelState = {
   availableModels: [],
-  selectedModel: loadState('selectedModel', 'google|gemini-3.1-flash'),
+  selectedModel: loadState('selectedModel', 'google|gemini-3.1-flash-lite'),
   visionModel: loadState('visionModel', 'google|gemini-3.1-flash-lite'),
   modelConfig: loadState('modelConfig', {
     temperature: 0.2,
