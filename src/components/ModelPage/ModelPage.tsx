@@ -17,45 +17,65 @@ interface Props {
   isDownloading?: boolean;
 }
 
-function HeptagonCorner({ corner, color, size }: { corner: 'tr' | 'bl'; color: string; size: number }) {
-  const radii = [70, 130, 195, 265, 335, 405, 470];
-  if (corner === 'tr') {
-    return (
-      <div style={{ position: 'fixed', top: 0, right: 0, width: size, height: size, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="none">
-          {radii.map((r, i) => {
-            const pts = Array.from({ length: 7 }, (_, k) => {
-              const a = (-90 + k * (360 / 7)) * Math.PI / 180;
-              return `${(size + r * Math.cos(a)).toFixed(1)},${(r * Math.sin(a)).toFixed(1)}`;
-            }).join(' ');
-            const sw = [5, 3.5, 2.5, 2, 1.5, 1, 0.7][i];
-            const so = [1, 0.7, 0.5, 0.35, 0.22, 0.14, 0.08][i];
-            const fills = [`${color}21`, `${color}11`, `${color}07`, 'none', 'none', 'none', 'none'];
-            return <polygon key={r} points={pts} stroke={color} strokeWidth={sw} strokeOpacity={so} fill={fills[i]} strokeDasharray={i === 3 || i === 5 ? '10 7' : 'none'} />;
-          })}
-          <circle cx={size} cy={0} r="9" fill={color} fillOpacity="0.9" />
-          <circle cx={size} cy={0} r="18" fill="none" stroke={color} strokeWidth="1.5" strokeOpacity="0.4" />
-          <circle cx={size - 110} cy={110} r="5" fill={color} fillOpacity="0.5" />
-        </svg>
-      </div>
-    );
-  }
+// Pinaka — scattered rectangles, random positions + 7-color palette
+const RECT_TR = [
+  { cx: 608, cy: 28,  r: 50, c: '#3b82f6' }, { cx: 544, cy: 8,   r: 33, c: '#f59e0b' },
+  { cx: 488, cy: 52,  r: 44, c: '#8b5cf6' }, { cx: 618, cy: 108, r: 38, c: '#10b981' },
+  { cx: 412, cy: 18,  r: 26, c: '#6366f1' }, { cx: 558, cy: 125, r: 46, c: '#0ea5e9' },
+  { cx: 338, cy: 42,  r: 22, c: '#ef4444' }, { cx: 470, cy: 142, r: 30, c: '#f59e0b' },
+  { cx: 615, cy: 188, r: 35, c: '#3b82f6' }, { cx: 280, cy: 75,  r: 20, c: '#8b5cf6' },
+  { cx: 390, cy: 112, r: 38, c: '#10b981' }, { cx: 515, cy: 205, r: 24, c: '#6366f1' },
+  { cx: 225, cy: 50,  r: 18, c: '#0ea5e9' }, { cx: 450, cy: 228, r: 42, c: '#f59e0b' },
+  { cx: 612, cy: 262, r: 28, c: '#ef4444' }, { cx: 335, cy: 182, r: 18, c: '#3b82f6' },
+  { cx: 565, cy: 302, r: 22, c: '#8b5cf6' }, { cx: 265, cy: 162, r: 32, c: '#10b981' },
+  { cx: 485, cy: 298, r: 20, c: '#6366f1' }, { cx: 395, cy: 272, r: 36, c: '#f59e0b' },
+];
+const RECT_BL = [
+  { cx: 22,  cy: 545, r: 50, c: '#3b82f6' }, { cx: 95,  cy: 560, r: 33, c: '#10b981' },
+  { cx: 162, cy: 528, r: 44, c: '#f59e0b' }, { cx: 15,  cy: 478, r: 38, c: '#8b5cf6' },
+  { cx: 248, cy: 552, r: 26, c: '#6366f1' }, { cx: 108, cy: 472, r: 46, c: '#0ea5e9' },
+  { cx: 325, cy: 530, r: 22, c: '#ef4444' }, { cx: 195, cy: 462, r: 30, c: '#f59e0b' },
+  { cx: 20,  cy: 402, r: 35, c: '#3b82f6' }, { cx: 388, cy: 518, r: 20, c: '#8b5cf6' },
+  { cx: 132, cy: 388, r: 38, c: '#10b981' }, { cx: 280, cy: 445, r: 24, c: '#6366f1' },
+  { cx: 62,  cy: 322, r: 18, c: '#0ea5e9' }, { cx: 218, cy: 355, r: 42, c: '#f59e0b' },
+  { cx: 25,  cy: 248, r: 28, c: '#ef4444' }, { cx: 358, cy: 422, r: 18, c: '#3b82f6' },
+  { cx: 155, cy: 282, r: 22, c: '#8b5cf6' }, { cx: 328, cy: 335, r: 32, c: '#10b981' },
+  { cx: 92,  cy: 222, r: 20, c: '#6366f1' }, { cx: 252, cy: 272, r: 36, c: '#0ea5e9' },
+];
+
+// Trishul — same random positions, warm palette
+const TC = ['#f59e0b','#ef4444','#f97316','#fbbf24','#ec4899','#a855f7','#f59e0b'];
+const TRI_TR = RECT_TR.map((s, i) => ({ ...s, c: TC[i % 7] }));
+const TRI_BL = RECT_BL.map((s, i) => ({ ...s, c: TC[i % 7] }));
+
+function RectangleCorner({ corner }: { corner: 'tr' | 'bl' }) {
+  const shapes = corner === 'tr' ? RECT_TR : RECT_BL;
+  const S = corner === 'tr' ? 620 : 560;
   return (
-    <div style={{ position: 'fixed', bottom: 0, left: 0, width: size, height: size, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="none">
-        {radii.map((r, i) => {
-          const pts = Array.from({ length: 7 }, (_, k) => {
-            const a = (90 + k * (360 / 7)) * Math.PI / 180;
-            return `${(r * Math.cos(a)).toFixed(1)},${(size + r * Math.sin(a)).toFixed(1)}`;
+    <div style={{ position: 'fixed', top: corner === 'tr' ? 0 : undefined, bottom: corner === 'bl' ? 0 : undefined, right: corner === 'tr' ? 0 : undefined, left: corner === 'bl' ? 0 : undefined, width: S, height: S, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+      <svg width={S} height={S} viewBox={`0 0 ${S} ${S}`} fill="none">
+        {shapes.map((s, i) => (
+          <rect key={i} x={s.cx - s.r} y={s.cy - s.r} width={s.r * 2} height={s.r * 2}
+            fill="none" stroke={s.c} strokeWidth="5.5" strokeOpacity="0.55" />
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function TriangleCorner({ corner }: { corner: 'tr' | 'bl' }) {
+  const shapes = corner === 'tr' ? TRI_TR : TRI_BL;
+  const S = corner === 'tr' ? 620 : 560;
+  return (
+    <div style={{ position: 'fixed', top: corner === 'tr' ? 0 : undefined, bottom: corner === 'bl' ? 0 : undefined, right: corner === 'tr' ? 0 : undefined, left: corner === 'bl' ? 0 : undefined, width: S, height: S, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+      <svg width={S} height={S} viewBox={`0 0 ${S} ${S}`} fill="none">
+        {shapes.map((s, i) => {
+          const pts = Array.from({ length: 3 }, (_, k) => {
+            const a = (k * 120 - 90) * Math.PI / 180;
+            return `${(s.cx + s.r * Math.cos(a)).toFixed(1)},${(s.cy + s.r * Math.sin(a)).toFixed(1)}`;
           }).join(' ');
-          const sw = [5, 3.5, 2.5, 2, 1.5, 1, 0.7][i];
-          const so = [1, 0.7, 0.5, 0.35, 0.22, 0.14, 0.08][i];
-          const fills = [`${color}21`, `${color}11`, `${color}07`, 'none', 'none', 'none', 'none'];
-          return <polygon key={r} points={pts} stroke={color} strokeWidth={sw} strokeOpacity={so} fill={fills[i]} strokeDasharray={i === 3 || i === 5 ? '10 7' : 'none'} />;
+          return <polygon key={i} points={pts} fill="none" stroke={s.c} strokeWidth="5.5" strokeOpacity="0.55" />;
         })}
-        <circle cx={0} cy={size} r="9" fill={color} fillOpacity="0.9" />
-        <circle cx={0} cy={size} r="18" fill="none" stroke={color} strokeWidth="1.5" strokeOpacity="0.4" />
-        <circle cx={110} cy={size - 110} r="5" fill={color} fillOpacity="0.5" />
       </svg>
     </div>
   );
@@ -142,6 +162,11 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
   const { color } = model;
 
   const BOX_SHADOW = '0 4px 40px rgba(0,0,0,0.08)';
+  const HERO_BG = model.id === 'pinaka'
+    ? `linear-gradient(135deg, ${color}22 0%, ${color}0e 60%, ${color}05 100%)`
+    : '#fdf6ee';
+  const STATS_BG = '#ffffff';
+  const LEDGER_BG = '#ffffff';
 
   const handleSort = (col: string) => {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -200,9 +225,8 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
   const cmdEntries = Object.entries(stats.cmdMap);
 
   return (
-    <div style={{ background: '#ffffff', flex: 1, position: 'relative', overflowX: 'hidden' }}>
-      <HeptagonCorner corner="tr" color={color} size={580} />
-      <HeptagonCorner corner="bl" color={color} size={500} />
+    <div style={{ background: '#eef0f5', flex: 1, position: 'relative', overflowX: 'hidden' }}>
+      {model.id === 'pinaka' ? <><RectangleCorner corner="tr" /><RectangleCorner corner="bl" /></> : <><TriangleCorner corner="tr" /><TriangleCorner corner="bl" /></>}
 
       <div style={{ maxWidth: '1280px', width: '100%', margin: '0 auto', padding: '40px 48px 80px', position: 'relative', zIndex: 1 }}>
 
@@ -248,7 +272,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
 
         {/* ── SECTION 1: HERO SLIDER ── */}
         <div style={{ marginBottom: '28px' }}>
-          <div style={{ background: '#ffffff', boxShadow: BOX_SHADOW, minHeight: '520px', display: 'flex', overflow: 'hidden' }}>
+          <div style={{ background: HERO_BG, boxShadow: BOX_SHADOW, minHeight: '520px', display: 'flex', overflow: 'hidden' }}>
 
             {/* Left — image with diagonal clip */}
             <div style={{ position: 'relative', flexShrink: 0, width: '42%', clipPath: 'polygon(0 0, 100% 0, 88% 100%, 0 100%)', overflow: 'hidden' }}>
@@ -282,7 +306,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
 
         {/* ── SECTION 2: STATS + PARAMS ── */}
         <div style={{ marginBottom: '28px' }}>
-          <div style={{ background: '#ffffff', boxShadow: BOX_SHADOW }}>
+          <div style={{ background: STATS_BG, boxShadow: BOX_SHADOW }}>
             {/* Colored accent strip */}
             <div style={{ height: '4px', background: color }} />
 
@@ -368,7 +392,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
 
         {/* ── SECTION 3: TRADE LEDGER ── */}
         <div>
-          <div style={{ background: '#ffffff', boxShadow: BOX_SHADOW }}>
+          <div style={{ background: LEDGER_BG, boxShadow: BOX_SHADOW }}>
 
             {/* Ledger header */}
             <div style={{ padding: '18px 28px', borderBottom: `1px solid ${color}18` }}>
@@ -523,9 +547,9 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
                     <div key={log.id}>
                       {/* Main row */}
                       <div
-                        style={{ display: 'grid', gridTemplateColumns: '110px 90px 90px 100px 100px 80px 76px 1fr', padding: '13px 28px', borderBottom: `1px solid ${color}0e`, gap: '8px', alignItems: 'center', borderLeft: `3px solid ${accentLine}`, background: isExpanded ? `${color}08` : (rowIdx % 2 === 0 ? `${color}09` : '#eef0f4'), transition: 'background 150ms', cursor: 'default' }}
-                        onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = `${color}12`; }}
-                        onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = rowIdx % 2 === 0 ? `${color}09` : '#eef0f4'; }}
+                        style={{ display: 'grid', gridTemplateColumns: '110px 90px 90px 100px 100px 80px 76px 1fr', padding: '13px 28px', borderBottom: `1px solid ${color}0e`, gap: '8px', alignItems: 'center', borderLeft: `3px solid ${accentLine}`, background: isExpanded ? `${color}12` : (rowIdx % 2 === 0 ? `${color}0d` : '#ffffff'), transition: 'background 150ms', cursor: 'default' }}
+                        onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = `${color}16`; }}
+                        onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = rowIdx % 2 === 0 ? `${color}0d` : '#ffffff'; }}
                       >
                         <span style={{ fontSize: '11px', fontWeight: 600, color: '#334155', fontFamily: 'monospace' }}>{fmtDate(log.timestamp)}</span>
                         <span style={{ fontSize: '11px', fontWeight: 700, color: '#0f172a' }}>{log.phase2?.asset_ticker || log.phase1?.asset_ticker || log.asset || '—'}</span>

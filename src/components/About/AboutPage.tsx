@@ -40,41 +40,50 @@ export default function AboutPage() {
   return (
     <div style={{ background: '#ffffff', flex: 1, position: 'relative', overflowX: 'hidden' }}>
 
-      {/* Top-right corner decoration */}
-      <div style={{ position: 'fixed', top: 0, right: 0, width: 500, height: 500, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-        <svg width="500" height="500" viewBox="0 0 500 500" fill="none">
-          {[60, 120, 185, 255, 325, 395, 460].map((r, i) => {
-            const pts = Array.from({ length: 7 }, (_, k) => {
-              const a = (-90 + k * (360 / 7)) * Math.PI / 180;
-              return `${(500 + r * Math.cos(a)).toFixed(1)},${(r * Math.sin(a)).toFixed(1)}`;
-            }).join(' ');
-            const sw = [5, 3.5, 2.5, 2, 1.5, 1, 0.7][i];
-            const so = [1, 0.7, 0.5, 0.35, 0.22, 0.14, 0.08][i];
-            const fills = [`#4169E121`, `#4169E111`, `#4169E107`, 'none', 'none', 'none', 'none'];
-            return <polygon key={r} points={pts} stroke="#4169E1" strokeWidth={sw} strokeOpacity={so} fill={fills[i]} strokeDasharray={i === 3 || i === 5 ? '10 7' : 'none'} />;
-          })}
+      {/* Top-right — scattered circles */}
+      <div style={{ position: 'fixed', top: 0, right: 0, width: 620, height: 620, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+        <svg width="620" height="620" viewBox="0 0 620 620" fill="none">
+          {([
+            { cx: 608, cy: 28,  r: 50, c: '#4169E1' }, { cx: 544, cy: 8,   r: 33, c: '#f59e0b' },
+            { cx: 488, cy: 52,  r: 44, c: '#8b5cf6' }, { cx: 618, cy: 108, r: 38, c: '#10b981' },
+            { cx: 412, cy: 18,  r: 26, c: '#6366f1' }, { cx: 558, cy: 125, r: 46, c: '#4169E1' },
+            { cx: 338, cy: 42,  r: 22, c: '#ef4444' }, { cx: 470, cy: 142, r: 30, c: '#0ea5e9' },
+            { cx: 615, cy: 188, r: 35, c: '#f59e0b' }, { cx: 280, cy: 75,  r: 20, c: '#8b5cf6' },
+            { cx: 390, cy: 112, r: 38, c: '#4169E1' }, { cx: 515, cy: 205, r: 24, c: '#10b981' },
+            { cx: 225, cy: 50,  r: 18, c: '#6366f1' }, { cx: 450, cy: 228, r: 42, c: '#f59e0b' },
+            { cx: 612, cy: 262, r: 28, c: '#0ea5e9' }, { cx: 335, cy: 182, r: 18, c: '#4169E1' },
+            { cx: 565, cy: 302, r: 22, c: '#ef4444' }, { cx: 265, cy: 162, r: 32, c: '#8b5cf6' },
+            { cx: 485, cy: 298, r: 20, c: '#10b981' }, { cx: 395, cy: 272, r: 36, c: '#6366f1' },
+          ] as {cx:number;cy:number;r:number;c:string}[]).map((s, i) => (
+            <circle key={i} cx={s.cx} cy={s.cy} r={s.r} fill="none" stroke={s.c} strokeWidth="5.5" strokeOpacity="0.55" />
+          ))}
         </svg>
       </div>
 
-      {/* Bottom-left corner decoration */}
-      <div style={{ position: 'fixed', bottom: 0, left: 0, width: 400, height: 400, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-        <svg width="400" height="400" viewBox="0 0 400 400" fill="none">
-          {[50, 100, 155, 215, 275, 335, 390].map((r, i) => {
-            const pts = Array.from({ length: 7 }, (_, k) => {
-              const a = (90 + k * (360 / 7)) * Math.PI / 180;
-              return `${(r * Math.cos(a)).toFixed(1)},${(400 + r * Math.sin(a)).toFixed(1)}`;
-            }).join(' ');
-            const sw = [4, 2.5, 2, 1.5, 1, 0.7, 0.5][i];
-            const so = [0.8, 0.55, 0.38, 0.25, 0.15, 0.09, 0.05][i];
-            return <polygon key={r} points={pts} stroke="#4169E1" strokeWidth={sw} strokeOpacity={so} fill="none" />;
-          })}
+      {/* Bottom-left — scattered circles */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, width: 560, height: 560, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+        <svg width="560" height="560" viewBox="0 0 560 560" fill="none">
+          {([
+            { cx: 22,  cy: 545, r: 50, c: '#4169E1' }, { cx: 95,  cy: 560, r: 33, c: '#10b981' },
+            { cx: 162, cy: 528, r: 44, c: '#f59e0b' }, { cx: 15,  cy: 478, r: 38, c: '#8b5cf6' },
+            { cx: 248, cy: 552, r: 26, c: '#4169E1' }, { cx: 108, cy: 472, r: 46, c: '#0ea5e9' },
+            { cx: 325, cy: 530, r: 22, c: '#ef4444' }, { cx: 195, cy: 462, r: 30, c: '#f59e0b' },
+            { cx: 20,  cy: 402, r: 35, c: '#4169E1' }, { cx: 388, cy: 518, r: 20, c: '#8b5cf6' },
+            { cx: 132, cy: 388, r: 38, c: '#6366f1' }, { cx: 280, cy: 445, r: 24, c: '#10b981' },
+            { cx: 62,  cy: 322, r: 18, c: '#0ea5e9' }, { cx: 218, cy: 355, r: 42, c: '#4169E1' },
+            { cx: 25,  cy: 248, r: 28, c: '#ef4444' }, { cx: 358, cy: 422, r: 18, c: '#f59e0b' },
+            { cx: 155, cy: 282, r: 22, c: '#8b5cf6' }, { cx: 328, cy: 335, r: 32, c: '#6366f1' },
+            { cx: 92,  cy: 222, r: 20, c: '#4169E1' }, { cx: 252, cy: 272, r: 36, c: '#0ea5e9' },
+          ] as {cx:number;cy:number;r:number;c:string}[]).map((s, i) => (
+            <circle key={i} cx={s.cx} cy={s.cy} r={s.r} fill="none" stroke={s.c} strokeWidth="5.5" strokeOpacity="0.55" />
+          ))}
         </svg>
       </div>
 
       <div style={{ maxWidth: '1100px', width: '100%', margin: '0 auto', padding: '64px 48px 100px', position: 'relative', zIndex: 1 }}>
 
         {/* ── HERO ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px', background: 'rgba(15,23,42,0.06)', marginBottom: '2px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px', background: 'rgba(15,23,42,0.06)', marginBottom: '2px', boxShadow: '0 4px 40px rgba(0,0,0,0.08)' }}>
 
           {/* Left — who I am */}
           <div style={{ background: '#e4e8f0', padding: '64px 60px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -161,7 +170,7 @@ export default function AboutPage() {
         {/* ── RESEARCH APPROACH ── */}
         <div style={{ marginBottom: '72px' }}>
           <div style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.35em', color: '#4169E1', marginBottom: '32px' }}>Research Approach</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '2px', background: 'rgba(15,23,42,0.06)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '2px', background: 'rgba(15,23,42,0.06)', boxShadow: '0 4px 40px rgba(0,0,0,0.08)' }}>
             {RESEARCH_APPROACH.map(item => (
               <div key={item.n} style={{ background: item.bg, padding: '40px 44px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>

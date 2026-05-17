@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git commit -m 'fix: add React import for React.Fragment usage in subheader *)",
+      "Bash(git commit -m 'design: stats box white/grey border for both Pinaka and Trishul, hero keeps tint *)",
+      "Bash(git commit -m 'design: grey border on all Pinaka model page boxes *)",
+      "Bash(git commit -m 'design: replace colored borders with home page shadow style on ModelPage boxes *)"
+    ]
+  }
+}

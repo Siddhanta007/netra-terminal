@@ -713,71 +713,50 @@ export default function NetraTerminal() {
                 /* ── COMMAND DASHBOARD ── */
                 <div className="flex-1 overflow-y-auto" style={{ background: '#ffffff', position: 'relative' }}>
 
-                  {/* ── CORNER: TOP-RIGHT — Heptagonal ── */}
-                  {/* ── CORNER: TOP-RIGHT — Scattered heptagons ── */}
+                  {/* ── CORNER: TOP-RIGHT — Scattered hexagons ── */}
                   <div style={{ position: 'fixed', top: 0, right: 0, width: '620px', height: '620px', pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
                     <svg width="620" height="620" viewBox="0 0 620 620" fill="none">
                       {([
-                        { cx: 598, cy: 22,  r: 52, color: '#2563eb' },
-                        { cx: 508, cy: 15,  r: 40, color: '#7c3aed' },
-                        { cx: 618, cy: 100, r: 44, color: '#d97706' },
-                        { cx: 428, cy: 32,  r: 34, color: '#2563eb' },
-                        { cx: 532, cy: 102, r: 46, color: '#7c3aed' },
-                        { cx: 358, cy: 12,  r: 28, color: '#d97706' },
-                        { cx: 455, cy: 118, r: 32, color: '#2563eb' },
-                        { cx: 615, cy: 178, r: 36, color: '#7c3aed' },
-                        { cx: 372, cy: 98,  r: 26, color: '#d97706' },
-                        { cx: 525, cy: 182, r: 38, color: '#2563eb' },
-                        { cx: 298, cy: 55,  r: 24, color: '#7c3aed' },
-                        { cx: 442, cy: 198, r: 30, color: '#d97706' },
-                        { cx: 615, cy: 252, r: 32, color: '#2563eb' },
-                        { cx: 348, cy: 168, r: 24, color: '#7c3aed' },
-                        { cx: 272, cy: 132, r: 20, color: '#2563eb' },
-                        { cx: 498, cy: 258, r: 28, color: '#d97706' },
-                        { cx: 388, cy: 248, r: 24, color: '#7c3aed' },
-                        { cx: 228, cy: 88,  r: 18, color: '#2563eb' },
-                        { cx: 445, cy: 308, r: 26, color: '#d97706' },
-                        { cx: 322, cy: 295, r: 20, color: '#7c3aed' },
-                      ] as {cx:number;cy:number;r:number;color:string}[]).map((s, i) => {
+                        { cx: 608, cy: 28,  r: 50, c: '#3b82f6' }, { cx: 544, cy: 8,   r: 33, c: '#f59e0b' },
+                        { cx: 488, cy: 52,  r: 44, c: '#8b5cf6' }, { cx: 618, cy: 108, r: 38, c: '#10b981' },
+                        { cx: 412, cy: 18,  r: 26, c: '#6366f1' }, { cx: 558, cy: 125, r: 46, c: '#0ea5e9' },
+                        { cx: 338, cy: 42,  r: 22, c: '#ef4444' }, { cx: 470, cy: 142, r: 30, c: '#f59e0b' },
+                        { cx: 615, cy: 188, r: 35, c: '#3b82f6' }, { cx: 280, cy: 75,  r: 20, c: '#8b5cf6' },
+                        { cx: 390, cy: 112, r: 38, c: '#10b981' }, { cx: 515, cy: 205, r: 24, c: '#6366f1' },
+                        { cx: 225, cy: 50,  r: 18, c: '#0ea5e9' }, { cx: 450, cy: 228, r: 42, c: '#f59e0b' },
+                        { cx: 612, cy: 262, r: 28, c: '#ef4444' }, { cx: 335, cy: 182, r: 18, c: '#3b82f6' },
+                        { cx: 565, cy: 302, r: 22, c: '#8b5cf6' }, { cx: 265, cy: 162, r: 32, c: '#10b981' },
+                        { cx: 485, cy: 298, r: 20, c: '#6366f1' }, { cx: 395, cy: 272, r: 36, c: '#f59e0b' },
+                      ] as {cx:number;cy:number;r:number;c:string}[]).map((s, i) => {
                         const pts = Array.from({ length: 6 }, (_, k) => {
                           const a = (k * 60 - 90) * Math.PI / 180;
                           return `${(s.cx + s.r * Math.cos(a)).toFixed(1)},${(s.cy + s.r * Math.sin(a)).toFixed(1)}`;
                         }).join(' ');
-                        return <polygon key={i} points={pts} fill="none" stroke={s.color} strokeWidth="4" strokeOpacity="0.4" />;
+                        return <polygon key={i} points={pts} fill="none" stroke={s.c} strokeWidth="5.5" strokeOpacity="0.55" />;
                       })}
                     </svg>
                   </div>
 
-                  {/* ── CORNER: BOTTOM-LEFT — Scattered heptagons ── */}
+                  {/* ── CORNER: BOTTOM-LEFT — Scattered hexagons ── */}
                   <div style={{ position: 'fixed', bottom: 0, left: 0, width: '560px', height: '560px', pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
                     <svg width="560" height="560" viewBox="0 0 560 560" fill="none">
                       {([
-                        { cx: 18,  cy: 538, r: 52, color: '#2563eb' },
-                        { cx: 112, cy: 552, r: 40, color: '#059669' },
-                        { cx: 8,   cy: 452, r: 44, color: '#d97706' },
-                        { cx: 188, cy: 522, r: 34, color: '#2563eb' },
-                        { cx: 98,  cy: 455, r: 46, color: '#059669' },
-                        { cx: 205, cy: 445, r: 28, color: '#d97706' },
-                        { cx: 18,  cy: 375, r: 32, color: '#2563eb' },
-                        { cx: 148, cy: 372, r: 36, color: '#059669' },
-                        { cx: 282, cy: 505, r: 26, color: '#d97706' },
-                        { cx: 68,  cy: 292, r: 38, color: '#2563eb' },
-                        { cx: 258, cy: 415, r: 24, color: '#059669' },
-                        { cx: 178, cy: 302, r: 30, color: '#d97706' },
-                        { cx: 335, cy: 455, r: 22, color: '#2563eb' },
-                        { cx: 15,  cy: 218, r: 28, color: '#059669' },
-                        { cx: 145, cy: 225, r: 22, color: '#d97706' },
-                        { cx: 285, cy: 332, r: 24, color: '#2563eb' },
-                        { cx: 75,  cy: 172, r: 20, color: '#059669' },
-                        { cx: 225, cy: 205, r: 20, color: '#d97706' },
-                        { cx: 355, cy: 372, r: 20, color: '#2563eb' },
-                        { cx: 165, cy: 138, r: 18, color: '#059669' },
-                      ] as {cx:number;cy:number;r:number;color:string}[]).map((s, i) => {
+                        { cx: 22,  cy: 545, r: 50, c: '#3b82f6' }, { cx: 95,  cy: 560, r: 33, c: '#10b981' },
+                        { cx: 162, cy: 528, r: 44, c: '#f59e0b' }, { cx: 15,  cy: 478, r: 38, c: '#8b5cf6' },
+                        { cx: 248, cy: 552, r: 26, c: '#6366f1' }, { cx: 108, cy: 472, r: 46, c: '#0ea5e9' },
+                        { cx: 325, cy: 530, r: 22, c: '#ef4444' }, { cx: 195, cy: 462, r: 30, c: '#f59e0b' },
+                        { cx: 20,  cy: 402, r: 35, c: '#3b82f6' }, { cx: 388, cy: 518, r: 20, c: '#8b5cf6' },
+                        { cx: 132, cy: 388, r: 38, c: '#10b981' }, { cx: 280, cy: 445, r: 24, c: '#6366f1' },
+                        { cx: 62,  cy: 322, r: 18, c: '#0ea5e9' }, { cx: 218, cy: 355, r: 42, c: '#f59e0b' },
+                        { cx: 25,  cy: 248, r: 28, c: '#ef4444' }, { cx: 358, cy: 422, r: 18, c: '#3b82f6' },
+                        { cx: 155, cy: 282, r: 22, c: '#8b5cf6' }, { cx: 328, cy: 335, r: 32, c: '#10b981' },
+                        { cx: 92,  cy: 222, r: 20, c: '#6366f1' }, { cx: 252, cy: 272, r: 36, c: '#0ea5e9' },
+                      ] as {cx:number;cy:number;r:number;c:string}[]).map((s, i) => {
                         const pts = Array.from({ length: 6 }, (_, k) => {
                           const a = (k * 60 - 90) * Math.PI / 180;
                           return `${(s.cx + s.r * Math.cos(a)).toFixed(1)},${(s.cy + s.r * Math.sin(a)).toFixed(1)}`;
                         }).join(' ');
-                        return <polygon key={i} points={pts} fill="none" stroke={s.color} strokeWidth="4" strokeOpacity="0.4" />;
+                        return <polygon key={i} points={pts} fill="none" stroke={s.c} strokeWidth="5.5" strokeOpacity="0.55" />;
                       })}
                     </svg>
                   </div>
