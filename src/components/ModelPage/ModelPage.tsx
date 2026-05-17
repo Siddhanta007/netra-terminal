@@ -143,8 +143,8 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
 
   // Per-model opaque box fills — hero and stats are intentionally different shades
   const BOX_THEME: Record<string, { hero: { bg: string; border: string }; stats: { bg: string; border: string } }> = {
-    pinaka:  { hero:  { bg: '#f7fbff', border: '#dbeafe' }, stats: { bg: '#faf8ff', border: '#ede9fe' } },
-    trishul: { hero:  { bg: '#fef3c7', border: '#fde68a' }, stats: { bg: '#fff7ed', border: '#fed7aa' } },
+    pinaka:  { hero:  { bg: '#e4e8f0', border: '#c8d0e0' }, stats: { bg: '#e9e6ee', border: '#d4cedf' } },
+    trishul: { hero:  { bg: '#ece8df', border: '#d8d0c4' }, stats: { bg: '#e5ebe5', border: '#c8d4c8' } },
   };
   const boxTheme = BOX_THEME[model.id] ?? BOX_THEME.pinaka;
 
@@ -238,12 +238,12 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
               <span style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.35em', color }}>{model.code} · {model.type}</span>
             </div>
             {model.status === 'planning' && (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', border: '1px solid rgba(217,119,6,0.4)', padding: '5px 14px', background: '#fef9e7' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', border: '1px solid rgba(217,119,6,0.35)', padding: '5px 14px', background: '#ece8df' }}>
                 <span style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#d97706' }}>Planning Phase</span>
               </div>
             )}
             {model.status === 'live' && (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', border: '1px solid rgba(16,185,129,0.4)', padding: '5px 14px', background: '#f0fdf4' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', border: '1px solid rgba(16,185,129,0.35)', padding: '5px 14px', background: '#e5ebe5' }}>
                 <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />
                 <span style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em', color: '#059669' }}>Live</span>
               </div>
@@ -528,9 +528,9 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
                     <div key={log.id}>
                       {/* Main row */}
                       <div
-                        style={{ display: 'grid', gridTemplateColumns: '110px 90px 90px 100px 100px 80px 76px 1fr', padding: '13px 28px', borderBottom: `1px solid ${color}0e`, gap: '8px', alignItems: 'center', borderLeft: `3px solid ${accentLine}`, background: isExpanded ? `${color}08` : (rowIdx % 2 === 0 ? `${color}07` : '#ffffff'), transition: 'background 150ms', cursor: 'default' }}
+                        style={{ display: 'grid', gridTemplateColumns: '110px 90px 90px 100px 100px 80px 76px 1fr', padding: '13px 28px', borderBottom: `1px solid ${color}0e`, gap: '8px', alignItems: 'center', borderLeft: `3px solid ${accentLine}`, background: isExpanded ? `${color}08` : (rowIdx % 2 === 0 ? `${color}09` : '#eef0f4'), transition: 'background 150ms', cursor: 'default' }}
                         onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = `${color}12`; }}
-                        onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = rowIdx % 2 === 0 ? `${color}07` : '#ffffff'; }}
+                        onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = rowIdx % 2 === 0 ? `${color}09` : '#eef0f4'; }}
                       >
                         <span style={{ fontSize: '11px', fontWeight: 600, color: '#334155', fontFamily: 'monospace' }}>{fmtDate(log.timestamp)}</span>
                         <span style={{ fontSize: '11px', fontWeight: 700, color: '#0f172a' }}>{log.phase2?.asset_ticker || log.phase1?.asset_ticker || log.asset || '—'}</span>

@@ -586,7 +586,7 @@ export default function NetraTerminal() {
 
           {/* LEFT SIDEBAR — Operational Ledger */}
           {(activeSessionId || activeEditLog) && (
-            <aside className={`sidebar-transition flex flex-col z-[150] ${isLoggerOpen ? 'w-[400px] max-w-[100vw] opacity-100 translate-x-0' : 'w-0 opacity-0 -translate-x-full overflow-hidden'}`} style={{ background: darkMode ? '#1C2128' : '#FFFFFF', borderRight: isLoggerOpen ? '1px solid rgba(65,105,225,0.18)' : 'none', boxShadow: isLoggerOpen ? '20px 0 60px rgba(0,0,0,0.3)' : 'none', position: 'relative', height: '100%', transition: 'all 500ms cubic-bezier(0.23,1,0.32,1)' }}>
+            <aside className={`sidebar-transition flex flex-col z-[150] ${isLoggerOpen ? 'w-[400px] max-w-[100vw] opacity-100 translate-x-0' : 'w-0 opacity-0 -translate-x-full overflow-hidden'}`} style={{ background: darkMode ? '#1C2128' : '#f0f2f7', borderRight: isLoggerOpen ? '1px solid rgba(65,105,225,0.18)' : 'none', boxShadow: isLoggerOpen ? '20px 0 60px rgba(0,0,0,0.3)' : 'none', position: 'relative', height: '100%', transition: 'all 500ms cubic-bezier(0.23,1,0.32,1)' }}>
               <div style={{ minWidth: '400px', height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ borderBottom: '1px solid var(--border)' }}>
                   <div style={{ height: '3px', background: 'linear-gradient(90deg, #4169E1, #7c3aed)' }} />
@@ -1109,7 +1109,7 @@ export default function NetraTerminal() {
                 <div style={{ flex: 1, background: '#ffffff', position: 'relative', overflow: 'auto' }}>
                   <PageCorners />
                   <div style={{ maxWidth: '560px', margin: '0 auto', padding: '64px 24px', position: 'relative', zIndex: 1 }}>
-                  <div style={{ background: '#eff6ff', border: '1px solid rgba(65,105,225,0.18)' }}>
+                  <div style={{ background: '#e4e8f0', border: '1px solid rgba(65,105,225,0.18)' }}>
                     <div style={{ height: '4px', background: '#4169E1' }} />
                     <div style={{ padding: '36px 40px' }}>
 
@@ -1149,7 +1149,7 @@ export default function NetraTerminal() {
                             const active = sessionInput.marketType === t;
                             return (
                               <button key={t} onClick={() => dispatch(setSessionInput({ ...sessionInput, marketType: t }))}
-                                style={{ padding: '14px 10px', border: `1px solid ${active ? '#4169E1' : 'rgba(15,23,42,0.12)'}`, background: active ? '#eff6ff' : '#f8fafc', color: active ? '#4169E1' : 'rgba(15,23,42,0.5)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', transition: 'all 150ms', borderLeft: active ? '3px solid #4169E1' : '3px solid transparent' }}>
+                                style={{ padding: '14px 10px', border: `1px solid ${active ? '#4169E1' : 'rgba(15,23,42,0.12)'}`, background: active ? '#e4e8f0' : '#eef0f4', color: active ? '#4169E1' : 'rgba(15,23,42,0.5)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', transition: 'all 150ms', borderLeft: active ? '3px solid #4169E1' : '3px solid transparent' }}>
                                 {t}
                               </button>
                             );
@@ -1188,7 +1188,7 @@ export default function NetraTerminal() {
                 <div style={{ flex: 1, background: '#ffffff', position: 'relative', overflow: 'auto' }}>
                   <PageCorners />
                   <div style={{ maxWidth: '480px', margin: '0 auto', padding: '64px 24px', position: 'relative', zIndex: 1 }}>
-                  <div style={{ background: '#eff6ff', border: '1px solid rgba(65,105,225,0.18)' }}>
+                  <div style={{ background: '#e4e8f0', border: '1px solid rgba(65,105,225,0.18)' }}>
                     <div style={{ height: '4px', background: '#4169E1' }} />
                     <div style={{ padding: '36px 40px' }}>
 

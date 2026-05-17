@@ -7,34 +7,10 @@ const RESEARCH_INTERESTS = [
 ];
 
 const RESEARCH_APPROACH = [
-  {
-    n: '01',
-    tag: 'The Problem',
-    color: '#4169E1',
-    bg: '#f8fafc',
-    text: 'I kept making the same mistakes in market analysis — not because I lacked information, but because I had no structure forcing me to be honest about what I actually saw. The Pinaka Doctrine was the answer to that.',
-  },
-  {
-    n: '02',
-    tag: 'The Framework',
-    color: '#7c3aed',
-    bg: '#f5f3ff',
-    text: 'Pinaka is a 10-phase checklist for trade selection — bias, structure, liquidity, command, weapon — each phase must clear before the next opens. Built from what I observed in markets over time, not from a textbook.',
-  },
-  {
-    n: '03',
-    tag: 'The AI Layer',
-    color: '#0d9488',
-    bg: '#f0fdfa',
-    text: 'MAYA is a multi-agent pipeline — Researcher → Doctrine Gate → Suggestion → Critique — built with LangGraph and RAG over doctrine documents and historical trade logs. It cannot suggest what the doctrine forbids.',
-  },
-  {
-    n: '04',
-    tag: 'The Build',
-    color: '#d97706',
-    bg: '#fff7ed',
-    text: 'Everything built solo: MongoDB schema, FastAPI backend, LangGraph agent graph, React terminal. Not to ship a product — to have a real system to validate the framework against actual market conditions.',
-  },
+  { n: '01', tag: 'The Problem',   color: '#4169E1', bg: '#e4e8f0', text: 'I kept making the same mistakes in market analysis — not because I lacked information, but because I had no structure forcing me to be honest about what I actually saw. The Pinaka Doctrine was the answer to that.' },
+  { n: '02', tag: 'The Framework', color: '#7c3aed', bg: '#e9e6ee', text: 'Pinaka is a 10-phase checklist for trade selection — bias, structure, liquidity, command, weapon — each phase must clear before the next opens. Built from what I observed in markets over time, not from a textbook.' },
+  { n: '03', tag: 'The AI Layer',  color: '#0d9488', bg: '#e4eae8', text: 'MAYA is a multi-agent pipeline — Researcher → Doctrine Gate → Suggestion → Critique — built with LangGraph and RAG over doctrine documents and historical trade logs. It cannot suggest what the doctrine forbids.' },
+  { n: '04', tag: 'The Build',     color: '#d97706', bg: '#ece8df', text: 'Everything built solo: MongoDB schema, FastAPI backend, LangGraph agent graph, React terminal. Not to ship a product — to have a real system to validate the framework against actual market conditions.' },
 ];
 
 const STACK = [
@@ -101,7 +77,7 @@ export default function AboutPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px', background: 'rgba(15,23,42,0.06)', marginBottom: '2px' }}>
 
           {/* Left — who I am */}
-          <div style={{ background: '#f8fafc', padding: '64px 60px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div style={{ background: '#e4e8f0', padding: '64px 60px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.35em', color: '#4169E1', marginBottom: '24px' }}>
                 Researcher
@@ -175,7 +151,7 @@ export default function AboutPage() {
         {/* ── RESEARCH INTERESTS ── */}
         <div style={{ display: 'flex', gap: '2px', background: 'rgba(15,23,42,0.06)', marginBottom: '72px' }}>
           {RESEARCH_INTERESTS.map(r => (
-            <div key={r.label} style={{ flex: 1, background: '#ffffff', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div key={r.label} style={{ flex: 1, background: '#e9e6ee', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div style={{ width: '24px', height: '3px', background: r.color }} />
               <span style={{ fontSize: '10px', fontWeight: 700, color: '#0f172a', lineHeight: 1.4 }}>{r.label}</span>
             </div>
@@ -204,7 +180,7 @@ export default function AboutPage() {
           <div style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.35em', color: '#4169E1', marginBottom: '32px' }}>Build Stack</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2px', background: 'rgba(15,23,42,0.06)' }}>
             {STACK.map(s => (
-              <div key={s.group} style={{ background: '#ffffff', padding: '32px 32px' }}>
+              <div key={s.group} style={{ background: '#e5ebe5', padding: '32px 32px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
                   <div style={{ width: '8px', height: '8px', background: s.color }} />
                   <span style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.25em', color: s.color }}>{s.group}</span>
