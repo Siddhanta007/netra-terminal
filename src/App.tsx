@@ -605,7 +605,7 @@ export default function NetraTerminal() {
                       <span style={{ fontSize: '13px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-1)', lineHeight: 1 }}>Operational Intelligence</span>
                     </div>
                     <button onClick={() => ctxSetIsLoggerOpen(false)} style={{ width: '28px', height: '28px', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 150ms' }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(65,105,225,0.08)'; e.currentTarget.style.borderColor = 'rgba(65,105,225,0.4)'; e.currentTarget.style.color = '#4169E1'; }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)'; e.currentTarget.style.color = '#ef4444'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-3)'; }}
                     >
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>

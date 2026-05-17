@@ -105,22 +105,25 @@ export default function MayaChatPanel() {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', background: t.panelBg, position: 'relative', transition: 'background 300ms' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', height: '48px', borderBottom: `1px solid ${t.headerBorder}`, background: t.headerBg, flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} className="animate-pulse" />
-          <span style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.18em', color: darkMode ? '#ffffff' : '#0f172a' }}>Maya</span>
-          <span style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: darkMode ? 'rgba(255,255,255,0.25)' : 'rgba(15,23,42,0.35)' }}>AI Uplink</span>
+      <div style={{ borderBottom: `1px solid ${t.headerBorder}`, background: t.headerBg, flexShrink: 0 }}>
+        <div style={{ height: '3px', background: 'linear-gradient(90deg, #10b981, #4169E1)' }} />
+        <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }} className="animate-pulse" />
+              <span style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#10b981' }}>AI Uplink · Live</span>
+            </div>
+            <span style={{ fontSize: '13px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.06em', color: darkMode ? '#ffffff' : '#0f172a', lineHeight: 1 }}>Maya</span>
+          </div>
+          <button
+            onClick={() => setIsAiPaneOpen(false)}
+            style={{ width: '28px', height: '28px', background: 'transparent', border: `1px solid ${t.aiBubbleBorder}`, color: t.toolbarText, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 150ms' }}
+            onMouseEnter={e => { e.currentTarget.style.background = t.closeHoverBg; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)'; e.currentTarget.style.color = '#ef4444'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = t.aiBubbleBorder; e.currentTarget.style.color = t.toolbarText; }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
         </div>
-        <button
-          onClick={() => setIsAiPaneOpen(false)}
-          style={{ width: '26px', height: '26px', border: `1px solid ${t.aiBubbleBorder}`, background: 'none', color: t.toolbarText, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 150ms' }}
-          onMouseEnter={e => { e.currentTarget.style.background = t.closeHoverBg; e.currentTarget.style.color = '#ef4444'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = t.toolbarText; }}
-        >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
       </div>
 
       {/* Chat History */}
