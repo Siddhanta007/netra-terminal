@@ -475,25 +475,23 @@ export default function NetraTerminal() {
 
       {/* MISSION TELEMETRY SUB-HEADER */}
       {activeSessionId && (
-        <div style={{ height: '48px', background: darkMode ? '#0a0a12' : '#f8fafc', borderBottom: `1px solid ${darkMode ? 'rgba(65,105,225,0.15)' : 'rgba(65,105,225,0.12)'}`, display: 'flex', alignItems: 'stretch', zIndex: 90, animation: 'slide-down 0.4s cubic-bezier(0.4,0,0.2,1)', flexShrink: 0 }} className="desktop-only">
+        <div style={{ height: '36px', background: darkMode ? '#0d1117' : '#f8fafc', borderBottom: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`, display: 'flex', alignItems: 'stretch', zIndex: 90, animation: 'slide-down 0.4s cubic-bezier(0.4,0,0.2,1)', flexShrink: 0 }} className="desktop-only">
 
-          {/* LEFT: session identity */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 20px', flexShrink: 0, borderRight: `1px solid ${darkMode ? 'rgba(65,105,225,0.15)' : 'rgba(65,105,225,0.12)'}` }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '3px 10px', background: 'rgba(65,105,225,0.08)', border: '1px solid rgba(65,105,225,0.2)' }}>
-              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} className="animate-pulse" />
-              <span style={{ fontSize: '8px', fontWeight: 900, color: '#4169E1', textTransform: 'uppercase', letterSpacing: '0.2em' }}>
-                {session?.assetName || activeEditLog?.phase1?.asset_ticker || '—'}
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-              <span style={{ fontSize: '7px', fontWeight: 700, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Strategy</span>
-              <span style={{ fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{tradeName || 'Tactical_Alpha'}</span>
-            </div>
+          {/* LEFT: session identity — clean inline */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 16px', flexShrink: 0, borderRight: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}` }}>
+            <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 5px rgba(16,185,129,0.8)' }} className="animate-pulse" />
+            <span style={{ fontSize: '10px', fontWeight: 800, color: '#4169E1', textTransform: 'uppercase', letterSpacing: '0.14em', fontFamily: 'JetBrains Mono, monospace' }}>
+              {session?.assetName || activeEditLog?.phase1?.asset_ticker || '—'}
+            </span>
+            <div style={{ width: '1px', height: '12px', background: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.1)' }} />
+            <span style={{ fontSize: '9px', fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono, monospace', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {tradeName || '—'}
+            </span>
           </div>
 
-          {/* CENTRE: phase progress steps */}
+          {/* CENTRE: phase steps — inline text breadcrumb */}
           {prepStep >= 2 && (activeView === 'terminal' || activeView === 'trishul') && (
-            <div style={{ display: 'flex', alignItems: 'center', flex: 1, overflowX: 'auto', padding: '0 20px', gap: '0', scrollbarWidth: 'none' } as React.CSSProperties}>
+            <div style={{ display: 'flex', alignItems: 'center', flex: 1, overflowX: 'auto', padding: '0 12px', scrollbarWidth: 'none' } as React.CSSProperties}>
               {([
                 { label: 'Vision', step: 0 },
                 { label: 'Bias', step: 1 },
@@ -508,57 +506,54 @@ export default function NetraTerminal() {
               ] as Array<{ label: string; step: number }>).map((m, idx, arr) => {
                 const isComplete = highestStep > m.step;
                 const isCurrent = highestStep === m.step;
-                const dotColor = isComplete ? '#10b981' : isCurrent ? '#4169E1' : (darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)');
-                const lineColor = isComplete ? '#10b981' : (darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.1)');
                 return (
-                  <div key={m.label} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
-                      <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: isComplete ? '#10b981' : isCurrent ? '#4169E1' : 'transparent', border: `2px solid ${dotColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 200ms', flexShrink: 0 }}>
-                        {isComplete
-                          ? <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>
-                          : <span style={{ fontSize: '7px', fontWeight: 900, color: isCurrent ? '#fff' : (darkMode ? 'rgba(255,255,255,0.25)' : 'rgba(15,23,42,0.25)'), fontFamily: 'monospace' }}>{m.step}</span>
-                        }
-                      </div>
-                      <span style={{ fontSize: '7px', fontWeight: isCurrent ? 900 : 700, color: isComplete ? 'var(--text-3)' : isCurrent ? '#4169E1' : 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap', opacity: isCurrent || isComplete ? 1 : 0.4 }}>{m.label}</span>
+                  <React.Fragment key={m.label}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '0 7px', height: '100%', borderBottom: isCurrent ? '2px solid #4169E1' : '2px solid transparent', flexShrink: 0, transition: 'border-color 200ms' }}>
+                      {isComplete && (
+                        <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3.5"><path d="M20 6L9 17l-5-5"/></svg>
+                      )}
+                      <span style={{ fontSize: '8px', fontWeight: isCurrent ? 900 : 600, color: isComplete ? '#10b981' : isCurrent ? '#4169E1' : (darkMode ? 'rgba(255,255,255,0.22)' : 'rgba(15,23,42,0.22)'), textTransform: 'uppercase', letterSpacing: '0.1em', whiteSpace: 'nowrap', transition: 'color 200ms' }}>
+                        {m.label}
+                      </span>
                     </div>
                     {idx < arr.length - 1 && (
-                      <div style={{ width: '28px', height: '2px', background: lineColor, margin: '0 4px', marginBottom: '14px', transition: 'background 300ms', flexShrink: 0 }} />
+                      <span style={{ fontSize: '9px', color: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.1)', flexShrink: 0, userSelect: 'none', lineHeight: 1 }}>›</span>
                     )}
-                  </div>
+                  </React.Fragment>
                 );
               })}
             </div>
           )}
 
-          <div style={{ width: '1px', background: 'var(--border)', flexShrink: 0 }} />
+          <div style={{ width: '1px', background: darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)', flexShrink: 0 }} />
 
           {/* RIGHT: mission controls */}
           {prepStep >= 2 && (activeView === 'terminal' || activeView === 'trishul') && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0 16px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0 14px', flexShrink: 0 }}>
 
               {/* Ledger toggle */}
               <button
                 onClick={() => ctxSetIsLoggerOpen(!isLoggerOpen)}
                 title="Operational Ledger"
-                style={{ height: '30px', padding: '0 12px', display: 'flex', alignItems: 'center', gap: '6px', background: isLoggerOpen ? 'rgba(65,105,225,0.12)' : 'transparent', border: `1px solid ${isLoggerOpen ? 'rgba(65,105,225,0.45)' : 'var(--border)'}`, color: isLoggerOpen ? '#4169E1' : 'var(--text-3)', cursor: 'pointer', transition: 'all 150ms', fontFamily: 'inherit' }}
+                style={{ height: '26px', padding: '0 10px', display: 'flex', alignItems: 'center', gap: '5px', background: isLoggerOpen ? 'rgba(65,105,225,0.12)' : 'transparent', border: `1px solid ${isLoggerOpen ? 'rgba(65,105,225,0.4)' : 'var(--border)'}`, color: isLoggerOpen ? '#4169E1' : 'var(--text-3)', cursor: 'pointer', transition: 'all 150ms', fontFamily: 'inherit' }}
                 onMouseEnter={e => { if (!isLoggerOpen) { e.currentTarget.style.borderColor = 'rgba(65,105,225,0.35)'; e.currentTarget.style.color = '#4169E1'; } }}
                 onMouseLeave={e => { if (!isLoggerOpen) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-3)'; } }}
               >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                <span style={{ fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Ledger</span>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                <span style={{ fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Ledger</span>
               </button>
 
-              <div style={{ width: '1px', height: '16px', background: 'var(--border)' }} />
+              <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
 
               {/* Scrub — icon only */}
               <button
                 onClick={() => { resetTerminalState(); showToast('Mission Scrubbed — State Purged', 'warning'); }}
                 title="Scrub mission data"
-                style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer', transition: 'all 150ms' }}
+                style={{ width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer', transition: 'all 150ms' }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(245,158,11,0.5)'; e.currentTarget.style.color = '#f59e0b'; e.currentTarget.style.background = 'rgba(245,158,11,0.06)'; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.background = 'transparent'; }}
               >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
               </button>
 
               {/* Commit — primary action */}
@@ -566,23 +561,23 @@ export default function NetraTerminal() {
                 onClick={() => commitTradeLog()}
                 disabled={isAiLoading}
                 title="Commit & Vectorize"
-                style={{ height: '30px', padding: '0 14px', display: 'flex', alignItems: 'center', gap: '6px', background: '#10b981', border: 'none', color: '#ffffff', cursor: isAiLoading ? 'not-allowed' : 'pointer', opacity: isAiLoading ? 0.5 : 1, transition: 'all 150ms', fontFamily: 'inherit' }}
+                style={{ height: '26px', padding: '0 12px', display: 'flex', alignItems: 'center', gap: '5px', background: '#10b981', border: 'none', color: '#ffffff', cursor: isAiLoading ? 'not-allowed' : 'pointer', opacity: isAiLoading ? 0.5 : 1, transition: 'all 150ms', fontFamily: 'inherit' }}
                 onMouseEnter={e => { if (!isAiLoading) e.currentTarget.style.background = '#059669'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = '#10b981'; }}
               >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>
-                <span style={{ fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Commit</span>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>
+                <span style={{ fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Commit</span>
               </button>
 
               {/* Abort — icon only */}
               <button
                 onClick={() => { setActiveSessionId(null); dispatch({ type: 'logs/setActiveEditLog', payload: null }); dispatch({ type: 'analysis/setHighestStep', payload: 0 }); dispatch({ type: 'analysis/setWeaponLocked', payload: false }); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); showToast('Protocol Aborted — State Purged'); }}
                 title="Abort protocol"
-                style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer', transition: 'all 150ms' }}
+                style={{ width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer', transition: 'all 150ms' }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(239,68,68,0.5)'; e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = 'rgba(239,68,68,0.06)'; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.background = 'transparent'; }}
               >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
 
             </div>
