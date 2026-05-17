@@ -534,55 +534,55 @@ export default function NetraTerminal() {
 
           {/* RIGHT: mission controls */}
           {prepStep >= 2 && (activeView === 'terminal' || activeView === 'trishul') && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '0 14px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0 16px', flexShrink: 0 }}>
 
               {/* Ledger toggle */}
               <button
                 onClick={() => ctxSetIsLoggerOpen(!isLoggerOpen)}
                 title="Operational Ledger"
-                style={{ height: '28px', padding: '0 10px', display: 'flex', alignItems: 'center', gap: '6px', background: isLoggerOpen ? 'rgba(65,105,225,0.18)' : 'rgba(65,105,225,0.06)', border: `1px solid ${isLoggerOpen ? 'rgba(65,105,225,0.5)' : 'rgba(65,105,225,0.2)'}`, color: '#4169E1', cursor: 'pointer', transition: 'all 150ms', fontFamily: 'inherit' }}
+                style={{ height: '30px', padding: '0 12px', display: 'flex', alignItems: 'center', gap: '6px', background: isLoggerOpen ? 'rgba(65,105,225,0.12)' : 'transparent', border: `1px solid ${isLoggerOpen ? 'rgba(65,105,225,0.45)' : 'var(--border)'}`, color: isLoggerOpen ? '#4169E1' : 'var(--text-3)', cursor: 'pointer', transition: 'all 150ms', fontFamily: 'inherit' }}
+                onMouseEnter={e => { if (!isLoggerOpen) { e.currentTarget.style.borderColor = 'rgba(65,105,225,0.35)'; e.currentTarget.style.color = '#4169E1'; } }}
+                onMouseLeave={e => { if (!isLoggerOpen) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-3)'; } }}
               >
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                <span style={{ fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Ledger</span>
+                <span style={{ fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Ledger</span>
               </button>
 
-              <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 4px' }} />
+              <div style={{ width: '1px', height: '16px', background: 'var(--border)' }} />
 
-              {/* Scrub */}
+              {/* Scrub — icon only */}
               <button
                 onClick={() => { resetTerminalState(); showToast('Mission Scrubbed — State Purged', 'warning'); }}
-                title="Scrub Mission Data"
-                style={{ height: '28px', padding: '0 10px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b', cursor: 'pointer', transition: 'all 150ms', fontFamily: 'inherit' }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.18)'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.08)'; }}
+                title="Scrub mission data"
+                style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer', transition: 'all 150ms' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(245,158,11,0.5)'; e.currentTarget.style.color = '#f59e0b'; e.currentTarget.style.background = 'rgba(245,158,11,0.06)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.background = 'transparent'; }}
               >
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                <span style={{ fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Scrub</span>
               </button>
 
-              {/* Commit */}
+              {/* Commit — primary action */}
               <button
                 onClick={() => commitTradeLog()}
                 disabled={isAiLoading}
                 title="Commit & Vectorize"
-                style={{ height: '28px', padding: '0 12px', display: 'flex', alignItems: 'center', gap: '6px', background: '#10b981', border: '1px solid rgba(16,185,129,0.6)', color: '#ffffff', cursor: isAiLoading ? 'not-allowed' : 'pointer', opacity: isAiLoading ? 0.5 : 1, transition: 'all 150ms', fontFamily: 'inherit' }}
+                style={{ height: '30px', padding: '0 14px', display: 'flex', alignItems: 'center', gap: '6px', background: '#10b981', border: 'none', color: '#ffffff', cursor: isAiLoading ? 'not-allowed' : 'pointer', opacity: isAiLoading ? 0.5 : 1, transition: 'all 150ms', fontFamily: 'inherit' }}
                 onMouseEnter={e => { if (!isAiLoading) e.currentTarget.style.background = '#059669'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = '#10b981'; }}
               >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>
-                <span style={{ fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Commit</span>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>
+                <span style={{ fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Commit</span>
               </button>
 
-              {/* Abort */}
+              {/* Abort — icon only */}
               <button
                 onClick={() => { setActiveSessionId(null); dispatch({ type: 'logs/setActiveEditLog', payload: null }); dispatch({ type: 'analysis/setHighestStep', payload: 0 }); dispatch({ type: 'analysis/setWeaponLocked', payload: false }); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); showToast('Protocol Aborted — State Purged'); }}
-                title="Abort Protocol"
-                style={{ height: '28px', padding: '0 10px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444', cursor: 'pointer', transition: 'all 150ms', fontFamily: 'inherit' }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.18)'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; }}
+                title="Abort protocol"
+                style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer', transition: 'all 150ms' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(239,68,68,0.5)'; e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = 'rgba(239,68,68,0.06)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.background = 'transparent'; }}
               >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                <span style={{ fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Abort</span>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
 
             </div>
