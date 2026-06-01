@@ -325,44 +325,6 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
           </div>
         </div>
 
-        {/* ── SUBHEADER: TODAY'S SNAPSHOT ── */}
-        <div style={{ marginBottom: '28px', background: `${color}09`, border: `1px solid ${color}22`, padding: '0 24px', display: 'flex', alignItems: 'center', gap: '0', height: '44px' }}>
-          {/* Date */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingRight: '20px', borderRight: `1px solid ${color}20` }}>
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-            <span style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', color, fontFamily: 'JetBrains Mono, monospace' }}>
-              {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-            </span>
-          </div>
-
-          {dailyStats ? (
-            <>
-              {[
-                { label: 'Sessions', value: String(dailyStats.total ?? 0) },
-                { label: 'Open',     value: String(dailyStats.open  ?? 0), dot: true, dotColor: '#f59e0b' },
-                { label: 'Wins',     value: String(dailyStats.wins  ?? 0), valueColor: '#10b981' },
-                { label: 'Losses',   value: String(dailyStats.losses ?? 0), valueColor: '#ef4444' },
-                { label: 'Win Rate', value: dailyStats.win_rate !== null ? `${dailyStats.win_rate}%` : '—', valueColor: color },
-                { label: 'P&L',      value: dailyStats.total_pnl === null ? '—' : dailyStats.total_pnl >= 0 ? `+₹${dailyStats.total_pnl.toFixed(0)}` : `-₹${Math.abs(dailyStats.total_pnl).toFixed(0)}`, valueColor: dailyStats.total_pnl === null ? undefined : dailyStats.total_pnl >= 0 ? '#10b981' : '#ef4444' },
-              ].map((item, i) => (
-                <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0 20px', borderRight: `1px solid ${color}20` }}>
-                  {item.dot && <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: item.dotColor }} />}
-                  <span style={{ fontSize: '9px', fontWeight: 600, color: 'rgba(15,23,42,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{item.label}</span>
-                  <span style={{ fontSize: '11px', fontWeight: 900, color: item.valueColor || '#0f172a', fontFamily: 'JetBrains Mono, monospace' }}>{item.value}</span>
-                </div>
-              ))}
-              {dailyStats.best_trade && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '20px' }}>
-                  <span style={{ fontSize: '9px', fontWeight: 600, color: 'rgba(15,23,42,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Best</span>
-                  <span style={{ fontSize: '11px', fontWeight: 900, color: '#10b981', fontFamily: 'JetBrains Mono, monospace' }}>+₹{Number(dailyStats.best_trade.pnl).toFixed(0)}</span>
-                  <span style={{ fontSize: '9px', color: 'rgba(15,23,42,0.35)' }}>{dailyStats.best_trade.name}</span>
-                </div>
-              )}
-            </>
-          ) : (
-            <span style={{ paddingLeft: '20px', fontSize: '9px', color: 'rgba(15,23,42,0.3)', fontStyle: 'italic' }}>{statsLoading ? 'Loading…' : 'No trades today'}</span>
-          )}
-        </div>
 
         {/* ── SECTION 1: HERO SLIDER ── */}
         <div style={{ marginBottom: '28px' }}>

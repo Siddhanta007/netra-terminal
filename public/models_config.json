@@ -1,0 +1,128 @@
+{
+  "reranker": {
+    "model": "rerank-2.5"
+  },
+  "tactical_provider": "google",
+  "vectorizer_provider": "local",
+  "embedding_model": "BAAI/bge-base-en-v1.5",
+  "vectorizers": {
+    "local": {
+      "provider": "local",
+      "model": "BAAI/bge-base-en-v1.5"
+    },
+    "free_online_vectorizer": {
+      "provider": "google",
+      "model": "gemini-embedding-2"
+    },
+    "paid_vectorizer": {
+      "provider": "openai",
+      "model": "text-embedding-3-small"
+    },
+    "voyage_finance": {
+      "provider": "voyageai",
+      "model": "voyage-finance-2"
+    },
+    "voyage_fallback": {
+      "provider": "voyageai",
+      "model": "voyage-4",
+      "dimensions": 1024
+    }
+  },
+  "providers": [
+    {
+      "provider": "Google",
+      "displayName": "Google",
+      "envKeyName": "GEMINI_API_KEY",
+      "models": [
+        {
+          "id": "gemini-3.1-flash-lite",
+          "name": "Gemini 3.1 Flash Lite",
+          "cost": "Low",
+          "tags": [
+            "Vision"
+          ]
+        },
+        {
+          "id": "gemini-2.5-flash",
+          "name": "Gemini 2.5 Flash",
+          "cost": "Low",
+          "tags": [
+            "Vision"
+          ]
+        }
+      ]
+    },
+    {
+      "provider": "Groq",
+      "displayName": "Groq",
+      "envKeyName": "GROQ_API_KEY",
+      "models": [
+        {
+          "id": "llama-3.3-70b-versatile",
+          "name": "Llama 3.3 70B",
+          "cost": "Low",
+          "tags": []
+        },
+        {
+          "id": "llama-3.1-8b-instant",
+          "name": "Llama 3.1 8B",
+          "cost": "Low",
+          "tags": []
+        },
+        {
+          "id": "qwen/qwen3-32b",
+          "name": "Qwen 3 32B",
+          "cost": "Low",
+          "tags": [
+            "Thinking"
+          ]
+        },
+        {
+          "id": "meta-llama/llama-4-scout-17b-16e-instruct",
+          "name": "Llama 4 Scout",
+          "cost": "Low",
+          "tags": []
+        }
+      ]
+    },
+    {
+      "provider": "OpenRouter",
+      "displayName": "OpenRouter",
+      "envKeyName": "OPENROUTER_API_KEY",
+      "models": [
+        {
+          "id": "nvidia/nemotron-3-super-120b-a12b:free",
+          "name": "Nemotron 3 Super",
+          "cost": "None",
+          "tags": []
+        },
+        {
+          "id": "minimax/minimax-m2.5:free",
+          "name": "MiniMax M2.5",
+          "cost": "None",
+          "tags": []
+        },
+        {
+          "id": "tencent/hy3-preview",
+          "name": "Tencent Hy3",
+          "cost": "None",
+          "tags": []
+        },
+        {
+          "id": "liquid/lfm-2.5-1.2b-thinking:free",
+          "name": "Liquid thinking",
+          "cost": "None",
+          "tags": [
+            "Thinking"
+          ]
+        },
+        {
+          "id": "openrouter/free",
+          "name": "Auto Free Router",
+          "cost": "None",
+          "tags": []
+        }
+      ]
+    }
+  ]
+}

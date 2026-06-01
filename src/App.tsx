@@ -677,113 +677,134 @@ export default function NetraTerminal() {
           {/* MAIN TERMINAL CONTAINER */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
 
-            {/* MISSION TELEMETRY SUB-HEADER — squeezed by sidebars */}
-            {activeSessionId && (
-              <div style={{ height: '36px', background: darkMode ? '#090c14' : '#f4f6fa', borderBottom: `1px solid ${darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.07)'}`, display: 'flex', alignItems: 'stretch', zIndex: 90, animation: 'slide-down 0.4s cubic-bezier(0.4,0,0.2,1)', flexShrink: 0 }} className="desktop-only">
+            {/* MISSION TELEMETRY SUB-HEADER */}
+            {activeSessionId && (() => {
+              const txt  = darkMode ? '#ffffff' : '#0f172a';
+              const bdr  = darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.1)';
+              const MONO = 'JetBrains Mono, monospace';
+              const lbl: React.CSSProperties  = { fontFamily: MONO, fontSize: '9px',  fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: txt };
+              const val: React.CSSProperties  = { fontFamily: MONO, fontSize: '13px', fontWeight: 900, color: txt, lineHeight: 1 };
+              const vbar = <div style={{ width: '1px', height: '16px', background: bdr, margin: '0 16px', flexShrink: 0 }} />;
 
-                {/* LEFT: ledger toggle + session identity */}
-                <div style={{ display: 'flex', alignItems: 'stretch', flexShrink: 0, borderRight: `1px solid ${darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.07)'}` }}>
-                  <button
-                    onClick={() => ctxSetIsLoggerOpen(!isLoggerOpen)}
-                    title="Operational Ledger"
-                    style={{ width: '36px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isLoggerOpen ? 'rgba(65,105,225,0.1)' : 'none', border: 'none', borderRight: `1px solid ${darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.07)'}`, color: isLoggerOpen ? '#4169E1' : (darkMode ? 'rgba(255,255,255,0.6)' : 'rgba(15,23,42,0.55)'), cursor: 'pointer', transition: 'color 150ms, background 150ms' }}
-                    onMouseEnter={e => { if (!isLoggerOpen) { e.currentTarget.style.color = '#4169E1'; e.currentTarget.style.background = 'rgba(65,105,225,0.06)'; } }}
-                    onMouseLeave={e => { if (!isLoggerOpen) { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.6)' : 'rgba(15,23,42,0.55)'; e.currentTarget.style.background = 'none'; } }}
-                  >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                  </button>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 16px' }}>
-                    <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px rgba(16,185,129,0.9)', flexShrink: 0 }} className="animate-pulse" />
-                    {renamingField === 'asset' ? (
-                      <input autoFocus value={renameValue} onChange={e => setRenameValue(e.target.value)} onBlur={commitRename} onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingField(null); }} style={{ fontSize: '10px', fontWeight: 800, color: '#4169E1', textTransform: 'uppercase', letterSpacing: '0.15em', fontFamily: 'JetBrains Mono, monospace', background: 'transparent', border: 'none', borderBottom: '1px solid #4169E1', outline: 'none', width: `${Math.max(renameValue.length, 4) + 2}ch`, padding: '0' }} />
-                    ) : (
-                      <button onClick={() => session && startRename('asset')} title="Click to rename" style={{ fontSize: '10px', fontWeight: 800, color: '#4169E1', textTransform: 'uppercase', letterSpacing: '0.15em', fontFamily: 'JetBrains Mono, monospace', background: 'none', border: 'none', cursor: session ? 'pointer' : 'default', padding: 0 }}>
-                        {session?.assetName || activeEditLog?.phase1?.asset_ticker || '—'}
-                      </button>
-                    )}
-                    <span style={{ fontSize: '10px', color: darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.35)', fontFamily: 'JetBrains Mono, monospace', userSelect: 'none' }}>·</span>
-                    {renamingField === 'trade' ? (
-                      <input autoFocus value={renameValue} onChange={e => setRenameValue(e.target.value)} onBlur={commitRename} onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingField(null); }} style={{ fontSize: '9px', fontWeight: 600, color: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono, monospace', background: 'transparent', border: 'none', borderBottom: `1px solid ${darkMode ? 'rgba(255,255,255,0.3)' : 'rgba(15,23,42,0.3)'}`, outline: 'none', width: `${Math.max(renameValue.length, 6) + 2}ch`, padding: '0', maxWidth: '120px' }} />
-                    ) : (
-                      <button onClick={() => session && startRename('trade')} title="Click to rename" style={{ fontSize: '9px', fontWeight: 600, color: darkMode ? '#ffffff' : '#0f172a', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono, monospace', background: 'none', border: 'none', cursor: session ? 'pointer' : 'default', padding: 0, maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {session?.tradeName || tradeName || activeEditLog?.name || '—'}
-                      </button>
-                    )}
-                  </div>
-                </div>
+              // color = hex accent, e.g. '#f59e0b'. Default bg = color@12%, border = color@40%, text = color.
+              // Hover deepens to bg@22%, border@70%.
+              const subBtn = (label: string, icon: React.ReactNode, onClick: () => void, color: string, disabled = false): React.ReactNode => (
+                <button
+                  onClick={onClick}
+                  disabled={disabled}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    padding: '0 16px', height: '32px',
+                    fontFamily: MONO, fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
+                    border: `1px solid ${color}55`,
+                    background: `${color}18`,
+                    color: color,
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    opacity: disabled ? 0.4 : 1,
+                    transition: 'all 150ms',
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={e => { if (!disabled) { e.currentTarget.style.background = `${color}32`; e.currentTarget.style.borderColor = `${color}99`; } }}
+                  onMouseLeave={e => { if (!disabled) { e.currentTarget.style.background = `${color}18`; e.currentTarget.style.borderColor = `${color}55`; } }}
+                >
+                  {icon}
+                  {label}
+                </button>
+              );
 
-                {/* CENTRE: today's stats */}
-                {(() => {
-                  const txt = darkMode ? '#ffffff' : '#0f172a';
-                  const lbl: React.CSSProperties = { fontSize: '8px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace', color: txt, flexShrink: 0 };
-                  const val: React.CSSProperties = { fontSize: '11px', fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', lineHeight: '1', color: txt, flexShrink: 0 };
-                  const sep = <div style={{ width: '1px', height: '12px', background: darkMode ? 'rgba(255,255,255,0.18)' : 'rgba(15,23,42,0.15)', margin: '0 20px', flexShrink: 0 }} />;
-                  return (
-                    <div style={{ display: 'flex', alignItems: 'center', flex: 1, overflowX: 'auto', padding: '0 20px', scrollbarWidth: 'none' } as React.CSSProperties}>
-                      {/* Date */}
-                      <span style={{ ...lbl, fontSize: '9px', fontWeight: 800, marginRight: '20px' }}>
-                        {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }).toUpperCase()}
-                      </span>
-                      {sep}
-                      {/* Sessions */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '20px' }}>
-                        <span style={lbl}>Sessions</span>
-                        <span style={val}>{todayStats?.total ?? '—'}</span>
-                      </div>
-                      {/* Open */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '20px' }}>
-                        <span style={lbl}>Open</span>
-                        <span style={{ ...val, color: '#f59e0b' }}>{todayStats?.open ?? '—'}</span>
-                      </div>
-                      {/* W / L */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginRight: '20px' }}>
-                        <span style={{ ...val, color: '#22c55e' }}>{todayStats?.wins ?? '—'}</span>
-                        <span style={lbl}>W</span>
-                        <span style={{ ...lbl, margin: '0 1px' }}>/</span>
-                        <span style={{ ...val, color: '#ef4444' }}>{todayStats?.losses ?? '—'}</span>
-                        <span style={lbl}>L</span>
-                      </div>
-                      {sep}
-                      {/* Win rate */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '20px' }}>
-                        <span style={lbl}>Win%</span>
-                        <span style={val}>{todayStats?.win_rate != null ? `${todayStats.win_rate}%` : '—'}</span>
-                      </div>
-                      {/* P&L */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={lbl}>P&amp;L</span>
-                        <span style={{ ...val, color: todayStats?.total_pnl == null ? txt : todayStats.total_pnl >= 0 ? '#22c55e' : '#ef4444' }}>
-                          {todayStats?.total_pnl != null ? `${todayStats.total_pnl >= 0 ? '+' : ''}₹${todayStats.total_pnl.toLocaleString('en-IN')}` : '—'}
-                        </span>
-                      </div>
+              return (
+                <div style={{ height: '52px', background: darkMode ? '#090c14' : '#f4f6fa', borderBottom: `1px solid ${bdr}`, display: 'flex', alignItems: 'center', zIndex: 90, flexShrink: 0, gap: 0 }} className="desktop-only">
+
+                  {/* LEFT: ledger toggle + identity */}
+                  <div style={{ display: 'flex', alignItems: 'center', height: '100%', borderRight: `1px solid ${bdr}`, flexShrink: 0 }}>
+                    <button
+                      onClick={() => ctxSetIsLoggerOpen(!isLoggerOpen)}
+                      title="Operational Ledger"
+                      style={{ width: '52px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isLoggerOpen ? 'rgba(65,105,225,0.12)' : 'transparent', border: 'none', borderRight: `1px solid ${bdr}`, color: isLoggerOpen ? '#4169E1' : txt, cursor: 'pointer', transition: 'all 150ms', flexShrink: 0 }}
+                      onMouseEnter={e => { if (!isLoggerOpen) { e.currentTarget.style.color = '#4169E1'; e.currentTarget.style.background = 'rgba(65,105,225,0.08)'; } }}
+                      onMouseLeave={e => { if (!isLoggerOpen) { e.currentTarget.style.color = txt; e.currentTarget.style.background = 'transparent'; } }}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0 20px' }}>
+                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px rgba(16,185,129,0.9)', flexShrink: 0 }} className="animate-pulse" />
+                      {renamingField === 'asset' ? (
+                        <input autoFocus value={renameValue} onChange={e => setRenameValue(e.target.value)} onBlur={commitRename} onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingField(null); }} style={{ fontFamily: MONO, fontSize: '11px', fontWeight: 800, color: '#4169E1', textTransform: 'uppercase', letterSpacing: '0.15em', background: 'transparent', border: 'none', borderBottom: '1px solid #4169E1', outline: 'none', width: `${Math.max(renameValue.length, 4) + 2}ch`, padding: '2px 0' }} />
+                      ) : (
+                        <button onClick={() => session && startRename('asset')} title="Click to rename" style={{ fontFamily: MONO, fontSize: '11px', fontWeight: 800, color: '#4169E1', textTransform: 'uppercase', letterSpacing: '0.15em', background: 'none', border: 'none', cursor: session ? 'pointer' : 'default', padding: 0 }}>
+                          {session?.assetName || activeEditLog?.phase1?.asset_ticker || '—'}
+                        </button>
+                      )}
+                      <span style={{ fontFamily: MONO, fontSize: '12px', color: txt, userSelect: 'none' }}>·</span>
+                      {renamingField === 'trade' ? (
+                        <input autoFocus value={renameValue} onChange={e => setRenameValue(e.target.value)} onBlur={commitRename} onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingField(null); }} style={{ fontFamily: MONO, fontSize: '11px', fontWeight: 600, color: txt, textTransform: 'uppercase', letterSpacing: '0.1em', background: 'transparent', border: 'none', borderBottom: `1px solid ${bdr}`, outline: 'none', width: `${Math.max(renameValue.length, 6) + 2}ch`, padding: '2px 0', maxWidth: '140px' }} />
+                      ) : (
+                        <button onClick={() => session && startRename('trade')} title="Click to rename" style={{ fontFamily: MONO, fontSize: '11px', fontWeight: 600, color: txt, textTransform: 'uppercase', letterSpacing: '0.1em', background: 'none', border: 'none', cursor: session ? 'pointer' : 'default', padding: 0, maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {session?.tradeName || tradeName || activeEditLog?.name || '—'}
+                        </button>
+                      )}
                     </div>
-                  );
-                })()}
-
-                {/* RIGHT: action buttons */}
-                {prepStep >= 2 && (activeView === 'terminal' || activeView === 'trishul') && (
-                  <div style={{ display: 'flex', alignItems: 'center', marginLeft: 'auto', gap: '4px', padding: '0 8px', borderLeft: `1px solid ${darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.07)'}` }}>
-                    <button onClick={() => { resetTerminalState(); showToast('Mission Scrubbed — State Purged', 'warning'); }} title="Scrub mission data" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '0 9px', height: '22px', background: darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)', border: `1px solid ${darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)'}`, borderRadius: '3px', color: darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.4)', cursor: 'pointer', transition: 'color 150ms, border-color 150ms, background 150ms' }} onMouseEnter={e => { e.currentTarget.style.color = '#f59e0b'; e.currentTarget.style.borderColor = 'rgba(245,158,11,0.4)'; e.currentTarget.style.background = 'rgba(245,158,11,0.08)'; }} onMouseLeave={e => { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.4)'; e.currentTarget.style.borderColor = darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)'; e.currentTarget.style.background = darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)'; }}>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                      <span style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace' }}>RESET</span>
-                    </button>
-                    <button onClick={() => { handleGlobalSave(); showToast('Session Saved', 'success'); }} disabled={isAiLoading} title="Save session" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '0 9px', height: '22px', background: darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)', border: `1px solid ${darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)'}`, borderRadius: '3px', color: darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.4)', cursor: isAiLoading ? 'not-allowed' : 'pointer', opacity: isAiLoading ? 0.5 : 1, transition: 'color 150ms, border-color 150ms, background 150ms' }} onMouseEnter={e => { if (!isAiLoading) { e.currentTarget.style.color = '#60a5fa'; e.currentTarget.style.borderColor = 'rgba(96,165,250,0.4)'; e.currentTarget.style.background = 'rgba(96,165,250,0.08)'; } }} onMouseLeave={e => { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.4)'; e.currentTarget.style.borderColor = darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)'; e.currentTarget.style.background = darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)'; }}>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                      <span style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace' }}>SAVE</span>
-                    </button>
-                    <button onClick={() => commitTradeLog()} disabled={isAiLoading} title="Commit & Vectorize" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '0 9px', height: '22px', background: 'rgba(16,185,129,0.07)', border: `1px solid ${isAiLoading ? 'rgba(16,185,129,0.15)' : 'rgba(16,185,129,0.3)'}`, borderRadius: '3px', color: isAiLoading ? 'rgba(16,185,129,0.3)' : '#10b981', cursor: isAiLoading ? 'not-allowed' : 'pointer', opacity: isAiLoading ? 0.6 : 1, transition: 'color 150ms, border-color 150ms, background 150ms' }} onMouseEnter={e => { if (!isAiLoading) { e.currentTarget.style.color = '#059669'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.6)'; e.currentTarget.style.background = 'rgba(16,185,129,0.14)'; } }} onMouseLeave={e => { e.currentTarget.style.color = isAiLoading ? 'rgba(16,185,129,0.3)' : '#10b981'; e.currentTarget.style.borderColor = isAiLoading ? 'rgba(16,185,129,0.15)' : 'rgba(16,185,129,0.3)'; e.currentTarget.style.background = 'rgba(16,185,129,0.07)'; }}>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>
-                      <span style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace' }}>COMMIT</span>
-                    </button>
-                    <button onClick={() => { setActiveSessionId(null); dispatch({ type: 'logs/setActiveEditLog', payload: null }); dispatch({ type: 'analysis/setHighestStep', payload: 0 }); dispatch({ type: 'analysis/setWeaponLocked', payload: false }); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); showToast('Protocol Aborted — State Purged'); }} title="Abort protocol" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '0 9px', height: '22px', background: darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)', border: `1px solid ${darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)'}`, borderRadius: '3px', color: darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.4)', cursor: 'pointer', transition: 'color 150ms, border-color 150ms, background 150ms' }} onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)'; e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; }} onMouseLeave={e => { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.4)'; e.currentTarget.style.borderColor = darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)'; e.currentTarget.style.background = darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)'; }}>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                      <span style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace' }}>CUT</span>
-                    </button>
                   </div>
-                )}
 
-              </div>
-            )}
+                  {/* CENTRE: today's stats */}
+                  <div style={{ display: 'flex', alignItems: 'center', flex: 1, overflowX: 'auto', padding: '0 24px', gap: 0, scrollbarWidth: 'none' } as React.CSSProperties}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '16px' }}>
+                      <span style={lbl}>Sessions</span>
+                      <span style={val}>{todayStats?.total ?? '—'}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '16px' }}>
+                      <span style={lbl}>Open</span>
+                      <span style={{ ...val, color: '#f59e0b' }}>{todayStats?.open ?? '—'}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '16px' }}>
+                      <span style={{ ...val, color: '#22c55e' }}>{todayStats?.wins ?? '—'}</span>
+                      <span style={lbl}>W</span>
+                      <span style={{ ...lbl }}>/</span>
+                      <span style={{ ...val, color: '#ef4444' }}>{todayStats?.losses ?? '—'}</span>
+                      <span style={lbl}>L</span>
+                    </div>
+                    {vbar}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '16px' }}>
+                      <span style={lbl}>Win%</span>
+                      <span style={val}>{todayStats?.win_rate != null ? `${todayStats.win_rate}%` : '—'}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={lbl}>P&amp;L</span>
+                      <span style={{ ...val, color: todayStats?.total_pnl == null ? txt : todayStats.total_pnl >= 0 ? '#22c55e' : '#ef4444' }}>
+                        {todayStats?.total_pnl != null ? `${todayStats.total_pnl >= 0 ? '+' : ''}₹${todayStats.total_pnl.toLocaleString('en-IN')}` : '—'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* RIGHT: action buttons */}
+                  {prepStep >= 2 && (activeView === 'terminal' || activeView === 'trishul') && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 16px', borderLeft: `1px solid ${bdr}`, height: '100%' }}>
+                      {subBtn('Reset',
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
+                        () => { resetTerminalState(); showToast('Mission Scrubbed — State Purged', 'warning'); },
+                        '#f59e0b'
+                      )}
+                      {subBtn('Save',
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
+                        () => { handleGlobalSave(); showToast('Session Saved', 'success'); },
+                        '#60a5fa', isAiLoading
+                      )}
+                      {subBtn('Commit',
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>,
+                        () => commitTradeLog(),
+                        '#10b981', isAiLoading
+                      )}
+                      {subBtn('Cut',
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+                        () => { setActiveSessionId(null); ctxSetPrepStep(1); ctxSetActiveView('terminal'); dispatch({ type: 'logs/setActiveEditLog', payload: null }); dispatch({ type: 'analysis/setHighestStep', payload: 0 }); dispatch({ type: 'analysis/setWeaponLocked', payload: false }); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); showToast('Protocol Aborted — State Purged'); },
+                        '#ef4444'
+                      )}
+                    </div>
+                  )}
+
+                </div>
+              );
+            })()}
 
             <main className={prepStep === 1 || prepStep === 5 || prepStep === 3 || prepStep === 4 || activeView === 'profile' || activeView === 'about' ? '' : 'terminal-main'} style={{ flex: 1, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
 
@@ -1280,7 +1301,7 @@ export default function NetraTerminal() {
                 /* ── MODEL DETAIL PAGE ── */
                 <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
                   <ModelPage
-                    model={MODEL_DATA[currentModel || 'pinaka']}
+                    model={MODEL_DATA[currentModel] ?? MODEL_DATA['pinaka']}
                     onBack={() => ctxSetPrepStep(1)}
                     fetchLogs={fetchLogs}
                     resumeSession={resumeSession}
@@ -1296,7 +1317,7 @@ export default function NetraTerminal() {
                 /* ── MODEL PAGE (no active session) ── */
                 <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
                   <ModelPage
-                    model={MODEL_DATA[currentModel || 'pinaka']}
+                    model={MODEL_DATA[currentModel] ?? MODEL_DATA['pinaka']}
                     onBack={() => ctxSetPrepStep(1)}
                     fetchLogs={fetchLogs}
                     resumeSession={resumeSession}

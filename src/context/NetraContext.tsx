@@ -326,13 +326,33 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
   const isGuest = useSelector((s: RootState) => s.session.isGuest);
 
   // ─── Boot: load models (always) + system data (auth only) ──────────
-  const FALLBACK_MODELS: AvailableModel[] = [
-    { id: 'google|gemini-2.5-flash',               name: 'Google : Gemini 2.5 Flash, Low Cost, Fast & Vision',   cost: 'Low',  tags: ['Fast', 'Vision'] },
-    { id: 'google|gemini-3.1-flash-lite',          name: 'Google : Gemini 3.1 Flash Lite, Low Cost, Fast',        cost: 'Low',  tags: ['Fast'] },
-    { id: 'groq|llama-3.3-70b-versatile',          name: 'Groq : Llama 3.3 70B, Free & Fast',                    cost: 'Free', tags: ['Fast'] },
-    { id: 'groq|llama-3.1-8b-instant',             name: 'Groq : Llama 3.1 8B, Free & Fast',                     cost: 'Free', tags: ['Fast'] },
-    { id: 'openrouter|nvidia/nemotron-3-super-120b-a12b:free', name: 'OpenRouter : Nemotron 3 Super, Free',       cost: 'Free', tags: [] },
-  ];
+
+  // Parses a models_config response (from API or static file) into a flat list.
+  const parseModelsConfig = (data: { providers?: Array<{ provider: string; models: Array<{ id: string; name: string; cost: string; tags: string[] }> }>; tactical_provider?: string }) => {
+    const flatModels: AvailableModel[] = [];
+    (data.providers || []).forEach((provider) => {
+      provider.models.forEach((model) => {
+        const tagStr = model.tags.length > 0 ? `, ${model.tags.join(' & ')}` : '';
+        flatModels.push({
+          name: `${provider.provider} : ${model.name}, ${model.cost} Cost${tagStr}`,
+          id:   `${provider.provider.toLowerCase()}|${model.id}`,
+          cost: model.cost,
+          tags: model.tags,
+        });
+      });
+    });
+    return { flatModels, tactical_provider: data.tactical_provider };
+  };
+
+  const applyModels = (flatModels: AvailableModel[], _tactical_provider?: string) => {
+    dispatch(setAvailableModelsAction(flatModels));
+    const isValid = flatModels.some((m) => m.id === selectedModel);
+    if (!isValid && flatModels.length > 0) {
+      dispatch(setSelectedModelAction(flatModels[0].id));
+    }
+    // Note: tactical_provider ("google", "groq") is the AI provider, NOT the trading model
+    // ("pinaka", "trishul"). Do not dispatch setCurrentModelAction here.
+  };
 
   useEffect(() => {
     fetch(`${API_BASE}/api/models`)
@@ -340,35 +360,26 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
         if (!res.ok) throw new Error(`${res.status}`);
         return res.json();
       })
-      .then((data: { providers?: Array<{ provider: string; models: Array<{ id: string; name: string; cost: string; tags: string[] }> }>; tactical_provider?: string }) => {
-        const flatModels: AvailableModel[] = [];
-        (data.providers || []).forEach((provider) => {
-          provider.models.forEach((model) => {
-            flatModels.push({
-              name: `${provider.provider} : ${model.name}, ${model.cost} Cost, ${model.tags.join(' & ')}`,
-              id: `${provider.provider.toLowerCase()}|${model.id}`,
-              cost: model.cost,
-              tags: model.tags,
-            });
-          });
-        });
-        dispatch(setAvailableModelsAction(flatModels));
-
-        const isValid = flatModels.some((m) => m.id === selectedModel);
-        if (!isValid) {
-          const defaultProvider = data.tactical_provider || 'google';
-          const providerObj = data.providers?.find((p) => p.provider.toLowerCase() === defaultProvider.toLowerCase());
-          const nextModel = (providerObj && providerObj.models.length > 0)
-            ? `${providerObj.provider.toLowerCase()}|${providerObj.models[0].id}`
-            : (flatModels[0]?.id ?? selectedModel);
-          if (flatModels.some((m) => m.id === nextModel)) dispatch(setSelectedModelAction(nextModel));
-        }
+      .then((data) => {
+        const { flatModels, tactical_provider } = parseModelsConfig(data);
+        applyModels(flatModels, tactical_provider);
       })
       .catch(() => {
-        if (import.meta.env.DEV) console.error('Failed to load models — using fallback list');
-        dispatch(setAvailableModelsAction(FALLBACK_MODELS));
-        const isValid = FALLBACK_MODELS.some((m) => m.id === selectedModel);
-        if (!isValid) dispatch(setSelectedModelAction(FALLBACK_MODELS[0].id));
+        // Backend unreachable (e.g. Vercel frontend + separate backend, VITE_API_URL not set).
+        // Try loading the bundled static copy shipped with the frontend build.
+        fetch('/models_config.json')
+          .then((res) => {
+            if (!res.ok) throw new Error('static missing');
+            return res.json();
+          })
+          .then((data) => {
+            const { flatModels, tactical_provider } = parseModelsConfig(data);
+            applyModels(flatModels, tactical_provider);
+          })
+          .catch(() => {
+            // Last resort: nothing available, leave store empty so UI shows a clear error.
+            if (import.meta.env.DEV) console.error('Failed to load models from API and static file');
+          });
       });
 
     if (isGuest) return;

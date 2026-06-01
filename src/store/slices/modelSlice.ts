@@ -22,7 +22,7 @@ const initialState: ModelState = {
     seed: 42,
     frequency_penalty: 0.0,
   }),
-  currentModel: loadState('currentModel', 'pinaka'),
+  currentModel: (['pinaka', 'trishul'].includes(loadState('currentModel', 'pinaka')) ? loadState('currentModel', 'pinaka') : 'pinaka'),
   sysData: null,
 };
 

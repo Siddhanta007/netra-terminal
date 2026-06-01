@@ -184,13 +184,25 @@ function TraceDisplay({ trace }: { trace: Array<{ agent: string; content: string
 function OutputDisplay({ output: rawOutput }: { output: unknown }) {
   if (typeof rawOutput === 'string') {
     return (
-      <p style={{ ...MONO, fontSize: '11px', color: 'rgba(255,255,255,0.92)', lineHeight: 1.85, margin: 0 }}>
+      <p style={{ ...MONO, fontSize: '12px', color: '#e8eaed', lineHeight: 1.85, margin: 0, whiteSpace: 'pre-wrap' }}>
         {rawOutput}
       </p>
     );
   }
-  const output    = rawOutput as AIOutput & { agent_trace?: Array<{ agent: string; content: string }>; market_analysis?: string; market_type?: string; summary?: string };
-  const mainText  = output.analysis || output.reasoning || output.description || output.synthesis || output.market_analysis || output.market_type || output.summary || '';
+
+  // Some agents (e.g. market_type_selector) return {data: {actual_fields}, agent_trace: [...]}
+  // instead of a flat object. Detect and unwrap that pattern here.
+  const raw = rawOutput as Record<string, unknown>;
+  const nested = raw.data;
+  const output = (nested && typeof nested === 'object' && !('status' in raw))
+    ? {
+        ...(nested as Record<string, unknown>),
+        agent_trace: raw.agent_trace ?? (nested as Record<string, unknown>).agent_trace,
+        thinking:    raw.thinking    ?? (nested as Record<string, unknown>).thinking ?? '',
+      } as AIOutput & { agent_trace?: Array<{ agent: string; content: string }>; market_analysis?: string; market_type?: string; summary?: string }
+    : raw as AIOutput & { agent_trace?: Array<{ agent: string; content: string }>; market_analysis?: string; market_type?: string; summary?: string };
+
+  const mainText  = output.analysis || output.reasoning || output.description || output.synthesis || (output as Record<string, unknown>).market_analysis as string || (output as Record<string, unknown>).market_type as string || (output as Record<string, unknown>).summary as string || '';
   const command   = output.cmd || output.weapon || null;
   const plan      = output.plan || null;
   const conviction = (output.conviction || output.predictability || null) as string | null;
@@ -200,7 +212,7 @@ function OutputDisplay({ output: rawOutput }: { output: unknown }) {
   const agentTrace = output.agent_trace || null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%', overflowY: 'auto' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
       {/* ── Command + HUD metrics ── */}
       {(command || conviction || riskLevel) && (
@@ -213,11 +225,11 @@ function OutputDisplay({ output: rawOutput }: { output: unknown }) {
 
       {/* ── Execution plan ── */}
       {plan && (
-        <div style={{ borderLeft: '2px solid var(--accent)', padding: '10px 14px', background: 'rgba(65,105,225,0.06)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <span style={{ ...MONO, fontSize: '7px', fontWeight: 700, letterSpacing: '0.3em', color: 'var(--accent)', textTransform: 'uppercase' }}>
+        <div style={{ borderLeft: '2px solid #4169E1', padding: '10px 14px', background: 'rgba(65,105,225,0.07)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <span style={{ ...MONO, fontSize: '7px', fontWeight: 700, letterSpacing: '0.3em', color: '#6b8cff', textTransform: 'uppercase' }}>
             EXECUTION PLAN
           </span>
-          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.92)', lineHeight: 1.7, margin: 0 }}>
+          <p style={{ ...MONO, fontSize: '11.5px', color: '#e8eaed', lineHeight: 1.75, margin: 0, whiteSpace: 'pre-wrap' }}>
             {plan}
           </p>
         </div>
@@ -225,7 +237,7 @@ function OutputDisplay({ output: rawOutput }: { output: unknown }) {
 
       {/* ── Main analysis body ── */}
       {mainText && (
-        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.92)', lineHeight: 1.9, margin: 0 }}>
+        <p style={{ ...MONO, fontSize: '12px', color: '#e8eaed', lineHeight: 1.9, margin: 0, whiteSpace: 'pre-wrap' }}>
           {mainText}
         </p>
       )}
@@ -240,12 +252,12 @@ function OutputDisplay({ output: rawOutput }: { output: unknown }) {
 // ─── Morphing line animation ──────────────────────────────────────────────────
 
 function MorphingLine() {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const raf    = useRef(0);
-  const t      = useRef(0);
+  const svgRef  = useRef<SVGSVGElement>(null);
+  const raf     = useRef(0);
+  const t       = useRef(0);
 
   useEffect(() => {
-    const N = 60, W = 600, H = 44, mid = H / 2, PERIOD = 240;
+    const N = 60, W = 600, H = 44, mid = H / 2, PERIOD = 110;
     const SHAPES: Array<(p: number) => number> = [
       ()  => 0,
       (p) => -Math.sin(p * Math.PI) * 16,
@@ -274,6 +286,7 @@ function MorphingLine() {
       const r  = Math.round(lerp(cA[0], cB[0], progress));
       const g  = Math.round(lerp(cA[1], cB[1], progress));
       const b  = Math.round(lerp(cA[2], cB[2], progress));
+      const color = `rgb(${r},${g},${b})`;
       const pts = Array.from({ length: N }, (_, i) => {
         const p  = i / (N - 1);
         const x  = p * W;
@@ -283,11 +296,15 @@ function MorphingLine() {
         return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`;
       }).join(' ');
       if (svgRef.current) {
-        const path = svgRef.current.querySelector('path');
-        if (path) {
-          path.setAttribute('d', pts);
-          path.setAttribute('stroke', `rgba(${r},${g},${b},0.72)`);
+        const [glow, line] = svgRef.current.querySelectorAll('path');
+        if (glow && line) {
+          glow.setAttribute('d', pts);
+          glow.setAttribute('stroke', color);
+          line.setAttribute('d', pts);
+          line.setAttribute('stroke', color);
         }
+        // Update drop-shadow color dynamically
+        svgRef.current.style.filter = `drop-shadow(0 0 8px rgba(${r},${g},${b},0.9)) drop-shadow(0 0 18px rgba(${r},${g},${b},0.5))`;
       }
       raf.current = requestAnimationFrame(tick);
     };
@@ -296,8 +313,11 @@ function MorphingLine() {
   }, []);
 
   return (
-    <svg ref={svgRef} width="100%" height="44" viewBox="0 0 600 44" preserveAspectRatio="none" style={{ display: 'block' }}>
-      <path fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <svg ref={svgRef} width="100%" height="44" viewBox="0 0 600 44" preserveAspectRatio="none" style={{ display: 'block', overflow: 'visible' }}>
+      {/* Wide blurred path for the outer glow */}
+      <path fill="none" stroke="white" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" strokeOpacity="0.25" style={{ filter: 'blur(4px)' }} />
+      {/* Sharp main line */}
+      <path fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeOpacity="0.95" />
     </svg>
   );
 }
@@ -437,8 +457,13 @@ export default function NetraAILabs({
 
   // ── Left panel body ──
   const leftBody = (() => {
-    if (isEvaluating)    return <TerminalScroller />;
-    if (customStatus)    return <div style={{ flex: 1, overflowY: 'auto', padding: '10px 8px' }}>{customStatus}</div>;
+    if (isEvaluating) return <TerminalScroller />;
+    if (customStatus) return (
+      <div style={{ flex: 1, overflowY: 'auto', padding: '10px 8px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {customStatus}
+        <TraceDisplay trace={((output as Record<string, unknown> | null)?.agent_trace as Array<{ agent: string; content: string }>) || []} />
+      </div>
+    );
     if (output != null)  return <div style={{ flex: 1, overflowY: 'auto', padding: '10px 8px' }}><OutputDisplay output={output} /></div>;
     return (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', opacity: 0.3 }}>
