@@ -11,10 +11,11 @@ import {
   setWeaponPrediction,
 } from '../store/slices/analysisSlice';
 import { setTradeName, setActiveEditLog, setEditFormData, setAuditData, setIsAuditing } from '../store/slices/logsSlice';
+import { registerSession, updateSession, setActiveRegistryId } from '../store/slices/sessionRegistrySlice';
 import { saveState } from '../utils/storage';
 import { API_BASE } from '../utils/constants';
 import { useNetraUtils } from './useNetraUtils';
-import { TradeLog } from '../types';
+import { TradeLog, SessionMeta } from '../types';
 
 export function useSessionManager() {
   const dispatch = useDispatch<AppDispatch>();
@@ -36,7 +37,7 @@ export function useSessionManager() {
     selections: { realBias: {}, htfStructure: {}, marketPulse: {}, liquidityContext: {} },
     notes: { realBias: '', htfStructure: '', marketPulse: '', liquidityContext: '' },
     interSelections: { pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' },
-    strikeSelections: { impulseQuality: '', continuationZone: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '' },
+    strikeSelections: { impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' },
     finalCommand: null as string | null,
     netraOutput: null as RootState['analysis']['netraOutput'],
     sysRecommendation: null as unknown,
@@ -71,7 +72,7 @@ export function useSessionManager() {
     dispatch(setSelections({ realBias: {}, htfStructure: {}, marketPulse: {}, liquidityContext: {} }));
     dispatch(setNotes({ realBias: '', htfStructure: '', marketPulse: '', liquidityContext: '' }));
     dispatch(setInterSelections({ pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }));
-    dispatch(setStrikeSelections({ impulseQuality: '', continuationZone: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '' }));
+    dispatch(setStrikeSelections({ impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' }));
     dispatch(setFinalCommand(null));
     dispatch(setNetraOutput(null));
     dispatch(setSysRecommendation(null));
@@ -84,6 +85,54 @@ export function useSessionManager() {
     dispatch(setImageDescription(null));
     dispatch(setWeaponPrediction(null));
   }, [dispatch]);
+
+  const buildSessionMeta = useCallback((log: TradeLog, parentId: string | null = null, forkPoint: number | null = null): SessionMeta => ({
+    id: String(log.id),
+    name: log.name || String(log.id),
+    parentId,
+    forkPoint,
+    weapon: log.session_state?.selectedWeaponId || log.weapon || null,
+    command: (log.session_state?.finalCommand as SessionMeta['command']) ?? null,
+    status: 'active',
+    pnl: null,
+    timestamp: log.timestamp || new Date().toISOString(),
+  }), []);
+
+  const loadSessionById = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/logs/${encodeURIComponent(id)}`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error('Not found');
+      const log: TradeLog = await res.json();
+      const state = log.session_state;
+      if (!state) return;
+
+      dispatch(setHighestStep(state.highestStep || 1));
+      dispatch(setSelections(state.selections || { realBias: {}, htfStructure: {}, marketPulse: {}, liquidityContext: {} }));
+      dispatch(setNotes(state.notes || { realBias: '', htfStructure: '', marketPulse: '', liquidityContext: '' }));
+      dispatch(setInterSelections(state.interSelections || { pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }));
+      dispatch(setStrikeSelections(state.strikeSelections || { impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' }));
+      dispatch(setFinalCommand(state.finalCommand || null));
+      dispatch(setNetraOutput(state.netraOutput || null));
+      dispatch(setSysRecommendation(state.sysRecommendation || null));
+      dispatch(setSelectedWeaponId(state.selectedWeaponId || null));
+      dispatch(setStepTimestamps(state.stepTimestamps || {}));
+      dispatch(setTradeName(log.name || state.tradeName || ''));
+      const assetName = log.phase2?.trading_asset || state.assetName || log.phase1?.asset_ticker || '';
+      dispatch(setSession({ userName: session?.userName || 'User', assetName: assetName as string, tradeName: log.name || state.tradeName || '' }));
+      dispatch(setActiveSessionId(log.id));
+      saveState('activeSessionId', log.id);
+      dispatch(setActiveView('terminal'));
+      dispatch(setActiveEditLog(log));
+      dispatch(setEditFormData({ ...log.phase2, ...log.phase3, ...log.phase4, trade_name: log.name }));
+      dispatch(setIsLoggerOpen(true));
+      dispatch(setPrepStep(2));
+      dispatch(setActiveRegistryId(id));
+      showToast(`Switched: ${log.name || id}`);
+      navigate('/mission/pinaka');
+    } catch {
+      showToast('Failed to load session', 'error');
+    }
+  }, [dispatch, getAuthHeaders, session, navigate, showToast]);
 
   const handleAuth = useCallback(() => {
     dispatch(setIsLoggingIn(true));
@@ -128,7 +177,7 @@ export function useSessionManager() {
         selections: { realBias: {}, htfStructure: {}, marketPulse: {}, liquidityContext: {} },
         notes: { realBias: '', htfStructure: '', marketPulse: '', liquidityContext: '' },
         interSelections: { pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' },
-        strikeSelections: { impulseQuality: '', continuationZone: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '' },
+        strikeSelections: { impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' },
         finalCommand: null, netraOutput: null, sysRecommendation: null,
         selectedWeaponId: null, stepTimestamps: {},
         tradeName: sessionInput.tradeName, assetName: sessionInput.assetName,
@@ -149,11 +198,13 @@ export function useSessionManager() {
         dispatch(setSessionInput({ ...sessionInput, assetName: '', tradeName: '' }));
         dispatch(setPrepStep(2));
         dispatch(setActiveView(sessionInput.modelName === 'trishul' ? 'trishul' : 'terminal'));
+        dispatch(registerSession(buildSessionMeta(data, null, null)));
+        dispatch(setActiveRegistryId(String(data.id)));
         showToast('Mission Initialized');
         navigate(sessionInput.modelName === 'trishul' ? '/mission/trishul' : '/mission/pinaka');
       })
       .catch((err: Error) => showToast(`Persistence Failure: ${err.message}`, 'error'));
-  }, [dispatch, getAuthHeaders, sessionInput, session, currentModel, resetTerminalState, navigate, showToast]);
+  }, [dispatch, getAuthHeaders, sessionInput, session, currentModel, resetTerminalState, navigate, showToast, buildSessionMeta]);
 
   const resumeSession = useCallback((log: TradeLog) => {
     if (!log?.session_state) return;
@@ -162,7 +213,7 @@ export function useSessionManager() {
     dispatch(setSelections(state.selections || { realBias: {}, htfStructure: {}, marketPulse: {}, liquidityContext: {} }));
     dispatch(setNotes(state.notes || { realBias: '', htfStructure: '', marketPulse: '', liquidityContext: '' }));
     dispatch(setInterSelections(state.interSelections || { pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }));
-    dispatch(setStrikeSelections(state.strikeSelections || { impulseQuality: '', continuationZone: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '' }));
+    dispatch(setStrikeSelections(state.strikeSelections || { impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' }));
     dispatch(setFinalCommand(state.finalCommand || null));
     dispatch(setNetraOutput(state.netraOutput || null));
     dispatch(setSysRecommendation(state.sysRecommendation || null));
@@ -179,9 +230,11 @@ export function useSessionManager() {
     dispatch(setEditFormData({ ...log.phase2, ...log.phase3, ...log.phase4, trade_name: log.name }));
     dispatch(setIsLoggerOpen(true));
     dispatch(setPrepStep(2));
+    dispatch(registerSession(buildSessionMeta(log, null, null)));
+    dispatch(setActiveRegistryId(String(log.id)));
     showToast(`Resumed: ${state.tradeName || log.id}`);
     navigate('/mission/pinaka');
-  }, [dispatch, session, navigate, showToast]);
+  }, [dispatch, session, navigate, showToast, buildSessionMeta]);
 
   const forkSession = useCallback((log: TradeLog, newName: string) => {
     if (isGuest) { showToast('Demo mode — fork disabled', 'error'); return; }
@@ -216,7 +269,7 @@ export function useSessionManager() {
         dispatch(setSelections(state.selections || { realBias: {}, htfStructure: {}, marketPulse: {}, liquidityContext: {} }));
         dispatch(setNotes(state.notes || { realBias: '', htfStructure: '', marketPulse: '', liquidityContext: '' }));
         dispatch(setInterSelections(state.interSelections || { pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }));
-        dispatch(setStrikeSelections(state.strikeSelections || { impulseQuality: '', continuationZone: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '' }));
+        dispatch(setStrikeSelections(state.strikeSelections || { impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' }));
         dispatch(setFinalCommand(state.finalCommand || null));
         dispatch(setNetraOutput(state.netraOutput || null));
         dispatch(setSysRecommendation(state.sysRecommendation || null));
@@ -231,11 +284,15 @@ export function useSessionManager() {
         dispatch(setEditFormData({ ...data.phase2, ...data.phase3, ...data.phase4, trade_name: data.name }));
         dispatch(setIsLoggerOpen(true));
         dispatch(setPrepStep(2));
+        // Register parent + forked child in session tree
+        dispatch(registerSession(buildSessionMeta(log, null, null)));
+        dispatch(registerSession(buildSessionMeta(data, String(log.id), null)));
+        dispatch(setActiveRegistryId(String(data.id)));
         showToast(`Forked: ${data.name}`);
         navigate('/mission/pinaka');
       })
       .catch((err: Error) => showToast(`Fork Failure: ${err.message}`, 'error'));
-  }, [dispatch, session, currentModel, navigate, showToast, getAuthHeaders]);
+  }, [dispatch, session, currentModel, navigate, showToast, getAuthHeaders, buildSessionMeta]);
 
   const forkCurrentSession = useCallback((phaseNum: number, newName: string) => {
     if (isGuest) { showToast('Demo mode — fork disabled', 'error'); return; }
@@ -315,7 +372,7 @@ export function useSessionManager() {
           dispatch(setSysRecommendation(null));
           dispatch(setCommandLocked(false));
           dispatch(setInterSelections({ pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }));
-          dispatch(setStrikeSelections({ impulseQuality: '', continuationZone: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '' }));
+          dispatch(setStrikeSelections({ impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' }));
           delete ts.marketPulse;
           delete ts.liquidityContext;
         } else if (phaseNum === 4) {
@@ -324,7 +381,7 @@ export function useSessionManager() {
           dispatch(setSysRecommendation(null));
           dispatch(setCommandLocked(false));
           dispatch(setInterSelections({ pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }));
-          dispatch(setStrikeSelections({ impulseQuality: '', continuationZone: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '' }));
+          dispatch(setStrikeSelections({ impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' }));
           dispatch(setSelectedWeaponId(null));
           dispatch(setWeaponLocked(false));
           delete ts.evaluation;
@@ -340,11 +397,23 @@ export function useSessionManager() {
         }
         dispatch(setStepTimestamps(ts));
 
+        // Register parent + forked child in session tree
+        const parentMeta: SessionMeta = {
+          id: String(snap.activeSessionId),
+          name: snap.tradeName || String(snap.activeSessionId),
+          parentId: null, forkPoint: null,
+          weapon: snap.selectedWeaponId, command: snap.finalCommand as SessionMeta['command'],
+          status: 'open', pnl: null, timestamp: new Date().toISOString(),
+        };
+        dispatch(registerSession(parentMeta));
+        dispatch(registerSession(buildSessionMeta(data, String(snap.activeSessionId), phaseNum)));
+        dispatch(setActiveRegistryId(String(data.id)));
+
         showToast(`Forked at Phase ${phaseNum}: ${data.name}`);
         navigate('/mission/pinaka');
       })
       .catch((err: Error) => showToast(`Fork Failure: ${err.message}`, 'error'));
-  }, [dispatch, session, currentModel, navigate, showToast, getAuthHeaders]);
+  }, [dispatch, session, currentModel, navigate, showToast, getAuthHeaders, buildSessionMeta]);
 
   const saveSession = useCallback(() => {
     const snap = analysisRef.current;
@@ -385,7 +454,7 @@ export function useSessionManager() {
 
   return {
     session, sessionInput, isLoggingIn, isGuest, activeSessionId: activeSessionIdVal,
-    handleAuth, handleGuestLogin, initializeMission, resumeSession, forkSession, forkCurrentSession, saveSession, resetTerminalState, logout,
+    handleAuth, handleGuestLogin, initializeMission, resumeSession, forkSession, forkCurrentSession, saveSession, resetTerminalState, logout, loadSessionById,
     setSession: (v: RootState['session']['session']) => dispatch(setSession(v)),
     setSessionInput: (v: RootState['session']['sessionInput']) => dispatch(setSessionInput(v)),
   };

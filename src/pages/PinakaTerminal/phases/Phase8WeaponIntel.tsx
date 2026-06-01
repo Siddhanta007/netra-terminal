@@ -1,5 +1,5 @@
-import { useNetra } from '../../context/NetraContext';
-import NetraAILabs from '../Templates/NetraAILabs';
+import { useNetra } from '../../../context/NetraContext';
+import NetraAILabs from '../../../components/Templates/NetraAILabs';
 
 export default function Phase8WeaponIntel() {
   const { weaponPrediction, isPredictingWeapon, triggerWeaponPrediction, stopWeaponPrediction } = useNetra();

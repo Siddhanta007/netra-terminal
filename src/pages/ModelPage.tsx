@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
+import Footer from '../components/Layout/Footer';
 import { useSelector } from 'react-redux';
-import { RootState } from '../../store';
-import { ModelPageData } from '../../utils/modelData';
-import { TradeLog } from '../../types';
+import { RootState } from '../store';
+import { ModelPageData } from '../utils/modelData';
+import { TradeLog } from '../types';
+import { useNetra } from '../context/NetraContext';
+import { API_BASE } from '../utils/constants';
 
 interface Props {
   model: ModelPageData;
@@ -150,6 +153,15 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
   const [filterCommand, setFilterCommand] = useState('all');
   const [filterPL, setFilterPL] = useState('all');
   const tradeLogs = useSelector((s: RootState) => s.logs.tradeLogs);
+  const { session } = useNetra();
+  const username = session?.userName || '';
+
+  const [dailyStats, setDailyStats]     = useState<Record<string, any> | null>(null);
+  const [rangeStats, setRangeStats]     = useState<Record<string, any> | null>(null);
+  const [statsTab, setStatsTab]         = useState<'today' | 'week' | 'month' | '3month'>('today');
+  const [statsDate, setStatsDate]       = useState(new Date().toISOString().slice(0, 10));
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsUser, setStatsUser]       = useState('');
 
   useEffect(() => { fetchLogs(model.id); }, [model.id, fetchLogs]);
   useEffect(() => {
@@ -157,16 +169,48 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
     return () => clearInterval(t);
   }, [model.slides.length]);
 
+  const [availableUsers, setAvailableUsers] = useState<string[]>([]);
+
+  // Seed statsUser once session is known; don't override if user manually picked someone
+  useEffect(() => {
+    if (username && !statsUser) setStatsUser(username);
+  }, [username]);
+
+  // Fetch all operators across all models
+  useEffect(() => {
+    fetch(`${API_BASE}/api/users`)
+      .then(r => r.json())
+      .then((users: string[]) => {
+        const merged = Array.from(new Set([...(username ? [username] : []), ...users]));
+        setAvailableUsers(merged);
+      })
+      .catch(() => {
+        if (username) setAvailableUsers([username]);
+      });
+  }, [username]);
+
+  useEffect(() => {
+    const target = statsUser || username;
+    if (!target) return;
+    setStatsLoading(true);
+    const rangeKey = statsTab === 'today' ? 'week' : statsTab;
+    Promise.all([
+      fetch(`${API_BASE}/api/stats/daily?model_id=${model.id}&username=${encodeURIComponent(target)}&date=${statsDate}`).then(r => r.json()),
+      fetch(`${API_BASE}/api/stats/range?model_id=${model.id}&username=${encodeURIComponent(target)}&range=${rangeKey}`).then(r => r.json()),
+    ]).then(([daily, range]) => {
+      setDailyStats(daily);
+      setRangeStats(range);
+    }).catch(console.error).finally(() => setStatsLoading(false));
+  }, [model.id, statsUser, username, statsDate, statsTab]);
+
   const slide = model.slides[slideIdx];
   const stats = computeStats(tradeLogs);
   const { color } = model;
 
   const BOX_SHADOW = '0 4px 40px rgba(0,0,0,0.08)';
-  const HERO_BG = model.id === 'pinaka'
-    ? `linear-gradient(135deg, ${color}22 0%, ${color}0e 60%, ${color}05 100%)`
-    : '#fdf6ee';
+  const HERO_BG = model.id === 'pinaka' ? '#eef2ff' : '#fdf6ee';
   const STATS_BG = '#ffffff';
-  const LEDGER_BG = '#ffffff';
+  const LEDGER_BG = '#f5f4f0';
 
   const handleSort = (col: string) => {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -228,46 +272,96 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
     <div style={{ background: '#eef0f5', flex: 1, position: 'relative', overflowX: 'hidden' }}>
       {model.id === 'pinaka' ? <><RectangleCorner corner="tr" /><RectangleCorner corner="bl" /></> : <><TriangleCorner corner="tr" /><TriangleCorner corner="bl" /></>}
 
-      <div style={{ maxWidth: '1280px', width: '100%', margin: '0 auto', padding: '40px 48px 80px', position: 'relative', zIndex: 1 }}>
+      <div style={{ maxWidth: '1280px', width: '100%', margin: '0 auto', padding: '40px 48px 0', position: 'relative', zIndex: 1 }}>
 
         {/* ── HEADER ── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '48px', paddingBottom: '28px', borderBottom: `1px solid ${color}35` }}>
+        <div style={{ marginBottom: '48px', paddingBottom: '28px', borderBottom: `1px solid ${color}35` }}>
+
+          {/* Row 1: Back */}
           <button
             onClick={onBack}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#475569', fontSize: '11px', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', fontFamily: 'inherit', padding: 0 }}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#475569', fontSize: '11px', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', fontFamily: 'inherit', padding: 0, marginBottom: '16px' }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg>
             Back
           </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {initializeMission && (
-              <button
-                onClick={initializeMission}
-                style={{ height: '34px', padding: '0 20px', background: '#4169E1', border: 'none', cursor: 'pointer', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#ffffff', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '8px', transition: 'opacity 150ms' }}
-                onMouseEnter={e => { e.currentTarget.style.opacity = '0.85'; }}
-                onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
-              >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                Initialize Mission
-              </button>
-            )}
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', border: `1px solid ${color}38`, padding: '5px 16px', background: `${color}10` }}>
-              <div style={{ width: '5px', height: '5px', background: color }} />
-              <span style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.35em', color }}>{model.code} · {model.type}</span>
-            </div>
-            {model.status === 'planning' && (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', border: '1px solid rgba(217,119,6,0.35)', padding: '5px 14px', background: '#ece8df' }}>
-                <span style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#d97706' }}>Planning Phase</span>
-              </div>
-            )}
-            {model.status === 'live' && (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', border: '1px solid rgba(16,185,129,0.35)', padding: '5px 14px', background: '#e5ebe5' }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />
-                <span style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em', color: '#059669' }}>Live</span>
-              </div>
-            )}
+          {/* Row 2: Big model name */}
+          <div style={{ marginBottom: '12px' }}>
+            <span style={{ fontSize: '80px', fontWeight: 950, color, textTransform: 'uppercase', letterSpacing: '-0.05em', lineHeight: 0.88 }}>{model.name}</span>
           </div>
+
+          {/* Row 3: Subtitle + all boxes */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a', letterSpacing: '0.02em' }}>{model.type}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {initializeMission && (
+                <button
+                  onClick={initializeMission}
+                  style={{ height: '34px', padding: '0 20px', background: '#4169E1', border: 'none', cursor: 'pointer', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#ffffff', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '8px', transition: 'opacity 150ms' }}
+                  onMouseEnter={e => { e.currentTarget.style.opacity = '0.85'; }}
+                  onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  Initialize Mission
+                </button>
+              )}
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', border: `1px solid ${color}60`, padding: '5px 16px', background: `${color}18` }}>
+                <div style={{ width: '5px', height: '5px', background: color }} />
+                <span style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.35em', color }}>{model.code} · {model.type}</span>
+              </div>
+              {model.status === 'planning' && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', border: '1px solid #d9770660', padding: '5px 14px', background: '#ece8df' }}>
+                  <span style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#d97706' }}>Planning Phase</span>
+                </div>
+              )}
+              {model.status === 'live' && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', border: '1px solid #10b98160', padding: '5px 14px', background: '#d1fae5' }}>
+                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />
+                  <span style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em', color: '#059669' }}>Live</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── SUBHEADER: TODAY'S SNAPSHOT ── */}
+        <div style={{ marginBottom: '28px', background: `${color}09`, border: `1px solid ${color}22`, padding: '0 24px', display: 'flex', alignItems: 'center', gap: '0', height: '44px' }}>
+          {/* Date */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingRight: '20px', borderRight: `1px solid ${color}20` }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            <span style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', color, fontFamily: 'JetBrains Mono, monospace' }}>
+              {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+            </span>
+          </div>
+
+          {dailyStats ? (
+            <>
+              {[
+                { label: 'Sessions', value: String(dailyStats.total ?? 0) },
+                { label: 'Open',     value: String(dailyStats.open  ?? 0), dot: true, dotColor: '#f59e0b' },
+                { label: 'Wins',     value: String(dailyStats.wins  ?? 0), valueColor: '#10b981' },
+                { label: 'Losses',   value: String(dailyStats.losses ?? 0), valueColor: '#ef4444' },
+                { label: 'Win Rate', value: dailyStats.win_rate !== null ? `${dailyStats.win_rate}%` : '—', valueColor: color },
+                { label: 'P&L',      value: dailyStats.total_pnl === null ? '—' : dailyStats.total_pnl >= 0 ? `+₹${dailyStats.total_pnl.toFixed(0)}` : `-₹${Math.abs(dailyStats.total_pnl).toFixed(0)}`, valueColor: dailyStats.total_pnl === null ? undefined : dailyStats.total_pnl >= 0 ? '#10b981' : '#ef4444' },
+              ].map((item, i) => (
+                <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0 20px', borderRight: `1px solid ${color}20` }}>
+                  {item.dot && <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: item.dotColor }} />}
+                  <span style={{ fontSize: '9px', fontWeight: 600, color: 'rgba(15,23,42,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{item.label}</span>
+                  <span style={{ fontSize: '11px', fontWeight: 900, color: item.valueColor || '#0f172a', fontFamily: 'JetBrains Mono, monospace' }}>{item.value}</span>
+                </div>
+              ))}
+              {dailyStats.best_trade && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '20px' }}>
+                  <span style={{ fontSize: '9px', fontWeight: 600, color: 'rgba(15,23,42,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Best</span>
+                  <span style={{ fontSize: '11px', fontWeight: 900, color: '#10b981', fontFamily: 'JetBrains Mono, monospace' }}>+₹{Number(dailyStats.best_trade.pnl).toFixed(0)}</span>
+                  <span style={{ fontSize: '9px', color: 'rgba(15,23,42,0.35)' }}>{dailyStats.best_trade.name}</span>
+                </div>
+              )}
+            </>
+          ) : (
+            <span style={{ paddingLeft: '20px', fontSize: '9px', color: 'rgba(15,23,42,0.3)', fontStyle: 'italic' }}>{statsLoading ? 'Loading…' : 'No trades today'}</span>
+          )}
         </div>
 
         {/* ── SECTION 1: HERO SLIDER ── */}
@@ -279,8 +373,6 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
               <img src={model.image} alt={model.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
               <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.3) 70%, transparent 100%)' }} />
               <div style={{ position: 'relative', zIndex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '52px 56px 52px 52px' }}>
-                <div style={{ fontSize: '10px', fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.4em', color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', marginBottom: '8px' }}>NETRA MODEL</div>
-                <div style={{ fontSize: '88px', fontWeight: 950, letterSpacing: '-0.04em', color: '#ffffff', lineHeight: 0.85, textTransform: 'uppercase', marginBottom: '20px' }}>{model.name}</div>
                 <div style={{ height: '2px', background: color, width: '56px' }} />
               </div>
             </div>
@@ -307,24 +399,142 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
         {/* ── SECTION 2: STATS + PARAMS ── */}
         <div style={{ marginBottom: '28px' }}>
           <div style={{ background: STATS_BG, boxShadow: BOX_SHADOW }}>
-            {/* Colored accent strip */}
             <div style={{ height: '4px', background: color }} />
 
-            {/* Row 1: Core performance tiles */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', borderBottom: `1px solid ${color}22` }}>
-              {[
-                { label: 'Total Missions', value: stats.total > 0 ? String(stats.total) : '—', sub: null },
-                { label: 'Confirmed Wins', value: stats.wins > 0 ? String(stats.wins) : '—', sub: null },
-                { label: 'Win Rate', value: stats.winPct !== null ? `${stats.winPct}%` : '—', sub: null },
-                { label: 'Confirmed Losses', value: stats.losses > 0 ? String(stats.losses) : '—', sub: null },
-                { label: 'Total P&L', value: stats.hasPL ? (stats.totalPL >= 0 ? `+${stats.totalPL.toFixed(0)}` : String(stats.totalPL.toFixed(0))) : '—', sub: null, valueColor: stats.hasPL ? plColor : undefined },
-              ].map((s, i, arr) => (
-                <div key={s.label} style={{ padding: '32px 28px', borderRight: i < arr.length - 1 ? `1px solid ${color}20` : 'none' }}>
-                  <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em', color: 'rgba(15,23,42,0.5)', marginBottom: '12px' }}>{s.label}</div>
-                  <div style={{ fontSize: '42px', fontWeight: 950, color: s.valueColor || (s.value === '—' ? 'rgba(15,23,42,0.2)' : '#0f172a'), letterSpacing: '-0.04em', lineHeight: 1, fontFamily: 'monospace' }}>{s.value}</div>
+            {/* Tab bar */}
+            <div style={{ padding: '0 28px', borderBottom: `1px solid ${color}20`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex' }}>
+                {([
+                  { key: 'today', label: 'Today' },
+                  { key: 'week',  label: '1 Week' },
+                  { key: 'month', label: '1 Month' },
+                  { key: '3month', label: '3 Months' },
+                ] as const).map(tab => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setStatsTab(tab.key)}
+                    style={{ height: '44px', padding: '0 18px', background: 'none', border: 'none', borderBottom: statsTab === tab.key ? `2px solid ${color}` : '2px solid transparent', fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', color: statsTab === tab.key ? color : 'rgba(15,23,42,0.4)', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 150ms', marginBottom: '-1px' }}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {/* User selector — always visible */}
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '6px', border: `1px solid ${color}30`, padding: '4px 10px', background: `${color}06` }}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                  <select
+                    value={statsUser}
+                    onChange={e => setStatsUser(e.target.value)}
+                    style={{ fontSize: '9px', fontWeight: 700, border: 'none', background: 'transparent', color: '#0f172a', fontFamily: 'JetBrains Mono, monospace', outline: 'none', cursor: 'pointer', appearance: 'none', paddingRight: '16px', minWidth: '80px' }}
+                  >
+                    {(availableUsers.length > 0 ? availableUsers : (username ? [username] : [])).map(u => (
+                      <option key={u} value={u}>{u}{u === username ? ' (you)' : ''}</option>
+                    ))}
+                  </select>
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="rgba(15,23,42,0.4)" strokeWidth="2.5" style={{ pointerEvents: 'none', position: 'absolute', right: '8px' }}><path d="M6 9l6 6 6-6"/></svg>
                 </div>
-              ))}
+                {statsTab === 'today' && (
+                  <input
+                    type="date" value={statsDate} onChange={e => setStatsDate(e.target.value)}
+                    style={{ fontSize: '9px', fontWeight: 600, border: `1px solid ${color}30`, padding: '4px 10px', color: '#0f172a', fontFamily: 'JetBrains Mono, monospace', outline: 'none', background: `${color}06`, cursor: 'pointer' }}
+                  />
+                )}
+                {statsTab !== 'today' && rangeStats && (
+                  <span style={{ fontSize: '9px', fontWeight: 600, fontFamily: 'monospace', color: 'rgba(15,23,42,0.3)' }}>{rangeStats.from_date} → {rangeStats.to_date}</span>
+                )}
+              </div>
             </div>
+
+            {/* TODAY content */}
+            {statsTab === 'today' && (
+              !dailyStats ? (
+                <div style={{ padding: '40px 28px', textAlign: 'center', color: 'rgba(15,23,42,0.3)', fontSize: '11px' }}>{statsLoading ? 'Loading…' : 'No data'}</div>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', borderBottom: `1px solid ${color}18` }}>
+                    {[
+                      { label: 'Sessions',  value: String(dailyStats.total ?? '—') },
+                      { label: 'Open',      value: String(dailyStats.open  ?? '—'), color: '#f59e0b' },
+                      { label: 'Closed',    value: String(dailyStats.closed ?? '—') },
+                      { label: 'Wins',      value: String(dailyStats.wins  ?? '—'), color: '#10b981' },
+                      { label: 'Losses',    value: String(dailyStats.losses ?? '—'), color: '#ef4444' },
+                      { label: 'Win Rate',  value: dailyStats.win_rate !== null ? `${dailyStats.win_rate}%` : '—', color },
+                    ].map((s, i, arr) => (
+                      <div key={s.label} style={{ padding: '24px 28px', borderRight: i < arr.length - 1 ? `1px solid ${color}18` : 'none' }}>
+                        <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em', color: 'rgba(15,23,42,0.45)', marginBottom: '10px' }}>{s.label}</div>
+                        <div style={{ fontSize: '36px', fontWeight: 950, color: s.color || (s.value === '—' ? 'rgba(15,23,42,0.2)' : '#0f172a'), letterSpacing: '-0.04em', lineHeight: 1, fontFamily: 'monospace' }}>{s.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', borderBottom: `1px solid ${color}18` }}>
+                    <div style={{ padding: '20px 28px', borderRight: `1px solid ${color}18` }}>
+                      <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.18em', color: 'rgba(15,23,42,0.45)', marginBottom: '8px' }}>Total P&L</div>
+                      <div style={{ fontSize: '28px', fontWeight: 950, fontFamily: 'monospace', letterSpacing: '-0.03em', color: dailyStats.total_pnl === null ? 'rgba(15,23,42,0.2)' : dailyStats.total_pnl >= 0 ? '#10b981' : '#ef4444' }}>
+                        {dailyStats.total_pnl === null ? '—' : dailyStats.total_pnl >= 0 ? `+₹${dailyStats.total_pnl.toFixed(0)}` : `-₹${Math.abs(dailyStats.total_pnl).toFixed(0)}`}
+                      </div>
+                    </div>
+                    <div style={{ padding: '20px 28px', borderRight: `1px solid ${color}18` }}>
+                      <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.18em', color: 'rgba(15,23,42,0.45)', marginBottom: '8px' }}>Best Trade</div>
+                      <div style={{ fontSize: '20px', fontWeight: 900, fontFamily: 'monospace', color: '#10b981' }}>{dailyStats.best_trade ? `+₹${Number(dailyStats.best_trade.pnl).toFixed(0)}` : '—'}</div>
+                      {dailyStats.best_trade?.name && <div style={{ fontSize: '10px', color: 'rgba(15,23,42,0.4)', marginTop: '3px' }}>{dailyStats.best_trade.name}</div>}
+                    </div>
+                    <div style={{ padding: '20px 28px' }}>
+                      <div style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.18em', color: '#f59e0b', marginBottom: '8px' }}>Open Positions</div>
+                      {dailyStats.open_trades?.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {dailyStats.open_trades.map((t: any) => (
+                            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }} />
+                              <span style={{ fontSize: '11px', fontWeight: 700, color: '#0f172a' }}>{t.asset || '—'}</span>
+                              {t.weapon && <span style={{ fontSize: '9px', fontWeight: 800, color, textTransform: 'uppercase' }}>{t.weapon}</span>}
+                              {t.direction && <span style={{ fontSize: '9px', color: 'rgba(15,23,42,0.4)', textTransform: 'uppercase' }}>{t.direction}</span>}
+                            </div>
+                          ))}
+                        </div>
+                      ) : <span style={{ fontSize: '10px', color: 'rgba(15,23,42,0.3)', fontStyle: 'italic' }}>None</span>}
+                    </div>
+                  </div>
+                </>
+              )
+            )}
+
+            {/* RANGE content */}
+            {statsTab !== 'today' && (
+              !rangeStats ? (
+                <div style={{ padding: '40px 28px', textAlign: 'center', color: 'rgba(15,23,42,0.3)', fontSize: '11px' }}>{statsLoading ? 'Loading…' : 'No data'}</div>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', borderBottom: `1px solid ${color}18` }}>
+                    {[
+                      { label: 'Total',         value: String(rangeStats.total ?? '—') },
+                      { label: 'Win Rate',       value: rangeStats.win_rate !== null ? `${rangeStats.win_rate}%` : '—', color },
+                      { label: 'Total P&L',      value: rangeStats.total_pnl !== null ? (rangeStats.total_pnl >= 0 ? `+₹${Number(rangeStats.total_pnl).toFixed(0)}` : `-₹${Math.abs(rangeStats.total_pnl).toFixed(0)}`) : '—', color: rangeStats.total_pnl !== null ? (rangeStats.total_pnl >= 0 ? '#10b981' : '#ef4444') : undefined },
+                      { label: 'Profit Factor',  value: rangeStats.profit_factor !== null ? String(rangeStats.profit_factor) : '—', color: (rangeStats.profit_factor ?? 0) >= 1 ? '#10b981' : '#ef4444' },
+                      { label: 'Streak',         value: rangeStats.streak === 0 ? '—' : rangeStats.streak > 0 ? `${rangeStats.streak}W` : `${Math.abs(rangeStats.streak)}L`, color: rangeStats.streak > 0 ? '#10b981' : rangeStats.streak < 0 ? '#ef4444' : '#94a3b8' },
+                    ].map((s, i, arr) => (
+                      <div key={s.label} style={{ padding: '24px 28px', borderRight: i < arr.length - 1 ? `1px solid ${color}18` : 'none' }}>
+                        <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em', color: 'rgba(15,23,42,0.45)', marginBottom: '10px' }}>{s.label}</div>
+                        <div style={{ fontSize: '36px', fontWeight: 950, color: s.color || (s.value === '—' ? 'rgba(15,23,42,0.2)' : '#0f172a'), letterSpacing: '-0.04em', lineHeight: 1, fontFamily: 'monospace' }}>{s.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', borderBottom: `1px solid ${color}18` }}>
+                    {[
+                      { label: 'Avg Win',    value: rangeStats.avg_win    !== null ? `₹${Number(rangeStats.avg_win).toFixed(0)}`    : '—', color: '#10b981' },
+                      { label: 'Avg Loss',   value: rangeStats.avg_loss   !== null ? `₹${Number(rangeStats.avg_loss).toFixed(0)}`   : '—', color: '#ef4444' },
+                      { label: 'Expectancy', value: rangeStats.expectancy !== null ? `₹${Number(rangeStats.expectancy).toFixed(0)}` : '—', color: (rangeStats.expectancy ?? 0) >= 0 ? '#10b981' : '#ef4444' },
+                      { label: 'Open Now',   value: String(rangeStats.open ?? '—'), color: '#f59e0b' },
+                    ].map((s, i, arr) => (
+                      <div key={s.label} style={{ padding: '20px 28px', borderRight: i < arr.length - 1 ? `1px solid ${color}18` : 'none' }}>
+                        <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.18em', color: 'rgba(15,23,42,0.45)', marginBottom: '8px' }}>{s.label}</div>
+                        <div style={{ fontSize: '28px', fontWeight: 950, fontFamily: 'monospace', letterSpacing: '-0.03em', color: s.color || (s.value === '—' ? 'rgba(15,23,42,0.2)' : '#0f172a') }}>{s.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )
+            )}
 
             {/* Row 2: Command-wise profitability + Top weapon */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: `1px solid ${color}20` }}>
@@ -512,8 +722,9 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
             ) : (
               <>
                 {/* Column headers (sortable) */}
-                <div style={{ display: 'grid', gridTemplateColumns: '110px 90px 90px 100px 100px 80px 76px 1fr', padding: '10px 28px', borderBottom: `1px solid ${color}20`, gap: '8px', background: `${color}08` }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '140px 110px 90px 90px 100px 100px 80px 76px 1fr', padding: '10px 28px', borderBottom: `1px solid ${color}20`, gap: '8px', background: `${color}08` }}>
                   {([
+                    { key: 'name', label: 'Name' },
                     { key: 'date', label: 'Date' },
                     { key: 'asset', label: 'Asset' },
                     { key: 'weapon', label: 'Weapon' },
@@ -547,10 +758,11 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
                     <div key={log.id}>
                       {/* Main row */}
                       <div
-                        style={{ display: 'grid', gridTemplateColumns: '110px 90px 90px 100px 100px 80px 76px 1fr', padding: '13px 28px', borderBottom: `1px solid ${color}0e`, gap: '8px', alignItems: 'center', borderLeft: `3px solid ${accentLine}`, background: isExpanded ? `${color}12` : (rowIdx % 2 === 0 ? `${color}0d` : '#ffffff'), transition: 'background 150ms', cursor: 'default' }}
+                        style={{ display: 'grid', gridTemplateColumns: '140px 110px 90px 90px 100px 100px 80px 76px 1fr', padding: '13px 28px', borderBottom: `1px solid ${color}0e`, gap: '8px', alignItems: 'center', borderLeft: `3px solid ${accentLine}`, background: isExpanded ? `${color}12` : (rowIdx % 2 === 0 ? `${color}0d` : LEDGER_BG), transition: 'background 150ms', cursor: 'default' }}
                         onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = `${color}16`; }}
-                        onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = rowIdx % 2 === 0 ? `${color}0d` : '#ffffff'; }}
+                        onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = rowIdx % 2 === 0 ? `${color}0d` : LEDGER_BG; }}
                       >
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.name || '—'}>{log.name || '—'}</span>
                         <span style={{ fontSize: '11px', fontWeight: 600, color: '#334155', fontFamily: 'monospace' }}>{fmtDate(log.timestamp)}</span>
                         <span style={{ fontSize: '11px', fontWeight: 700, color: '#0f172a' }}>{log.phase2?.asset_ticker || log.phase1?.asset_ticker || log.asset || '—'}</span>
                         <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.06em', color }}>{log.phase3?.manual_weapon || log.weapon || '—'}</span>
@@ -646,13 +858,8 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
           </div>
         </div>
 
-        {/* Footer */}
-        <div style={{ borderTop: `1px solid ${color}20`, paddingTop: '24px', marginTop: '48px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em', color }}>{model.name} · {model.type}</span>
-          <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em', color: 'rgba(15,23,42,0.35)', fontFamily: 'monospace' }}>NETRA v2.0</span>
-        </div>
-
       </div>
+      <Footer accentColor={color} />
     </div>
   );
 }

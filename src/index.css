@@ -1,10 +1,14 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════
    NETRA TERMINAL — INSTITUTIONAL DESIGN SYSTEM
    Professional Trading Assistant v2.0
    ═══════════════════════════════════════════════════════════ */
+
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
 
 :root {
   /* Nuanced HSL-based Surface Palette (Light Mode) */
@@ -110,16 +114,16 @@
   align-items: center;
   justify-content: center;
   padding: 0 10px;
-  height: 38px;
+  height: 34px;
   background: var(--bg);
   color: var(--accent);
   font-family: 'Inter', sans-serif;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  border: 1.5px solid var(--accent);
-  border-radius: 20px;
+  border: 1px solid var(--accent);
+  border-radius: 0;
   cursor: pointer;
   transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
@@ -150,7 +154,7 @@
   align-items: center;
   justify-content: center;
   padding: 0 10px;
-  height: 38px;
+  height: 34px;
   background: var(--surface-2);
   color: var(--text-3);
   font-size: 10px;
@@ -158,30 +162,53 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: 0;
   cursor: default;
 }
 
-/* Reset step button */
+/* Edit button — yellow */
+.btn-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  height: 34px;
+  background: transparent;
+  color: hsl(43, 70%, 52%);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid hsl(43, 55%, 38%);
+  border-radius: 0;
+  cursor: pointer;
+  transition: all 120ms;
+  white-space: nowrap;
+}
+.btn-edit:hover:not(:disabled) { background: hsl(43, 40%, 14%); border-color: hsl(43, 70%, 52%); }
+.btn-edit:disabled { opacity: 0.25; cursor: not-allowed; }
+
+/* Reset button — red */
 .btn-reset {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0 10px;
-  height: 38px;
+  height: 34px;
   background: transparent;
-  color: var(--text-3);
+  color: var(--red);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  border: 1px solid hsl(0, 40%, 38%);
+  border-radius: 0;
   cursor: pointer;
   transition: all 120ms;
   white-space: nowrap;
 }
-.btn-reset:hover { border-color: var(--red); color: var(--red); background: var(--red-bg); }
+.btn-reset:hover:not(:disabled) { background: var(--red-bg); border-color: var(--red); }
+.btn-reset:disabled { opacity: 0.25; cursor: not-allowed; }
 
 /* Ghost / reset button */
 .btn-ghost {
@@ -488,10 +515,11 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
 /* ── Phase Themes ────────────────────────────────────────── */
 
 .phase-theme-0 { --phase-accent: #f59e0b; --phase-accent-bg: rgba(245, 158, 11, 0.1); }
-.phase-theme-1 { --phase-accent: #4169E1; --phase-accent-bg: rgba(65, 105, 225, 0.1); }
-.phase-theme-2 { --phase-accent: #8b5cf6; --phase-accent-bg: rgba(139, 92, 246, 0.1); }
-.phase-theme-3 { --phase-accent: #10b981; --phase-accent-bg: rgba(16, 185, 129, 0.1); }
+.phase-theme-1 { --phase-accent: hsl(217, 70%, 52%); --phase-accent-bg: hsla(217, 70%, 52%, 0.12); }
+.phase-theme-2 { --phase-accent: hsl(40, 35%, 48%); --phase-accent-bg: hsla(40, 35%, 48%, 0.12); }
+.phase-theme-3 { --phase-accent: hsl(174, 38%, 42%); --phase-accent-bg: hsla(174, 38%, 42%, 0.12); }
 .phase-theme-4 { --phase-accent: #f43f5e; --phase-accent-bg: rgba(244, 63, 94, 0.1); }
+.phase-theme-5 { --phase-accent: hsl(22, 38%, 48%); --phase-accent-bg: hsla(22, 38%, 48%, 0.12); }
 
 .phase-heading {
   color: var(--phase-accent); /* Accent Color */
@@ -520,17 +548,17 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
 .precision-row {
   display: flex;
   align-items: flex-start;
-  padding: 8px 0;
+  padding: 11px 0;
   gap: 20px;
 }
 .precision-row:last-child { border-bottom: none; }
 
 .precision-label {
-  font-size: 10px;
-  font-weight: 800;
+  font-size: 9px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--tactical-text);
+  letter-spacing: 0.08em;
+  color: var(--text-1);
   width: 200px;
   flex-shrink: 0;
   padding-top: 8px;
@@ -538,18 +566,19 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
 
 /* Dark mode: brighter labels, option text, and row borders */
 .dark .precision-label {
-  color: #ffffff;
+  color: hsl(210, 30%, 92%);
 }
 .dark .precision-row {
-  border-bottom-color: hsla(222, 20%, 100%, 0.12);
+  border-bottom-color: hsla(222, 20%, 100%, 0.10);
 }
 .dark .precision-opt {
-  color: hsl(210, 20%, 88%);
-  border-color: hsla(222, 20%, 100%, 0.22);
+  color: var(--text-2);
+  border-color: var(--border);
 }
 .dark .precision-opt:hover {
-  color: #ffffff;
-  border-color: hsla(222, 20%, 100%, 0.55);
+  color: var(--text-1);
+  border-color: var(--border-strong);
+  background: var(--surface-2);
 }
 
 .precision-selector {
@@ -562,12 +591,13 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
 
 .precision-opt {
   flex: 0 0 auto;
-  min-width: 110px;
-  height: 32px;
-  padding: 0 16px;
-  font-size: 10px;
+  min-width: 90px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 0;
+  font-size: 9px;
   font-weight: 700;
-  color: var(--text-3);
+  color: var(--text-2);
   background: transparent;
   border: 1px solid var(--border);
   cursor: pointer;
@@ -586,9 +616,10 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
 
 .precision-opt.selected {
   color: var(--phase-accent);
-  background: color-mix(in srgb, var(--phase-accent) 14%, transparent);
+  background: color-mix(in srgb, var(--phase-accent) 12%, var(--surface));
   border-color: var(--phase-accent);
   font-weight: 800;
+  border-width: 1.5px;
 }
 
 /* ── Phase-Specific Interaction Refinements ──────────────── */
@@ -846,43 +877,41 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
    ═══════════════════════════════════════════════════════════ */
 
 .dark {
-  /* High-Performance Surface Palette (Dark Mode) */
-  --bg:            hsl(224, 30%, 6%);       /* Deep Navy-Black */
-  --surface:       hsl(224, 26%, 12%);      /* Card — visible above bg */
-  --surface-2:     hsl(224, 22%, 17%);      /* Elevated layer */
-  --surface-3:     hsl(224, 20%, 22%);      /* Interactive layer */
+  /* Surface Palette — calibrated for deep-dark terminals */
+  --bg:            hsl(224, 28%, 7%);
+  --surface:       hsl(224, 24%, 11%);
+  --surface-2:     hsl(224, 20%, 16%);
+  --surface-3:     hsl(224, 18%, 21%);
 
-  /* High-Contrast Borders */
-  --border:        hsla(222, 20%, 100%, 0.16);
-  --border-strong: hsla(222, 20%, 100%, 0.30);
+  /* Solid borders — hold contrast at any screen brightness */
+  --border:        hsl(222, 14%, 24%);
+  --border-strong: hsl(222, 14%, 33%);
 
-  /* Radiant Typography */
-  --text-1:        hsl(210, 40%, 98%);      /* Pure Frost */
-  --text-2:        hsl(210, 20%, 85%);      /* Silver Silk */
-  --text-3:        hsl(210, 15%, 70%);      /* Muted Slate */
-  --text-4:        hsl(210, 10%, 50%);      /* Dark Metadata */
+  /* Typography — readable at low brightness */
+  --text-1:        hsl(210, 25%, 93%);
+  --text-2:        hsl(210, 18%, 78%);
+  --text-3:        hsl(210, 12%, 60%);
+  --text-4:        hsl(210, 8%,  42%);
 
-  /* Neon Accents */
-  --accent:        hsl(217, 91%, 60%);      /* Electric Cobalt */
-  --accent-h:      hsl(217, 91%, 70%);
-  --accent-bg:     hsla(217, 91%, 60%, 0.08);
-  --accent-border: hsla(217, 91%, 60%, 0.25);
-  
-  /* Modular Tactical Text (White in Dark) */
-  --tactical-text:  #FFFFFF;
+  /* Accents — desaturated, solid */
+  --accent:        hsl(217, 65%, 58%);
+  --accent-h:      hsl(217, 65%, 68%);
+  --accent-bg:     hsl(217, 25%, 16%);
+  --accent-border: hsl(217, 28%, 30%);
 
-  /* Semantic - Tactical Glow */
-  --green:         hsl(150, 80%, 50%);      /* Matrix Green */
-  --green-bg:      hsla(150, 80%, 50%, 0.05);
-  --red:           hsl(0, 85%, 60%);        /* Warning Flare */
-  --red-bg:        hsla(0, 85%, 60%, 0.05);
-  --amber:         hsl(45, 100%, 55%);      /* Cyber Gold */
-  --amber-bg:      hsla(45, 100%, 55%, 0.05);
+  --tactical-text: hsl(210, 25%, 93%);
 
-  /* Glassmorphism Overrides */
-  --glass-bg:      rgba(15, 20, 30, 0.6);
-  --glass-border:  rgba(255, 255, 255, 0.08);
-  --shadow-lg:     0 20px 50px rgba(0, 0, 0, 0.6);
+  /* Semantic */
+  --green:         hsl(152, 45%, 48%);
+  --green-bg:      hsl(152, 30%, 13%);
+  --red:           hsl(0,   60%, 55%);
+  --red-bg:        hsl(0,   30%, 13%);
+  --amber:         hsl(40,  70%, 50%);
+  --amber-bg:      hsl(40,  30%, 13%);
+
+  --glass-bg:      rgba(10, 14, 24, 0.7);
+  --glass-border:  hsl(222, 14%, 24%);
+  --shadow-lg:     0 20px 50px rgba(0, 0, 0, 0.7);
 }
 
 /* Fix dark mode sticky header bg */
@@ -1196,6 +1225,84 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
   .mobile-only { display: none !important; }
 }
 
+/* ── Macro Mapping Card ────────────────────────────────────── */
+
+/* Unified deep-charcoal surface for the entire MM section */
+.mm-card,
+.mm-card[data-active="true"] {
+  background: hsl(218, 38%, 88%) !important;
+}
+.dark .mm-card,
+.dark .mm-card[data-active="true"] {
+  background: hsl(220, 48%, 8%) !important;
+}
+
+/* mm-card selected: deep cerulean fill — shines on dark navy */
+.dark .mm-card .precision-opt.selected {
+  background: hsl(213, 72%, 38%);
+  border-color: hsl(213, 72%, 45%);
+  color: #ffffff;
+  font-weight: 900;
+  border-width: 1.5px;
+}
+
+/* ── Market Pulse card — deep teal dark surface ──────────── */
+.mp-card,
+.mp-card[data-active="true"] {
+  background: hsl(174, 22%, 88%) !important;
+}
+.dark .mp-card,
+.dark .mp-card[data-active="true"] {
+  background: hsl(174, 14%, 5%) !important;
+}
+
+/* mp-card selected: deep teal fill — clean and professional on dark card */
+.dark .mp-card .precision-opt.selected {
+  background: hsl(174, 38%, 30%);
+  border-color: hsl(174, 40%, 42%);
+  color: #ffffff;
+  font-weight: 900;
+  border-width: 1.5px;
+}
+
+/* ── Command card — near-black bronze dark surface ──────────── */
+.cmd-card,
+.cmd-card[data-active="true"] {
+  background: hsl(38, 18%, 88%) !important;
+}
+.dark .cmd-card,
+.dark .cmd-card[data-active="true"] {
+  background: hsl(36, 22%, 5%) !important;
+}
+
+/* cmd-card selected: deep brass fill */
+.dark .cmd-card .precision-opt.selected {
+  background: hsl(38, 40%, 28%);
+  border-color: hsl(40, 40%, 42%);
+  color: #ffffff;
+  font-weight: 900;
+  border-width: 1.5px;
+}
+
+/* ── Weapon Armory card — near-black terra-cotta surface ─────── */
+.wap-card,
+.wap-card[data-active="true"] {
+  background: hsl(22, 14%, 89%) !important;
+}
+.dark .wap-card,
+.dark .wap-card[data-active="true"] {
+  background: hsl(22, 18%, 5%) !important;
+}
+
+/* wap-card weapon selector selected: terra-cotta fill */
+.dark .wap-card .precision-opt.selected {
+  background: hsl(22, 38%, 22%);
+  border-color: hsl(22, 42%, 46%);
+  color: #ffffff;
+  font-weight: 900;
+  border-width: 1.5px;
+}
+
 /* ── Terminal Responsive Layout ─────────────────────────── */
 
 .terminal-main { padding: 16px 20px; }
@@ -1216,7 +1323,7 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
 .phase-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 0;            /* Sharp 90° corners */
+  border-radius: 0;
   overflow: visible;
   position: relative;
 }
@@ -1225,10 +1332,9 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
   border-color: hsla(222, 20%, 100%, 0.1);
 }
 
-/* Active card — left accent + faint background tint */
+/* Active card — subtle bg tint only, left accent lives on component subheadings */
 .phase-card[data-active="true"] {
-  border-left: 2px solid var(--accent);
-  background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+  background: color-mix(in srgb, var(--phase-accent, var(--accent)) 4%, var(--surface));
 }
 
 /* Phase card header band */
@@ -1239,15 +1345,38 @@ select.field { background-image: url("data:image/svg+xml,%3csvg xmlns='http://ww
   padding: 9px 24px;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
+  border-radius: 0;
 }
 
 /* Phase card content — breathing room so inner components never touch the card edges */
 .phase-card-body {
-  padding: 16px 20px;
+  padding: 20px 28px;
 }
 
 @media (max-width: 640px) {
-  .phase-card-body  { padding: 12px; }
+  .phase-card-body  { padding: 14px 16px; }
   .phase-card-header { padding: 7px 12px; gap: 10px; }
   .precision-opt { min-width: 80px !important; font-size: 9px !important; }
+}
+
+/* Trade card action buttons */
+.card-btn-save {
+  transition: background 120ms, color 120ms;
+}
+.card-btn-save:hover:not(:disabled) {
+  background: rgba(96,165,250,0.18) !important;
+  color: #93c5fd !important;
+}
+.card-btn-save:active:not(:disabled) {
+  background: rgba(96,165,250,0.28) !important;
+}
+.card-btn-close {
+  transition: background 120ms, color 120ms;
+}
+.card-btn-close:hover:not(:disabled) {
+  background: rgba(239,68,68,0.22) !important;
+  color: #f87171 !important;
+}
+.card-btn-close:active:not(:disabled) {
+  background: rgba(239,68,68,0.35) !important;
 }

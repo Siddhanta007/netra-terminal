@@ -40,7 +40,7 @@ export default function MayaChatPanel() {
   const darkMode = useSelector((s: RootState) => s.ui.darkMode);
   const AVAILABLE_MODELS = useSelector((s: RootState) => s.model.availableModels);
 
-  const { handleSendMessage, uploadedVisionFiles, setUploadedVisionFiles, setIsAiPaneOpen } = useNetra();
+  const { handleSendMessage, uploadedVisionFiles, setUploadedVisionFiles } = useNetra();
 
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -50,10 +50,10 @@ export default function MayaChatPanel() {
 
   // Theme tokens
   const t = darkMode ? {
-    panelBg: '#0d0d14',
-    headerBg: '#0d0d14',
-    headerBorder: 'rgba(65,105,225,0.2)',
-    chatBg: 'transparent',
+    panelBg: '#0d0d0d',
+    headerBg: '#0d0d0d',
+    headerBorder: 'rgba(255,255,255,0.08)',
+    chatBg: '#0d0d0d',
     aiBubbleBg: 'rgba(255,255,255,0.05)',
     aiBubbleBorder: 'rgba(255,255,255,0.08)',
     aiBubbleText: '#e2e8f0',
@@ -62,18 +62,19 @@ export default function MayaChatPanel() {
     inputBoxBorder: 'rgba(255,255,255,0.1)',
     inputText: '#ffffff',
     inputPlaceholder: 'rgba(255,255,255,0.35)',
-    toolbarBorder: 'rgba(255,255,255,0.06)',
-    toolbarText: 'rgba(255,255,255,0.4)',
+    toolbarBorder: 'rgba(255,255,255,0.08)',
+    toolbarText: 'rgba(255,255,255,0.65)',
+    toolbarBtnBorder: 'rgba(255,255,255,0.18)',
     toolbarHoverBg: 'rgba(255,255,255,0.06)',
     closeHoverBg: 'rgba(239,68,68,0.12)',
     paramsBg: 'rgba(255,255,255,0.02)',
     paramsBorder: 'rgba(255,255,255,0.08)',
-    paramsText: 'rgba(255,255,255,0.4)',
+    paramsText: 'rgba(255,255,255,0.5)',
     watermark: '#ffffff',
     emptyIcon: 'rgba(65,105,225,0.15)',
     emptyTitle: 'rgba(255,255,255,0.7)',
     emptyBody: 'rgba(255,255,255,0.3)',
-    sepColor: 'rgba(255,255,255,0.08)',
+    sepColor: 'rgba(255,255,255,0.15)',
   } : {
     panelBg: '#ffffff',
     headerBg: '#ffffff',
@@ -88,7 +89,8 @@ export default function MayaChatPanel() {
     inputText: '#0f172a',
     inputPlaceholder: 'rgba(15,23,42,0.35)',
     toolbarBorder: 'rgba(65,105,225,0.12)',
-    toolbarText: 'rgba(15,23,42,0.4)',
+    toolbarText: 'rgba(15,23,42,0.65)',
+    toolbarBtnBorder: 'rgba(15,23,42,0.2)',
     toolbarHoverBg: 'rgba(65,105,225,0.06)',
     closeHoverBg: 'rgba(239,68,68,0.08)',
     paramsBg: '#f8fafc',
@@ -98,33 +100,12 @@ export default function MayaChatPanel() {
     emptyIcon: 'rgba(65,105,225,0.08)',
     emptyTitle: '#0f172a',
     emptyBody: 'rgba(15,23,42,0.45)',
-    sepColor: 'rgba(15,23,42,0.1)',
+    sepColor: 'rgba(15,23,42,0.15)',
   };
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', background: t.panelBg, position: 'relative', transition: 'background 300ms' }}>
 
-      {/* Header */}
-      <div style={{ borderBottom: `1px solid ${t.headerBorder}`, background: t.headerBg, flexShrink: 0 }}>
-        <div style={{ height: '3px', background: 'linear-gradient(90deg, #10b981, #4169E1)' }} />
-        <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }} className="animate-pulse" />
-              <span style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#10b981' }}>AI Uplink · Live</span>
-            </div>
-            <span style={{ fontSize: '13px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.06em', color: darkMode ? '#ffffff' : '#0f172a', lineHeight: 1 }}>Maya</span>
-          </div>
-          <button
-            onClick={() => setIsAiPaneOpen(false)}
-            style={{ width: '28px', height: '28px', background: 'transparent', border: `1px solid ${t.aiBubbleBorder}`, color: t.toolbarText, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 150ms' }}
-            onMouseEnter={e => { e.currentTarget.style.background = t.closeHoverBg; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)'; e.currentTarget.style.color = '#ef4444'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = t.aiBubbleBorder; e.currentTarget.style.color = t.toolbarText; }}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
-          </button>
-        </div>
-      </div>
 
       {/* Chat History */}
       <div
@@ -132,10 +113,6 @@ export default function MayaChatPanel() {
         style={{ flex: 1, overflowY: 'auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '12px', background: t.chatBg, position: 'relative' }}
         className="custom-scrollbar"
       >
-        {/* Watermark */}
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', overflow: 'hidden' }}>
-          <span style={{ fontSize: '52px', fontFamily: "'Dancing Script', cursive", color: t.watermark, opacity: 0.04, transform: 'rotate(-8deg)', letterSpacing: '4px', userSelect: 'none' }}>maya</span>
-        </div>
 
         {chatHistory.length === 0 && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', textAlign: 'center', opacity: 0.8 }}>
@@ -228,7 +205,7 @@ export default function MayaChatPanel() {
                 <img src={URL.createObjectURL(file)} style={{ width: '100%', height: '100%', objectFit: 'cover', border: `1px solid ${t.aiBubbleBorder}` }} alt="Preview" />
                 <button
                   onClick={() => setUploadedVisionFiles([])}
-                  style={{ position: 'absolute', top: '-6px', right: '-6px', width: '16px', height: '16px', background: darkMode ? '#0d0d14' : '#ffffff', border: `1px solid ${t.aiBubbleBorder}`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '10px', color: '#ef4444' }}
+                  style={{ position: 'absolute', top: '-6px', right: '-6px', width: '16px', height: '16px', background: darkMode ? '#0d0d0d' : '#ffffff', border: `1px solid ${t.aiBubbleBorder}`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '10px', color: '#ef4444' }}
                 >×</button>
               </div>
             ))}
@@ -254,14 +231,14 @@ export default function MayaChatPanel() {
               <button
                 onClick={() => setIsConfigOpen(!isConfigOpen)}
                 title="Model Configuration"
-                style={{ width: '26px', height: '26px', border: `1px solid ${isConfigOpen ? '#4169E1' : t.aiBubbleBorder}`, background: isConfigOpen ? 'rgba(65,105,225,0.1)' : 'none', color: isConfigOpen ? '#4169E1' : t.toolbarText, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 150ms' }}
+                style={{ width: '26px', height: '26px', border: `1px solid ${isConfigOpen ? '#4169E1' : t.toolbarBtnBorder}`, background: isConfigOpen ? 'rgba(65,105,225,0.1)' : 'none', color: isConfigOpen ? '#4169E1' : t.toolbarText, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 150ms' }}
               >
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 12h6"/></svg>
               </button>
 
               {/* Upload image */}
               <label
-                style={{ width: '26px', height: '26px', border: `1px solid ${t.aiBubbleBorder}`, background: 'none', color: t.toolbarText, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 150ms' }}
+                style={{ width: '26px', height: '26px', border: `1px solid ${t.toolbarBtnBorder}`, background: 'none', color: t.toolbarText, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 150ms' }}
                 title="Attach image"
               >
                 <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) setUploadedVisionFiles([e.target.files[0]]); }} />
@@ -290,7 +267,7 @@ export default function MayaChatPanel() {
               <button
                 onClick={() => dispatch(setIncludeData(!includeData))}
                 title="Include trade data"
-                style={{ width: '26px', height: '26px', border: `1px solid ${includeData ? '#6366f1' : t.aiBubbleBorder}`, background: includeData ? 'rgba(99,102,241,0.1)' : 'none', color: includeData ? '#6366f1' : t.toolbarText, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 150ms' }}
+                style={{ width: '26px', height: '26px', border: `1px solid ${includeData ? '#6366f1' : t.toolbarBtnBorder}`, background: includeData ? 'rgba(99,102,241,0.1)' : 'none', color: includeData ? '#6366f1' : t.toolbarText, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 150ms' }}
               >
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { useNetra } from '../../context/NetraContext';
-import { setRulesAcknowledged } from '../../store/slices/analysisSlice';
+import { useNetra } from '../../../context/NetraContext';
+import { setRulesAcknowledged } from '../../../store/slices/analysisSlice';
 
 // Sub-components copied from App.tsx
 function TimeInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {

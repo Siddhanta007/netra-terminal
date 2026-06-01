@@ -36,9 +36,20 @@ export interface InterSelections {
 export interface StrikeSelections {
   impulseQuality: string;
   continuationZone: string;
+  // Trishul (D2 = None / Shallow Pullback)
+  pullbackDepth: string;
+  // Bramosh (D2 = FVG / OB Present)
   pullbackQuality: string;
   zoneReaction: string;
   continuationTrigger: string;
+  // Agni (D2 = Compression Visible)
+  compressionQuality: string;
+  breakoutEnergy: string;
+  postBreakoutBehaviour: string;
+  // Vajra (D2 = Acceptance Building)
+  boundaryBreakQuality: string;
+  acceptanceQuality: string;
+  entryPattern: string;
 }
 
 export interface NetraOutput {
@@ -152,6 +163,13 @@ export interface TradeLog {
   weapon: string;
   timestamp: string;
   asset?: string;
+  // Top-level server-returned fields (also present nested in phase1)
+  model_id?: string;
+  protocol?: string;
+  realBias?: string | Record<string, string>;
+  htfStructure?: string | Record<string, string>;
+  marketPulse?: string | Record<string, string>;
+  liquidityContext?: string | Record<string, string>;
   phase1?: TradeLogPhase1;
   phase2?: TradeLogPhase2;
   phase3?: TradeLogPhase3;
@@ -204,6 +222,8 @@ export interface EditFormData {
   trade_name?: string;
   exit_price?: string | number;
   execution_rating?: number;
+  entry_time?: string;
+  exit_time?: string;
   [key: string]: unknown;
 }
 
@@ -218,15 +238,33 @@ export interface SystemDimension {
   [key: string]: unknown;
 }
 
+export interface WeaponDimension {
+  id: string;
+  name: string;
+  opts: string[];
+  description?: string;
+  howToMeasure?: string;
+  optDescriptions?: Record<string, string>;
+}
+
 export interface Weapon {
   id: string;
   name: string;
+  type?: string;
   logic: string;
   activation: string;
   entry?: string;
+  entryPrimary?: string;
+  entryAlternative?: string;
+  entryAggressive?: string;
   stop?: string;
   target?: string;
+  targetPrimary?: string;
+  targetSecondary?: string;
   misfire?: string;
+  misfireList?: string[];
+  executionMarks?: string[];
+  weaponDimensions?: WeaponDimension[];
 }
 
 export interface SystemWeapons {
@@ -278,5 +316,19 @@ export interface AIOutput {
   [key: string]: unknown;
 }
 
-export type FinalCommand = 'STRIKE' | 'INTERCEPTION' | 'NO_ENGAGEMENT' | null;
+export type FinalCommand = 'STRIKE' | 'INTERCEPTION' | 'SATURATION' | 'NO_ENGAGEMENT' | null;
 export type ActiveView = 'terminal' | 'trishul' | 'profile' | 'about';
+
+// ─── Session Registry ─────────────────────────────────────────────────────────
+
+export interface SessionMeta {
+  id: string;
+  name: string;
+  parentId: string | null;
+  forkPoint: number | null;
+  weapon: string | null;
+  command: FinalCommand;
+  status: 'active' | 'open' | 'closed';
+  pnl: string | null;
+  timestamp: string;
+}

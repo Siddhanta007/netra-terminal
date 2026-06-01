@@ -1,5 +1,12 @@
 import { Middleware } from '@reduxjs/toolkit';
 import { saveState } from '../../utils/storage';
+import { SessionMeta } from '../../types';
+
+interface RegistrySlice {
+  sessions: SessionMeta[];
+  activeId: string | null;
+}
+type StateWithRegistry = { sessionRegistry: RegistrySlice };
 
 // Maps action type → localStorage key. Only listed keys are persisted.
 const PERSIST_MAP: Record<string, string> = {
@@ -22,9 +29,29 @@ const PERSIST_MAP: Record<string, string> = {
   'ui/setDarkMode': 'darkMode',
 };
 
-export const localStorageMiddleware: Middleware = () => (next) => (action) => {
+// These actions persist the full derived state slice, not just the payload.
+const REGISTRY_ACTIONS = new Set([
+  'sessionRegistry/registerSession',
+  'sessionRegistry/updateSession',
+  'sessionRegistry/removeSession',
+]);
+
+export const localStorageMiddleware: Middleware = (storeAPI) => (next) => (action) => {
   const result = next(action);
   const actionType = (action as { type: string }).type;
+
+  if (REGISTRY_ACTIONS.has(actionType)) {
+    const state = storeAPI.getState() as StateWithRegistry;
+    saveState('sessionRegistry', state.sessionRegistry.sessions);
+    return result;
+  }
+  if (actionType === 'sessionRegistry/setActiveRegistryId') {
+    const state = storeAPI.getState() as StateWithRegistry;
+    saveState('sessionRegistryActiveId', state.sessionRegistry.activeId);
+    saveState('sessionRegistry', state.sessionRegistry.sessions);
+    return result;
+  }
+
   const key = PERSIST_MAP[actionType];
   if (key) {
     const payload = (action as { type: string; payload: unknown }).payload;

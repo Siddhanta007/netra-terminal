@@ -8,29 +8,29 @@ import { RootState } from './store';
 import { setSelectedModel, setModelConfig } from './store/slices/modelSlice';
 import { setIncludeData, setIncludeDoctrine, setChatInput } from './store/slices/chatSlice';
 import { setTradeName, setLogSearchTerm, setLogFilterOutcome, setLogSortOrder } from './store/slices/logsSlice';
-import { setSessionInput } from './store/slices/sessionSlice';
+import { setSessionInput, setSession } from './store/slices/sessionSlice';
 import { setPrepStep, setActiveView, setIsLoggerOpen } from './store/slices/uiSlice';
 import { setRulesAcknowledged } from './store/slices/analysisSlice';
 import Login from './components/Auth/Login';
 import GlobalOverlay from './components/Layout/GlobalOverlay';
 import MayaChatPanel from './components/Layout/MayaChatPanel';
-import Phase0Vision from './components/Terminal/Phase0Vision';
-import Phase1Bias from './components/Terminal/Phase1Bias';
-import Phase2Auction from './components/Terminal/Phase2Auction';
-import Phase3MarketPulse from './components/Terminal/Phase3MarketPulse';
-import Phase5Synthesis from './components/Terminal/Phase5Synthesis';
-import Phase6Command from './components/Terminal/Phase6Command';
-import Phase8WeaponIntel from './components/Terminal/Phase8WeaponIntel';
-import Phase9WeaponArmory from './components/Terminal/Phase9WeaponArmory';
-import Phase10MissionControl from './components/Terminal/Phase10MissionControl';
-import Phase11MayaAudit from './components/Terminal/Phase11MayaAudit';
+import Phase0Vision from './pages/PinakaTerminal/phases/Phase0Vision';
+import { StrategicMarkingChecklist, STRATEGIC_MARKS_TOTAL, BiasDimensions, HTFDimensions, MacroMappingActions } from './pages/PinakaTerminal/PhaseMacroMap';
+import Phase3MarketPulse from './pages/PinakaTerminal/phases/Phase3MarketPulse';
+import Phase5Synthesis from './pages/PinakaTerminal/phases/Phase5Synthesis';
+import Phase6Command from './pages/PinakaTerminal/phases/Phase6Command';
+import Phase8WeaponIntel from './pages/PinakaTerminal/phases/Phase8WeaponIntel';
+import Phase9WeaponArmory from './pages/PinakaTerminal/phases/Phase9WeaponArmory';
+import Phase10MissionControl from './pages/PinakaTerminal/phases/Phase10MissionControl';
+import Phase11MayaAudit from './pages/PinakaTerminal/phases/Phase11MayaAudit';
 
-import Phase9OperationalIntelligence from './components/Terminal/Phase9OperationalIntelligence';
-import MarketTypeSelector from './components/Terminal/MarketTypeSelector';
-import ProfilePage from './components/Terminal/ProfilePage';
-import AboutPage from './components/About/AboutPage';
+import Phase9OperationalIntelligence from './pages/PinakaTerminal/phases/Phase9OperationalIntelligence';
+import MarketTypeSelector from './pages/PinakaTerminal/MarketTypeSelector';
+import ProfilePage from './pages/ProfilePage';
+import AboutPage from './pages/AboutPage';
 import ForkButton from './components/UI/ForkButton';
-import ModelPage from './components/ModelPage/ModelPage';
+import Footer from './components/Layout/Footer';
+import ModelPage from './pages/ModelPage';
 import { MODEL_DATA } from './utils/modelData';
 
 // ─── Protocol sub-views ───────────────────────────────────────────────────────
@@ -143,7 +143,7 @@ export default function NetraTerminal() {
     toggleTradeData, toggleAnalyst,
     confirmModal,
     commitTradeLog, updateTradeLog, deleteTradeLog, fetchLogs,
-    resumeSession, forkSession, forkCurrentSession, resetTerminalState,
+    resumeSession, forkSession, forkCurrentSession, loadSessionById, resetTerminalState,
     initializeMission, handleGlobalSave,
     saveSession,
     confirmStep, editStep, doResetStep,
@@ -168,6 +168,26 @@ export default function NetraTerminal() {
     defaultName: string;
   }>({ isOpen: false, defaultName: '' });
   const [forkInputName, setForkInputName] = useState('');
+
+  // Inline rename for asset/trade name in subheader
+  const [renamingField, setRenamingField]   = useState<'asset' | 'trade' | null>(null);
+  const [renameValue,   setRenameValue]     = useState('');
+
+  const startRename = (field: 'asset' | 'trade') => {
+    if (!session) return;
+    setRenamingField(field);
+    setRenameValue(field === 'asset' ? (session.assetName || '') : (session.tradeName || tradeName || ''));
+  };
+
+  const commitRename = () => {
+    if (!session || !renamingField) return;
+    dispatch(setSession({
+      ...session,
+      assetName:  renamingField === 'asset' ? renameValue.trim().toUpperCase() : session.assetName,
+      tradeName:  renamingField === 'trade' ? renameValue.trim()               : session.tradeName,
+    }));
+    setRenamingField(null);
+  };
 
   const handleConfirmFork = () => {
     const name = forkInputName || forkModalState.defaultName;
@@ -197,6 +217,7 @@ export default function NetraTerminal() {
   const isExpiryDay = useSelector((s: RootState) => s.analysis.isExpiryDay);
   const expiryCutoff = useSelector((s: RootState) => s.analysis.expiryCutoff);
   const rulesAcknowledged = useSelector((s: RootState) => s.analysis.rulesAcknowledged);
+  const sessionRegistry = useSelector((s: RootState) => s.sessionRegistry);
   const selections = useSelector((s: RootState) => s.analysis.selections);
   const notes = useSelector((s: RootState) => s.analysis.notes);
   const finalCommand = useSelector((s: RootState) => s.analysis.finalCommand);
@@ -219,8 +240,11 @@ export default function NetraTerminal() {
   const isUploadingImage = useSelector((s: RootState) => s.analysis.isUploadingImage);
   const isMobileMenuOpen = useSelector((s: RootState) => s.ui.isMobileMenuOpen);
 
+  const [smcOpen, setSmcOpen] = useState(false);
+  const [smcChecked, setSmcChecked] = useState<Record<string, boolean>>({});
+  const smcDone = Object.values(smcChecked).filter(Boolean).length;
+
   const [isDownloading, setIsDownloading] = useState(false);
-  const [isRulesExpanded, setIsRulesExpanded] = useState(false);
   const [isLeftPaneOpen, setIsLeftPaneOpen] = useState(true);
   const [sortCol, setSortCol] = useState<string>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -228,6 +252,23 @@ export default function NetraTerminal() {
   const [frameworkIdx, setFrameworkIdx] = useState(0);
   const [slideIdx, setSlideIdx] = useState(0);
   const [modelSlideIdx, setModelSlideIdx] = useState(0);
+
+  // ─── Today's stats strip ─────────────────────────────────────────────────────
+  const [todayStats, setTodayStats] = useState<any>(null);
+  const API_BASE_APP = (import.meta as any).env?.VITE_API_URL || '';
+  useEffect(() => {
+    if (!session?.userName) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const model = currentModel || 'pinaka';
+    const headers: Record<string, string> = {};
+    const token = localStorage.getItem('netra_token');
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    headers['x-user'] = session.userName;
+    fetch(`${API_BASE_APP}/api/stats/daily?model_id=${model}&username=${encodeURIComponent(session.userName)}&date=${today}`, { headers })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => setTodayStats(data))
+      .catch(() => {});
+  }, [session?.userName, currentModel]);
 
   // ─── Auto dark mode: terminal = dark, everything else = light ───────────────
   const isTerminalView = !!(activeSessionId && prepStep >= 2 && (activeView === 'terminal' || activeView === 'trishul'));
@@ -366,7 +407,7 @@ export default function NetraTerminal() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: 'var(--bg)', backgroundImage: _cornerBg, backgroundRepeat: 'no-repeat, no-repeat', backgroundPosition: 'top right, bottom left', backgroundSize: '380px 380px, 380px 380px', overflow: 'hidden', position: 'relative' }}>
 
       {/* HEADER — dark in terminal, light everywhere else */}
-      <header style={{ height: '56px', position: 'sticky', top: 0, background: darkMode ? '#0a0a0f' : '#ffffff', borderBottom: darkMode ? '1px solid rgba(65,105,225,0.3)' : '1px solid rgba(65,105,225,0.22)', zIndex: 200, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', transition: 'background 300ms, border-color 300ms' }}>
+      <header style={{ height: '56px', position: 'sticky', top: 0, background: darkMode ? '#0a0a0f' : '#ffffff', borderBottom: '2px solid #4169E1', zIndex: 200, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', transition: 'background 300ms, border-color 300ms' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button className="mobile-only" onClick={() => dispatch({ type: 'ui/setMobileMenuOpen', payload: !isMobileMenuOpen })} style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: '#4169E1' }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -384,12 +425,12 @@ export default function NetraTerminal() {
           <div className="desktop-only" style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
             {[
               { label: 'Home', active: prepStep === 1 && activeView !== 'profile' && activeView !== 'about', action: () => { ctxSetPrepStep(1); ctxSetActiveView('terminal'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } },
-              { label: 'Pinaka', active: prepStep === 5 && currentModel === 'pinaka', action: () => { setCurrentModel('pinaka'); setActiveSessionId(null); ctxSetPrepStep(5); ctxSetActiveView('terminal'); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } },
-              { label: 'Trishul', active: prepStep === 5 && currentModel === 'trishul', action: () => { setCurrentModel('trishul'); setActiveSessionId(null); ctxSetPrepStep(5); ctxSetActiveView('trishul'); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } },
+              { label: 'Pinaka', active: prepStep === 5 && currentModel === 'pinaka' && activeView !== 'about' && activeView !== 'profile', action: () => { setCurrentModel('pinaka'); setActiveSessionId(null); ctxSetPrepStep(5); ctxSetActiveView('terminal'); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } },
+              { label: 'Trishul', active: prepStep === 5 && currentModel === 'trishul' && activeView !== 'about' && activeView !== 'profile', action: () => { setCurrentModel('trishul'); setActiveSessionId(null); ctxSetPrepStep(5); ctxSetActiveView('trishul'); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } },
               { label: 'About', active: activeView === 'about', action: () => { ctxSetActiveView('about'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } },
             ].map(nav => (
-              <button key={nav.label} onClick={nav.action} style={{ padding: '5px 14px', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: nav.active ? '#4169E1' : (darkMode ? 'rgba(255,255,255,0.45)' : 'rgba(15,23,42,0.45)'), border: 'none', borderBottom: nav.active ? '2px solid #4169E1' : '2px solid transparent', background: nav.active ? (darkMode ? 'rgba(65,105,225,0.12)' : 'rgba(65,105,225,0.05)') : 'none', cursor: 'pointer', transition: 'all 150ms', height: '56px' }}>
-                {nav.label}
+              <button key={nav.label} onClick={nav.action} style={{ padding: '0 14px', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: nav.active ? '#4169E1' : (darkMode ? 'rgba(255,255,255,0.45)' : 'rgba(15,23,42,0.45)'), border: 'none', background: 'none', cursor: 'pointer', transition: 'all 150ms', height: '56px', display: 'flex', alignItems: 'center' }}>
+                <span style={{ borderBottom: nav.active ? '2px solid #4169E1' : '2px solid transparent', paddingBottom: '4px', transition: 'border-color 150ms' }}>{nav.label}</span>
               </button>
             ))}
           </div>
@@ -402,12 +443,12 @@ export default function NetraTerminal() {
           <button
             onClick={() => setIsAiPaneOpen(!isAiPaneOpen)}
             title="Maya AI"
-            style={{ height: '56px', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', borderBottom: isAiPaneOpen ? '2px solid #4169E1' : '2px solid transparent', color: isAiPaneOpen ? '#4169E1' : (darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)'), cursor: 'pointer', transition: 'all 200ms', fontFamily: 'inherit' }}
+            style={{ height: '56px', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: isAiPaneOpen ? '#4169E1' : (darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)'), cursor: 'pointer', transition: 'all 200ms', fontFamily: 'inherit' }}
             onMouseEnter={e => { if (!isAiPaneOpen) { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.8)' : '#0f172a'; } }}
             onMouseLeave={e => { if (!isAiPaneOpen) { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)'; } }}
           >
             {isAiPaneOpen && <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#10b981' }} className="animate-pulse" />}
-            <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Maya</span>
+            <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', borderBottom: isAiPaneOpen ? '2px solid #4169E1' : '2px solid transparent', paddingBottom: '4px', transition: 'border-color 200ms' }}>Maya</span>
           </button>
 
           {/* Demo badge */}
@@ -473,236 +514,277 @@ export default function NetraTerminal() {
         </div>
       </header>
 
-      {/* MISSION TELEMETRY SUB-HEADER */}
-      {activeSessionId && (
-        <div style={{ height: '36px', background: darkMode ? '#0d1117' : '#f8fafc', borderBottom: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`, display: 'flex', alignItems: 'stretch', zIndex: 90, animation: 'slide-down 0.4s cubic-bezier(0.4,0,0.2,1)', flexShrink: 0 }} className="desktop-only">
-
-          {/* LEFT: ledger toggle + session identity */}
-          <div style={{ display: 'flex', alignItems: 'stretch', flexShrink: 0, borderRight: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}` }}>
-            {/* Ledger toggle — icon only */}
-            <button
-              onClick={() => ctxSetIsLoggerOpen(!isLoggerOpen)}
-              title="Operational Ledger"
-              style={{ width: '36px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', borderRight: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`, color: isLoggerOpen ? '#4169E1' : 'var(--text-3)', cursor: 'pointer', transition: 'color 150ms' }}
-              onMouseEnter={e => { if (!isLoggerOpen) e.currentTarget.style.color = '#4169E1'; }}
-              onMouseLeave={e => { if (!isLoggerOpen) e.currentTarget.style.color = 'var(--text-3)'; }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            </button>
-            {/* Session identity */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 14px' }}>
-              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 5px rgba(16,185,129,0.8)' }} className="animate-pulse" />
-              <span style={{ fontSize: '10px', fontWeight: 800, color: '#4169E1', textTransform: 'uppercase', letterSpacing: '0.14em', fontFamily: 'JetBrains Mono, monospace' }}>
-                {session?.assetName || activeEditLog?.phase1?.asset_ticker || '—'}
-              </span>
-              <div style={{ width: '1px', height: '12px', background: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.1)' }} />
-              <span style={{ fontSize: '9px', fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono, monospace', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {tradeName || '—'}
-              </span>
-            </div>
-          </div>
-
-          {/* CENTRE: phase steps — inline text breadcrumb */}
-          {prepStep >= 2 && (activeView === 'terminal' || activeView === 'trishul') && (
-            <div style={{ display: 'flex', alignItems: 'center', flex: 1, overflowX: 'auto', padding: '0 12px', scrollbarWidth: 'none' } as React.CSSProperties}>
-              {([
-                { label: 'Vision', step: 0 },
-                { label: 'Bias', step: 1 },
-                { label: 'HTF', step: 2 },
-                { label: 'Pulse', step: 3 },
-                { label: 'Synthesis', step: 4 },
-                { label: 'Command', step: 5 },
-                { label: 'Intel', step: 6 },
-                { label: 'Armory', step: 7 },
-                { label: 'Control', step: 8 },
-                { label: 'Audit', step: 9 },
-              ] as Array<{ label: string; step: number }>).map((m, idx, arr) => {
-                const isComplete = highestStep > m.step;
-                const isCurrent = highestStep === m.step;
-                return (
-                  <React.Fragment key={m.label}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '0 7px', height: '100%', borderBottom: isCurrent ? '2px solid #4169E1' : '2px solid transparent', flexShrink: 0, transition: 'border-color 200ms' }}>
-                      {isComplete && (
-                        <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3.5"><path d="M20 6L9 17l-5-5"/></svg>
-                      )}
-                      <span style={{ fontSize: '8px', fontWeight: isCurrent ? 900 : 600, color: isComplete ? '#10b981' : isCurrent ? '#4169E1' : (darkMode ? 'rgba(255,255,255,0.22)' : 'rgba(15,23,42,0.22)'), textTransform: 'uppercase', letterSpacing: '0.1em', whiteSpace: 'nowrap', transition: 'color 200ms' }}>
-                        {m.label}
-                      </span>
-                    </div>
-                    {idx < arr.length - 1 && (
-                      <span style={{ fontSize: '9px', color: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.1)', flexShrink: 0, userSelect: 'none', lineHeight: 1 }}>›</span>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </div>
-          )}
-
-          {/* RIGHT: action icons — no borders, just ghost icons */}
-          {prepStep >= 2 && (activeView === 'terminal' || activeView === 'trishul') && (
-            <div style={{ display: 'flex', alignItems: 'stretch', marginLeft: 'auto', borderLeft: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}` }}>
-
-              {/* Scrub */}
-              <button
-                onClick={() => { resetTerminalState(); showToast('Mission Scrubbed — State Purged', 'warning'); }}
-                title="Scrub mission data"
-                style={{ width: '36px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', borderLeft: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`, color: darkMode ? 'rgba(255,255,255,0.25)' : 'rgba(15,23,42,0.25)', cursor: 'pointer', transition: 'color 150ms' }}
-                onMouseEnter={e => { e.currentTarget.style.color = '#f59e0b'; }}
-                onMouseLeave={e => { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.25)' : 'rgba(15,23,42,0.25)'; }}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-              </button>
-
-              {/* Commit */}
-              <button
-                onClick={() => commitTradeLog()}
-                disabled={isAiLoading}
-                title="Commit & Vectorize"
-                style={{ width: '36px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', borderLeft: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`, color: isAiLoading ? 'rgba(16,185,129,0.3)' : '#10b981', cursor: isAiLoading ? 'not-allowed' : 'pointer', transition: 'color 150ms' }}
-                onMouseEnter={e => { if (!isAiLoading) e.currentTarget.style.color = '#059669'; }}
-                onMouseLeave={e => { e.currentTarget.style.color = isAiLoading ? 'rgba(16,185,129,0.3)' : '#10b981'; }}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>
-              </button>
-
-              {/* Abort */}
-              <button
-                onClick={() => { setActiveSessionId(null); dispatch({ type: 'logs/setActiveEditLog', payload: null }); dispatch({ type: 'analysis/setHighestStep', payload: 0 }); dispatch({ type: 'analysis/setWeaponLocked', payload: false }); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); showToast('Protocol Aborted — State Purged'); }}
-                title="Abort protocol"
-                style={{ width: '36px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', borderLeft: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)'}`, color: darkMode ? 'rgba(255,255,255,0.25)' : 'rgba(15,23,42,0.25)', cursor: 'pointer', transition: 'color 150ms' }}
-                onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; }}
-                onMouseLeave={e => { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.25)' : 'rgba(15,23,42,0.25)'; }}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-
-            </div>
-          )}
-        </div>
-      )}
-
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }} className="relative">
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }} className="relative">
 
           {/* LEFT SIDEBAR — Operational Ledger */}
           {(activeSessionId || activeEditLog) && (
-            <aside className={`sidebar-transition flex flex-col z-[150] ${isLoggerOpen ? 'w-[400px] max-w-[100vw] opacity-100 translate-x-0' : 'w-0 opacity-0 -translate-x-full overflow-hidden'}`} style={{ background: darkMode ? '#1C2128' : '#f0f2f7', borderRight: isLoggerOpen ? '1px solid rgba(65,105,225,0.18)' : 'none', boxShadow: isLoggerOpen ? '20px 0 60px rgba(0,0,0,0.3)' : 'none', position: 'relative', height: '100%', transition: 'all 500ms cubic-bezier(0.23,1,0.32,1)' }}>
+            <aside className={`sidebar-transition flex flex-col z-[150] ${isLoggerOpen ? 'w-[400px] max-w-[100vw] opacity-100 translate-x-0' : 'w-0 opacity-0 -translate-x-full overflow-hidden'}`} style={{ background: '#0d0d0d', borderRight: isLoggerOpen ? '1px solid rgba(255,255,255,0.08)' : 'none', boxShadow: isLoggerOpen ? '20px 0 60px rgba(0,0,0,0.5)' : 'none', position: 'relative', height: '100%', transition: 'all 500ms cubic-bezier(0.23,1,0.32,1)' }}>
               <div style={{ minWidth: '400px', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ borderBottom: '1px solid var(--border)' }}>
+                <div style={{ borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
                   <div style={{ height: '3px', background: 'linear-gradient(90deg, #4169E1, #7c3aed)' }} />
-                  <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                      <span style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#4169E1' }}>Netra Ledger</span>
-                      <span style={{ fontSize: '13px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-1)', lineHeight: 1 }}>Operational Intelligence</span>
-                    </div>
-                    <button onClick={() => ctxSetIsLoggerOpen(false)} style={{ width: '28px', height: '28px', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 150ms' }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)'; e.currentTarget.style.color = '#ef4444'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-3)'; }}
+                  <div style={{ height: '36px', display: 'flex', alignItems: 'stretch' }}>
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '0 14px', fontSize: '8px', fontWeight: 900, letterSpacing: '0.2em', color: '#ffffff', textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace' }}>LEDGER</div>
+                    <button onClick={() => ctxSetIsLoggerOpen(false)}
+                      style={{ width: '36px', height: '100%', background: 'transparent', border: 'none', borderLeft: '1px solid var(--border)', color: 'var(--text-4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'color 150ms', flexShrink: 0 }}
+                      onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-4)'; }}
                     >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
                     </button>
                   </div>
                 </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-1">
-                  {/* Seven Rules — collapsible */}
-                  <div style={{ marginBottom: '8px', border: '1px solid var(--border)' }}>
-                    <button
-                      onClick={() => setIsRulesExpanded(v => !v)}
-                      style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: 'none', cursor: 'pointer', color: 'var(--text-1)' }}
-                    >
-                      <span style={{ fontSize: '9px', fontWeight: 900, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#4169E1' }}>The Seven Rules</span>
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ transform: isRulesExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 200ms', color: 'var(--text-4)' }}>
-                        <polyline points="6 9 12 15 18 9" />
-                      </svg>
-                    </button>
-                    {isRulesExpanded && (
-                      <div style={{ padding: '8px 10px 12px 10px', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--border)' }}>
-                        {[
-                          'R is fixed before entry. Position size is calculated from R ÷ Stop Distance. Never widen the stop to increase size.',
-                          'First target on Interception is mandatory. No holding full position past T1. No exceptions.',
-                          'Breakeven trigger activates on first target body close. Immediately — not before, not after a delay.',
-                          'Daily loss limit ends the session. No revenge trading. No "one more trade." The S-400 has fired.',
-                          'Daily target ends the session voluntarily. Profitable sessions that continue after target give back gains.',
-                          'No re-entry on a failed Interception. The reversal failed. The original edge is gone.',
-                          'Time Protocol is structural, not situational. Session cutoff and expiry cutoff apply regardless of setup quality.',
-                        ].map((rule, i) => (
-                          <div key={i} style={{ display: 'flex', gap: '8px', fontSize: '10px', color: 'var(--text-2)', lineHeight: 1.55 }}>
-                            <span style={{ color: '#4169E1', fontWeight: 900, flexShrink: 0, fontSize: '9px' }}>{i + 1}.</span>
-                            <span>{rule}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Selection tree — one row per dimension selected */}
-                  {([
-                    { phase: '00 · REAL BIAS',         color: '#4169E1', val: activeEditLog ? activeEditLog.phase1?.realBias        : selections.realBias },
-                    { phase: '01 · HTF STRUCTURE',     color: '#6366f1', val: activeEditLog ? activeEditLog.phase1?.htfStructure    : selections.htfStructure },
-                    { phase: '02 · MARKET PULSE',      color: '#0ea5e9', val: activeEditLog ? activeEditLog.phase1?.marketPulse     : selections.marketPulse },
-                    { phase: '03 · LIQUIDITY CONTEXT', color: '#f59e0b', val: activeEditLog ? activeEditLog.phase1?.liquidityContext : selections.liquidityContext },
-                  ] as Array<{ phase: string; color: string; val: Record<string, string> | undefined }>).map((p, i) => {
-                    const entries = p.val ? Object.entries(p.val).filter(([, v]) => !!v) : [];
+                {(() => {
+                  // ── Fork-tree helpers ──────────────────────────────────
+                  const sessId = (sessionRegistry.activeId ?? activeSessionId ?? '') as string;
+                  const sessRec = sessionRegistry.sessions.find(s => s.id === sessId);
+                  const rootId  = (sessRec?.parentId ?? sessId) as string;
+                  const allForks = sessionRegistry.sessions.filter(s => s.parentId === rootId);
+                  const rootRec  = sessionRegistry.sessions.find(s => s.id === rootId);
+
+                  const dotClr = (n: { status: string; pnl: string | null }): string =>
+                    n.status === 'active' ? '#00e5a0' : n.status === 'open' ? '#f59e0b' :
+                    n.pnl && parseFloat(n.pnl) >= 0 ? '#22c55e' : '#ef4444';
+
+                  // Renders the inline branch graph right after a given phase step
+                  const forkVizAt = (step: number): React.ReactNode => {
+                    const atStep = allForks.filter(b => b.forkPoint === step);
+                    if (atStep.length === 0) return null;
+                    const nodes = rootRec ? [rootRec, ...atStep] : atStep;
                     return (
-                      <div key={i}>
-                        <div style={{ fontSize: '8px', fontWeight: 900, color: p.color, letterSpacing: '0.2em', textTransform: 'uppercase', padding: '10px 4px 4px 4px', opacity: 0.9 }}>{p.phase}</div>
-                        {entries.length > 0 ? entries.map(([key, value]) => (
-                          <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '3px 8px', borderLeft: `2px solid ${p.color}30` }}>
-                            <span style={{ fontSize: '9px', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                            <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--text-1)', fontFamily: 'monospace' }}>{String(value)}</span>
-                          </div>
-                        )) : (
-                          <div style={{ padding: '3px 8px', borderLeft: `2px solid ${p.color}20`, fontSize: '9px', color: 'var(--text-4)', fontStyle: 'italic', opacity: 0.5 }}>pending</div>
-                        )}
+                      <div style={{ margin: '6px 0 4px 6px' }}>
+                        {nodes.map((n, idx) => {
+                          const isCurrent = n.id === sessId;
+                          const isLast    = idx === nodes.length - 1;
+                          const dc        = dotClr(n);
+                          return (
+                            <div key={n.id} style={{ display: 'flex', alignItems: 'stretch', marginBottom: isLast ? 0 : '2px' }}>
+                              {/* Tree connector glyphs */}
+                              <div style={{ width: '18px', flexShrink: 0, position: 'relative', userSelect: 'none' }}>
+                                {/* vertical trunk line above mid-point */}
+                                {idx > 0 && <div style={{ position: 'absolute', top: 0, bottom: '50%', left: '6px', width: '1px', background: 'rgba(255,255,255,0.1)' }} />}
+                                {/* vertical trunk line below mid-point (only if not last) */}
+                                {!isLast && <div style={{ position: 'absolute', top: '50%', bottom: 0, left: '6px', width: '1px', background: 'rgba(255,255,255,0.1)' }} />}
+                                {/* horizontal branch arm */}
+                                <div style={{ position: 'absolute', top: '50%', left: '6px', width: '10px', height: '1px', background: 'rgba(255,255,255,0.1)' }} />
+                              </div>
+                              {/* Node row */}
+                              <div
+                                onClick={() => !isCurrent && loadSessionById(n.id)}
+                                style={{
+                                  flex: 1, display: 'flex', alignItems: 'center', gap: '7px',
+                                  padding: '4px 8px',
+                                  cursor: isCurrent ? 'default' : 'pointer',
+                                  background: isCurrent ? 'rgba(65,105,225,0.1)' : 'transparent',
+                                  borderLeft: isCurrent ? `2px solid #4169E1` : '2px solid rgba(255,255,255,0.06)',
+                                  transition: 'background 150ms',
+                                }}
+                                onMouseEnter={e => { if (!isCurrent) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                                onMouseLeave={e => { if (!isCurrent) e.currentTarget.style.background = 'transparent'; }}
+                              >
+                                <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: dc, flexShrink: 0, boxShadow: isCurrent ? `0 0 5px ${dc}80` : 'none' }} />
+                                <span style={{ fontSize: '9px', fontWeight: 700, color: isCurrent ? '#fff' : 'var(--text-3)', fontFamily: 'monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {n.name || n.id}
+                                </span>
+                                {n.weapon && <span style={{ fontSize: '7px', fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.1em', flexShrink: 0, textTransform: 'uppercase' }}>{n.weapon}</span>}
+                                {n.pnl && <span style={{ fontSize: '9px', fontWeight: 900, fontFamily: 'monospace', color: parseFloat(n.pnl) >= 0 ? '#22c55e' : '#ef4444', flexShrink: 0 }}>{parseFloat(n.pnl) >= 0 ? '+' : ''}{n.pnl}</span>}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     );
-                  })}
+                  };
 
-                  {/* Command */}
-                  <div style={{ marginTop: '8px' }}>
-                    <div style={{ fontSize: '8px', fontWeight: 900, letterSpacing: '0.2em', textTransform: 'uppercase', padding: '10px 4px 4px 4px', color: finalCommand === 'STRIKE' ? '#ffd700' : finalCommand === 'INTERCEPTION' ? '#38bdf8' : finalCommand === 'SATURATION' ? '#f97316' : finalCommand === 'NO ENGAGEMENT' ? '#ef4444' : '#ffffff', opacity: 0.9 }}>04 · COMMAND</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '3px 8px', borderLeft: `2px solid rgba(255,255,255,0.12)` }}>
-                      <span style={{ fontSize: '9px', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Protocol</span>
-                      <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--text-1)', fontFamily: 'monospace' }}>{finalCommand || '—'}</span>
-                    </div>
-                  </div>
+                  // ── Ledger body ────────────────────────────────────────
+                  return (
+                    <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-1">
+                      {/* Phases 00–03 with inline fork visualization after each */}
+                      {([
+                        { phase: '00 · REAL BIAS',         color: '#4169E1', val: activeEditLog ? activeEditLog.phase1?.realBias        : selections.realBias,         step: 1 },
+                        { phase: '01 · HTF STRUCTURE',     color: '#6366f1', val: activeEditLog ? activeEditLog.phase1?.htfStructure    : selections.htfStructure,     step: 2 },
+                        { phase: '02 · MARKET PULSE',      color: '#0ea5e9', val: activeEditLog ? activeEditLog.phase1?.marketPulse     : selections.marketPulse,      step: 3 },
+                        { phase: '03 · LIQUIDITY CONTEXT', color: '#f59e0b', val: activeEditLog ? activeEditLog.phase1?.liquidityContext : selections.liquidityContext, step: 4 },
+                      ] as Array<{ phase: string; color: string; val: Record<string, string> | undefined; step: number }>).map((p, i) => {
+                        const entries = p.val ? Object.entries(p.val).filter(([, v]) => !!v) : [];
+                        return (
+                          <React.Fragment key={i}>
+                            {forkVizAt(p.step)}
+                            <div>
+                              <div style={{ fontSize: '8px', fontWeight: 900, color: p.color, letterSpacing: '0.2em', textTransform: 'uppercase', padding: '10px 4px 4px 4px', opacity: 0.9 }}>{p.phase}</div>
+                              {entries.length > 0 ? entries.map(([key, value]) => (
+                                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '3px 8px', borderLeft: `2px solid ${p.color}30` }}>
+                                  <span style={{ fontSize: '9px', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{key.replace(/([A-Z])/g, ' $1').trim()}</span>
+                                  <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--text-1)', fontFamily: 'monospace' }}>{String(value)}</span>
+                                </div>
+                              )) : (
+                                <div style={{ padding: '3px 8px', borderLeft: `2px solid ${p.color}20`, fontSize: '9px', color: 'var(--text-4)', fontStyle: 'italic', opacity: 0.5 }}>pending</div>
+                              )}
+                            </div>
+                          </React.Fragment>
+                        );
+                      })}
 
-                  {/* STS selections */}
-                  {finalCommand && finalCommand !== 'NO ENGAGEMENT' && (() => {
-                    const stsEntries = Object.entries(
-                      finalCommand === 'INTERCEPTION' ? interSelections : finalCommand === 'STRIKE' ? strikeSelections : {}
-                    ).filter(([, v]) => !!v);
-                    const stsColor = finalCommand === 'STRIKE' ? '#ffd700' : finalCommand === 'INTERCEPTION' ? '#38bdf8' : '#f97316';
-                    return (
-                      <div>
-                        <div style={{ fontSize: '8px', fontWeight: 900, color: stsColor, letterSpacing: '0.2em', textTransform: 'uppercase', padding: '10px 4px 4px 4px', opacity: 0.9 }}>STS · EXECUTION TREE</div>
-                        {stsEntries.length > 0 ? stsEntries.map(([key, value]) => (
-                          <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '3px 8px', borderLeft: `2px solid ${stsColor}30` }}>
-                            <span style={{ fontSize: '9px', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                            <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--text-1)', fontFamily: 'monospace' }}>{String(value)}</span>
-                          </div>
-                        )) : (
-                          <div style={{ padding: '3px 8px', borderLeft: `2px solid ${stsColor}20`, fontSize: '9px', color: 'var(--text-4)', fontStyle: 'italic', opacity: 0.5 }}>pending</div>
-                        )}
+                      {forkVizAt(5)}
+                      {/* 04 · COMMAND */}
+                      <div style={{ marginTop: '8px' }}>
+                        <div style={{ fontSize: '8px', fontWeight: 900, letterSpacing: '0.2em', textTransform: 'uppercase', padding: '10px 4px 4px 4px', color: finalCommand === 'STRIKE' ? '#ffd700' : finalCommand === 'INTERCEPTION' ? '#38bdf8' : finalCommand === 'SATURATION' ? '#f97316' : finalCommand === 'NO ENGAGEMENT' ? '#ef4444' : '#ffffff', opacity: 0.9 }}>04 · COMMAND</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '3px 8px', borderLeft: ' 2px solid rgba(255,255,255,0.12)' }}>
+                          <span style={{ fontSize: '9px', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Protocol</span>
+                          <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--text-1)', fontFamily: 'monospace' }}>{finalCommand || '—'}</span>
+                        </div>
                       </div>
-                    );
-                  })()}
 
-                  {/* Weapon */}
-                  <div style={{ marginTop: '8px', paddingBottom: '20px' }}>
-                    <div style={{ fontSize: '8px', fontWeight: 900, color: '#10b981', letterSpacing: '0.2em', textTransform: 'uppercase', padding: '10px 4px 4px 4px', opacity: 0.9 }}>05 · WEAPON</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '3px 8px', borderLeft: '2px solid rgba(16,185,129,0.3)' }}>
-                      <span style={{ fontSize: '9px', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Identity</span>
-                      <span style={{ fontSize: '10px', fontWeight: 900, color: '#10b981', fontFamily: 'monospace' }}>{selectedWeaponId || activeEditLog?.weapon || '—'}</span>
+                      {/* STS · EXECUTION TREE */}
+                      {finalCommand && finalCommand !== 'NO ENGAGEMENT' && (() => {
+                        const stsEntries = Object.entries(
+                          finalCommand === 'INTERCEPTION' ? interSelections : finalCommand === 'STRIKE' ? strikeSelections : {}
+                        ).filter(([, v]) => !!v);
+                        const stsColor = finalCommand === 'STRIKE' ? '#ffd700' : finalCommand === 'INTERCEPTION' ? '#38bdf8' : '#f97316';
+                        return (
+                          <div>
+                            <div style={{ fontSize: '8px', fontWeight: 900, color: stsColor, letterSpacing: '0.2em', textTransform: 'uppercase', padding: '10px 4px 4px 4px', opacity: 0.9 }}>STS · EXECUTION TREE</div>
+                            {stsEntries.length > 0 ? stsEntries.map(([key, value]) => (
+                              <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '3px 8px', borderLeft: `2px solid ${stsColor}30` }}>
+                                <span style={{ fontSize: '9px', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{key.replace(/([A-Z])/g, ' $1').trim()}</span>
+                                <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--text-1)', fontFamily: 'monospace' }}>{String(value)}</span>
+                              </div>
+                            )) : (
+                              <div style={{ padding: '3px 8px', borderLeft: `2px solid ${stsColor}20`, fontSize: '9px', color: 'var(--text-4)', fontStyle: 'italic', opacity: 0.5 }}>pending</div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      {forkVizAt(6)}
+                      {/* 05 · WEAPON */}
+                      <div style={{ marginTop: '8px', paddingBottom: '20px' }}>
+                        <div style={{ fontSize: '8px', fontWeight: 900, color: '#10b981', letterSpacing: '0.2em', textTransform: 'uppercase', padding: '10px 4px 4px 4px', opacity: 0.9 }}>05 · WEAPON</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '3px 8px', borderLeft: '2px solid rgba(16,185,129,0.3)' }}>
+                          <span style={{ fontSize: '9px', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Identity</span>
+                          <span style={{ fontSize: '10px', fontWeight: 900, color: '#10b981', fontFamily: 'monospace' }}>{selectedWeaponId || activeEditLog?.weapon || '—'}</span>
+                        </div>
+                      </div>
+                      {forkVizAt(7)}
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
             </aside>
           )}
 
           {/* MAIN TERMINAL CONTAINER */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+
+            {/* MISSION TELEMETRY SUB-HEADER — squeezed by sidebars */}
+            {activeSessionId && (
+              <div style={{ height: '36px', background: darkMode ? '#090c14' : '#f4f6fa', borderBottom: `1px solid ${darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.07)'}`, display: 'flex', alignItems: 'stretch', zIndex: 90, animation: 'slide-down 0.4s cubic-bezier(0.4,0,0.2,1)', flexShrink: 0 }} className="desktop-only">
+
+                {/* LEFT: ledger toggle + session identity */}
+                <div style={{ display: 'flex', alignItems: 'stretch', flexShrink: 0, borderRight: `1px solid ${darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.07)'}` }}>
+                  <button
+                    onClick={() => ctxSetIsLoggerOpen(!isLoggerOpen)}
+                    title="Operational Ledger"
+                    style={{ width: '36px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isLoggerOpen ? 'rgba(65,105,225,0.1)' : 'none', border: 'none', borderRight: `1px solid ${darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.07)'}`, color: isLoggerOpen ? '#4169E1' : (darkMode ? 'rgba(255,255,255,0.6)' : 'rgba(15,23,42,0.55)'), cursor: 'pointer', transition: 'color 150ms, background 150ms' }}
+                    onMouseEnter={e => { if (!isLoggerOpen) { e.currentTarget.style.color = '#4169E1'; e.currentTarget.style.background = 'rgba(65,105,225,0.06)'; } }}
+                    onMouseLeave={e => { if (!isLoggerOpen) { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.6)' : 'rgba(15,23,42,0.55)'; e.currentTarget.style.background = 'none'; } }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 16px' }}>
+                    <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px rgba(16,185,129,0.9)', flexShrink: 0 }} className="animate-pulse" />
+                    {renamingField === 'asset' ? (
+                      <input autoFocus value={renameValue} onChange={e => setRenameValue(e.target.value)} onBlur={commitRename} onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingField(null); }} style={{ fontSize: '10px', fontWeight: 800, color: '#4169E1', textTransform: 'uppercase', letterSpacing: '0.15em', fontFamily: 'JetBrains Mono, monospace', background: 'transparent', border: 'none', borderBottom: '1px solid #4169E1', outline: 'none', width: `${Math.max(renameValue.length, 4) + 2}ch`, padding: '0' }} />
+                    ) : (
+                      <button onClick={() => session && startRename('asset')} title="Click to rename" style={{ fontSize: '10px', fontWeight: 800, color: '#4169E1', textTransform: 'uppercase', letterSpacing: '0.15em', fontFamily: 'JetBrains Mono, monospace', background: 'none', border: 'none', cursor: session ? 'pointer' : 'default', padding: 0 }}>
+                        {session?.assetName || activeEditLog?.phase1?.asset_ticker || '—'}
+                      </button>
+                    )}
+                    <span style={{ fontSize: '10px', color: darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.35)', fontFamily: 'JetBrains Mono, monospace', userSelect: 'none' }}>·</span>
+                    {renamingField === 'trade' ? (
+                      <input autoFocus value={renameValue} onChange={e => setRenameValue(e.target.value)} onBlur={commitRename} onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingField(null); }} style={{ fontSize: '9px', fontWeight: 600, color: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono, monospace', background: 'transparent', border: 'none', borderBottom: `1px solid ${darkMode ? 'rgba(255,255,255,0.3)' : 'rgba(15,23,42,0.3)'}`, outline: 'none', width: `${Math.max(renameValue.length, 6) + 2}ch`, padding: '0', maxWidth: '120px' }} />
+                    ) : (
+                      <button onClick={() => session && startRename('trade')} title="Click to rename" style={{ fontSize: '9px', fontWeight: 600, color: darkMode ? '#ffffff' : '#0f172a', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'JetBrains Mono, monospace', background: 'none', border: 'none', cursor: session ? 'pointer' : 'default', padding: 0, maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {session?.tradeName || tradeName || activeEditLog?.name || '—'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* CENTRE: today's stats */}
+                {(() => {
+                  const txt = darkMode ? '#ffffff' : '#0f172a';
+                  const lbl: React.CSSProperties = { fontSize: '8px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace', color: txt, flexShrink: 0 };
+                  const val: React.CSSProperties = { fontSize: '11px', fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', lineHeight: '1', color: txt, flexShrink: 0 };
+                  const sep = <div style={{ width: '1px', height: '12px', background: darkMode ? 'rgba(255,255,255,0.18)' : 'rgba(15,23,42,0.15)', margin: '0 20px', flexShrink: 0 }} />;
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', flex: 1, overflowX: 'auto', padding: '0 20px', scrollbarWidth: 'none' } as React.CSSProperties}>
+                      {/* Date */}
+                      <span style={{ ...lbl, fontSize: '9px', fontWeight: 800, marginRight: '20px' }}>
+                        {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }).toUpperCase()}
+                      </span>
+                      {sep}
+                      {/* Sessions */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '20px' }}>
+                        <span style={lbl}>Sessions</span>
+                        <span style={val}>{todayStats?.total ?? '—'}</span>
+                      </div>
+                      {/* Open */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '20px' }}>
+                        <span style={lbl}>Open</span>
+                        <span style={{ ...val, color: '#f59e0b' }}>{todayStats?.open ?? '—'}</span>
+                      </div>
+                      {/* W / L */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginRight: '20px' }}>
+                        <span style={{ ...val, color: '#22c55e' }}>{todayStats?.wins ?? '—'}</span>
+                        <span style={lbl}>W</span>
+                        <span style={{ ...lbl, margin: '0 1px' }}>/</span>
+                        <span style={{ ...val, color: '#ef4444' }}>{todayStats?.losses ?? '—'}</span>
+                        <span style={lbl}>L</span>
+                      </div>
+                      {sep}
+                      {/* Win rate */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '20px' }}>
+                        <span style={lbl}>Win%</span>
+                        <span style={val}>{todayStats?.win_rate != null ? `${todayStats.win_rate}%` : '—'}</span>
+                      </div>
+                      {/* P&L */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={lbl}>P&amp;L</span>
+                        <span style={{ ...val, color: todayStats?.total_pnl == null ? txt : todayStats.total_pnl >= 0 ? '#22c55e' : '#ef4444' }}>
+                          {todayStats?.total_pnl != null ? `${todayStats.total_pnl >= 0 ? '+' : ''}₹${todayStats.total_pnl.toLocaleString('en-IN')}` : '—'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* RIGHT: action buttons */}
+                {prepStep >= 2 && (activeView === 'terminal' || activeView === 'trishul') && (
+                  <div style={{ display: 'flex', alignItems: 'center', marginLeft: 'auto', gap: '4px', padding: '0 8px', borderLeft: `1px solid ${darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.07)'}` }}>
+                    <button onClick={() => { resetTerminalState(); showToast('Mission Scrubbed — State Purged', 'warning'); }} title="Scrub mission data" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '0 9px', height: '22px', background: darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)', border: `1px solid ${darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)'}`, borderRadius: '3px', color: darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.4)', cursor: 'pointer', transition: 'color 150ms, border-color 150ms, background 150ms' }} onMouseEnter={e => { e.currentTarget.style.color = '#f59e0b'; e.currentTarget.style.borderColor = 'rgba(245,158,11,0.4)'; e.currentTarget.style.background = 'rgba(245,158,11,0.08)'; }} onMouseLeave={e => { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.4)'; e.currentTarget.style.borderColor = darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)'; e.currentTarget.style.background = darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)'; }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                      <span style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace' }}>RESET</span>
+                    </button>
+                    <button onClick={() => { handleGlobalSave(); showToast('Session Saved', 'success'); }} disabled={isAiLoading} title="Save session" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '0 9px', height: '22px', background: darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)', border: `1px solid ${darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)'}`, borderRadius: '3px', color: darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.4)', cursor: isAiLoading ? 'not-allowed' : 'pointer', opacity: isAiLoading ? 0.5 : 1, transition: 'color 150ms, border-color 150ms, background 150ms' }} onMouseEnter={e => { if (!isAiLoading) { e.currentTarget.style.color = '#60a5fa'; e.currentTarget.style.borderColor = 'rgba(96,165,250,0.4)'; e.currentTarget.style.background = 'rgba(96,165,250,0.08)'; } }} onMouseLeave={e => { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.4)'; e.currentTarget.style.borderColor = darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)'; e.currentTarget.style.background = darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)'; }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                      <span style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace' }}>SAVE</span>
+                    </button>
+                    <button onClick={() => commitTradeLog()} disabled={isAiLoading} title="Commit & Vectorize" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '0 9px', height: '22px', background: 'rgba(16,185,129,0.07)', border: `1px solid ${isAiLoading ? 'rgba(16,185,129,0.15)' : 'rgba(16,185,129,0.3)'}`, borderRadius: '3px', color: isAiLoading ? 'rgba(16,185,129,0.3)' : '#10b981', cursor: isAiLoading ? 'not-allowed' : 'pointer', opacity: isAiLoading ? 0.6 : 1, transition: 'color 150ms, border-color 150ms, background 150ms' }} onMouseEnter={e => { if (!isAiLoading) { e.currentTarget.style.color = '#059669'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.6)'; e.currentTarget.style.background = 'rgba(16,185,129,0.14)'; } }} onMouseLeave={e => { e.currentTarget.style.color = isAiLoading ? 'rgba(16,185,129,0.3)' : '#10b981'; e.currentTarget.style.borderColor = isAiLoading ? 'rgba(16,185,129,0.15)' : 'rgba(16,185,129,0.3)'; e.currentTarget.style.background = 'rgba(16,185,129,0.07)'; }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                      <span style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace' }}>COMMIT</span>
+                    </button>
+                    <button onClick={() => { setActiveSessionId(null); dispatch({ type: 'logs/setActiveEditLog', payload: null }); dispatch({ type: 'analysis/setHighestStep', payload: 0 }); dispatch({ type: 'analysis/setWeaponLocked', payload: false }); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); showToast('Protocol Aborted — State Purged'); }} title="Abort protocol" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '0 9px', height: '22px', background: darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)', border: `1px solid ${darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)'}`, borderRadius: '3px', color: darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.4)', cursor: 'pointer', transition: 'color 150ms, border-color 150ms, background 150ms' }} onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)'; e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; }} onMouseLeave={e => { e.currentTarget.style.color = darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.4)'; e.currentTarget.style.borderColor = darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)'; e.currentTarget.style.background = darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)'; }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      <span style={{ fontSize: '8px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace' }}>CUT</span>
+                    </button>
+                  </div>
+                )}
+
+              </div>
+            )}
+
             <main className={prepStep === 1 || prepStep === 5 || prepStep === 3 || prepStep === 4 || activeView === 'profile' || activeView === 'about' ? '' : 'terminal-main'} style={{ flex: 1, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
 
               {activeView === 'about' ? (
@@ -761,7 +843,7 @@ export default function NetraTerminal() {
                     </svg>
                   </div>
 
-                  <div style={{ maxWidth: '1280px', width: '100%', margin: '0 auto', padding: '48px 48px 80px', display: 'flex', flexDirection: 'column', gap: '0', position: 'relative', zIndex: 1 }}>
+                  <div style={{ maxWidth: '1280px', width: '100%', margin: '0 auto', padding: '48px 48px 0', display: 'flex', flexDirection: 'column', gap: '0', position: 'relative', zIndex: 1 }}>
 
                     {/* HEADER */}
                     <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: '36px', borderBottom: '2px solid rgba(37,99,235,0.18)', marginBottom: '48px' }}>
@@ -1042,7 +1124,7 @@ export default function NetraTerminal() {
                         <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#2563eb', marginBottom: '20px' }}>New Session</div>
                         <div style={{ fontSize: '40px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '-0.03em', color: '#0f172a', lineHeight: 1, marginBottom: '16px' }}>Initialize<br />Mission</div>
                         <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.65, maxWidth: '440px' }}>
-                          Deploy a full multi-phase structural analysis session. Real Bias → HTF Structure → Market Pulse → Liquidity → Command → Weapon → Mission Control.
+                          Deploy a full multi-phase structural analysis session. Real Bias → HTF Structure → Market Pulse → Liquidity → Command → Weapon → Trading Data.
                         </div>
                         <div style={{ marginTop: '32px', display: 'flex', alignItems: 'center', gap: '8px', color: '#2563eb' }}>
                           <span style={{ fontSize: '11px', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase' }}>Begin</span>
@@ -1071,17 +1153,8 @@ export default function NetraTerminal() {
                       </button>
                     </div>
 
-                    {/* FOOTER LINE */}
-                    <div style={{ borderTop: '1px solid rgba(109,40,217,0.12)', paddingTop: '24px', marginTop: '48px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em', color: '#2563eb' }}>
-                        Precision is the only objective. Discipline is the only tool.
-                      </span>
-                      <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em', color: '#2563eb', fontFamily: 'monospace' }}>
-                        NETRA v2.0
-                      </span>
-                    </div>
-
                   </div>
+                  <Footer />
                 </div>
               ) : prepStep === 3 ? (
                 /* INITIALIZE MISSION */
@@ -1268,54 +1341,82 @@ export default function NetraTerminal() {
                       }} size="sm" style={{ marginRight: '8px' }} />
                       <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Chart Context Analysis</span>
                     </div>
-                    <div className="phase-card-body"><Phase0Vision /></div>
+                    <div className="phase-card-body" style={{ padding: '12px' }}><Phase0Vision /></div>
                   </div>
 
-                  {/* P1: BIAS */}
+                  {/* MACRO MAPPING — Strategic Marking + Bias + HTF Structure */}
                   {highestStep >= 1 && (
-                    <div className="phase-card" data-phase="1" data-active={highestStep === 1 ? 'true' : undefined}>
-                      <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P1</span>
-                        <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>BIAS</span>
-                        <div style={{ flex: 1 }} />
-                        <ForkButton onClick={() => {
-                          setForkModalState({ isOpen: true, phaseNum: 1, defaultName: `FORK_${tradeName || 'Trade'}_P1` });
-                          setForkInputName(`FORK_${tradeName || 'Trade'}_P1`);
-                        }} size="sm" style={{ marginRight: '8px' }} />
-                        {stepTimestamps.realBias
-                          ? <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', fontWeight: 700, color: 'var(--green)', letterSpacing: '0.1em' }}>✓ LOCKED · {stepTimestamps.realBias}</span>
-                          : <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Pre-Market Directional Predisposition</span>
-                        }
-                      </div>
-                      <div className="phase-card-body"><Phase1Bias /></div>
-                    </div>
-                  )}
+                    <div className="phase-card mm-card phase-theme-1" data-phase="1" data-active={highestStep <= 2 ? 'true' : undefined}>
 
-                  {/* P2: HTF STRUCTURE */}
-                  {highestStep >= 2 && (
-                    <div className="phase-card" data-phase="2" data-active={highestStep === 2 ? 'true' : undefined}>
+                      {/* Card header */}
                       <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P2</span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.25em' }}>MM</span>
                         <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>HTF STRUCTURE</span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>MACRO MAPPING</span>
                         <div style={{ flex: 1 }} />
-                        <ForkButton onClick={() => {
-                          setForkModalState({ isOpen: true, phaseNum: 2, defaultName: `FORK_${tradeName || 'Trade'}_P2` });
-                          setForkInputName(`FORK_${tradeName || 'Trade'}_P2`);
-                        }} size="sm" style={{ marginRight: '8px' }} />
-                        {stepTimestamps.htfStructure
-                          ? <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', fontWeight: 700, color: 'var(--green)', letterSpacing: '0.1em' }}>✓ LOCKED · {stepTimestamps.htfStructure}</span>
-                          : <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Higher Timeframe Structural Analysis</span>
+                        {highestStep > 2
+                          ? <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.1em' }}>✓ LOCKED</span>
+                          : <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Pre-Market Analysis</span>
                         }
                       </div>
-                      <div className="phase-card-body"><Phase2Auction /></div>
+
+                      {/* Single body — sections separated by labeled rules */}
+                      <div className="phase-card-body">
+
+                        {/* ── Component 1: Strategic Marking ── */}
+                        <div
+                          onClick={() => setSmcOpen(o => !o)}
+                          style={{
+                            margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '10px',
+                            borderLeft: '3px solid var(--phase-accent)', paddingLeft: '10px',
+                            cursor: 'pointer', userSelect: 'none',
+                          }}
+                        >
+                          <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '11px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase', flexShrink: 0 }}>Component 1 — Strategic Marking</span>
+                          <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '9px', fontWeight: 700, color: smcDone === STRATEGIC_MARKS_TOTAL ? 'var(--phase-accent)' : 'var(--text-3)', letterSpacing: '0.04em', flexShrink: 0 }}>{smcDone}/{STRATEGIC_MARKS_TOTAL}</span>
+                          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
+                          <span style={{ fontSize: '9px', color: 'var(--text-4)', flexShrink: 0 }}>{smcOpen ? '▾' : '▸'}</span>
+                        </div>
+                        <StrategicMarkingChecklist
+                          open={smcOpen}
+                          checked={smcChecked}
+                          onToggle={(id) => setSmcChecked(c => ({ ...c, [id]: !c[id] }))}
+                        />
+
+                        {/* ── Component 2: Bias ── */}
+                        <div style={{
+                          margin: '28px 0 12px 0', display: 'flex', alignItems: 'center', gap: '10px',
+                          borderLeft: '3px solid var(--phase-accent)', paddingLeft: '10px',
+                        }}>
+                          <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '11px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase', flexShrink: 0 }}>Component 2 — Bias</span>
+                          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
+                        </div>
+                        <BiasDimensions />
+
+                        {/* ── Component 3: HTF Structure ── */}
+                        <div style={{
+                          margin: '28px 0 12px 0', display: 'flex', alignItems: 'center', gap: '10px',
+                          borderLeft: '3px solid var(--phase-accent)', paddingLeft: '10px',
+                        }}>
+                          <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '11px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase', flexShrink: 0 }}>Component 3 — HTF Structure</span>
+                          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
+                          <ForkButton onClick={() => {
+                            setForkModalState({ isOpen: true, phaseNum: 2, defaultName: `FORK_${tradeName || 'Trade'}_HTF` });
+                            setForkInputName(`FORK_${tradeName || 'Trade'}_HTF`);
+                          }} size="sm" />
+                        </div>
+                        <HTFDimensions />
+
+                        {/* ── Shared footer ── */}
+                        <MacroMappingActions />
+
+                      </div>
                     </div>
                   )}
 
                   {/* P3: MARKET PULSE (Auction & Energy + Liquidity Context combined) */}
                   {highestStep >= 3 && (
-                    <div className="phase-card" data-phase="3" data-active={highestStep === 3 ? 'true' : undefined}>
+                    <div className="phase-card mp-card phase-theme-3" data-phase="3" data-active={highestStep === 3 ? 'true' : undefined}>
                       <div className="phase-card-header">
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P3</span>
                         <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
@@ -1326,8 +1427,8 @@ export default function NetraTerminal() {
                           setForkInputName(`FORK_${tradeName || 'Trade'}_P3`);
                         }} size="sm" style={{ marginRight: '8px' }} />
                         {stepTimestamps.marketPulse
-                          ? <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', fontWeight: 700, color: 'var(--green)', letterSpacing: '0.1em' }}>✓ LOCKED · {stepTimestamps.marketPulse}</span>
-                          : <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Auction State · Price Behaviour · Liquidity Context</span>
+                          ? <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', fontWeight: 700, color: 'var(--phase-accent)', letterSpacing: '0.1em' }}>✓ LOCKED · {stepTimestamps.marketPulse}</span>
+                          : <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Auction State · Price Behaviour · Liquidity Context</span>
                         }
                       </div>
                       <div className="phase-card-body"><Phase3MarketPulse /></div>
@@ -1345,13 +1446,13 @@ export default function NetraTerminal() {
                         <div style={{ flex: 1 }} />
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Neural Fusion Output</span>
                       </div>
-                      <div className="phase-card-body"><Phase5Synthesis /></div>
+                      <div className="phase-card-body" style={{ padding: '12px' }}><Phase5Synthesis /></div>
                     </div>
                   )}
 
                   {/* P6: COMMAND */}
                   {highestStep >= 4 && (
-                    <div className="phase-card" data-phase="6" data-active={highestStep === 4 ? 'true' : undefined}>
+                    <div className="phase-card cmd-card phase-theme-2" data-phase="6" data-active={highestStep === 4 ? 'true' : undefined}>
                       <div className="phase-card-header">
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P5</span>
                         <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
@@ -1378,15 +1479,15 @@ export default function NetraTerminal() {
                         <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>MISSION INTEL</span>
                         <div style={{ flex: 1 }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Maya Weapon Recommendation</span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.22em', textTransform: 'uppercase' }}>MAYA</span>
                       </div>
-                      <div className="phase-card-body"><Phase8WeaponIntel /></div>
+                      <div className="phase-card-body" style={{ padding: '12px' }}><Phase8WeaponIntel /></div>
                     </div>
                   )}
 
                   {/* P8: WEAPON ARMORY */}
                   {highestStep >= 5 && (
-                    <div className="phase-card" data-phase="8" data-active={highestStep === 5 ? 'true' : undefined}>
+                    <div className="phase-card wap-card phase-theme-5" data-phase="8" data-active={highestStep === 5 ? 'true' : undefined}>
                       <div className="phase-card-header">
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P7</span>
                         <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
@@ -1404,25 +1505,25 @@ export default function NetraTerminal() {
 
 
 
-                  {/* P10: MISSION CONTROL */}
+                  {/* P10: TRADING DATA */}
                   {highestStep >= 6 && (
                     <div className="phase-card" data-phase="9" data-active={highestStep === 6 ? 'true' : undefined}>
                       <div className="phase-card-header">
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P8</span>
                         <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>MISSION CONTROL</span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>TRADING DATA</span>
                         <div style={{ flex: 1 }} />
                         <ForkButton onClick={() => {
                           setForkModalState({ isOpen: true, phaseNum: 6, defaultName: `FORK_${tradeName || 'Trade'}_P6` });
                           setForkInputName(`FORK_${tradeName || 'Trade'}_P6`);
                         }} size="sm" style={{ marginRight: '8px' }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Operational Debrief & Audit</span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Trade Execution Record</span>
                       </div>
                       <div className="phase-card-body"><Phase10MissionControl /></div>
                     </div>
                   )}
                   {/* P11: MAYA AUDIT */}
-                  {highestStep >= 7 && (
+                  {highestStep >= 6 && (
                     <div className="phase-card" data-phase="10" data-active={highestStep === 7 ? 'true' : undefined}>
                       <div className="phase-card-header">
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P9</span>
@@ -1431,7 +1532,7 @@ export default function NetraTerminal() {
                         <div style={{ flex: 1 }} />
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Strategic Evaluation</span>
                       </div>
-                      <div className="phase-card-body"><Phase11MayaAudit /></div>
+                      <div className="phase-card-body" style={{ padding: '12px' }}><Phase11MayaAudit /></div>
                     </div>
                   )}
 
@@ -1457,7 +1558,7 @@ export default function NetraTerminal() {
         </div>
 
         {/* RIGHT SIDEBAR — Maya Chat Panel */}
-        <aside className={`sidebar-transition flex flex-col z-[150] ${isAiPaneOpen ? 'w-[440px] max-w-[100vw] opacity-100 translate-x-0' : 'w-0 opacity-0 translate-x-full overflow-hidden'}`} style={{ background: darkMode ? '#12141D' : '#F0F2FF', borderLeft: isAiPaneOpen ? '1px solid rgba(65,105,225,0.18)' : 'none', boxShadow: isAiPaneOpen ? '-20px 0 60px rgba(0,0,0,0.3)' : 'none', position: 'relative', height: '100%', transition: 'all 500ms cubic-bezier(0.23,1,0.32,1)' }}>
+        <aside className={`sidebar-transition flex flex-col z-[150] ${isAiPaneOpen ? 'w-[440px] max-w-[100vw] opacity-100 translate-x-0' : 'w-0 opacity-0 translate-x-full overflow-hidden'}`} style={{ background: '#0d0d0d', borderLeft: isAiPaneOpen ? '1px solid rgba(255,255,255,0.08)' : 'none', boxShadow: isAiPaneOpen ? '-20px 0 60px rgba(0,0,0,0.5)' : 'none', position: 'relative', height: '100%', transition: 'all 500ms cubic-bezier(0.23,1,0.32,1)' }}>
           <div style={{ minWidth: '440px', height: '100%', display: 'flex', flexDirection: 'column' }}>
             <MayaChatPanel />
           </div>
@@ -1479,9 +1580,9 @@ export default function NetraTerminal() {
           <button onClick={() => dispatch({ type: 'ui/setMobileMenuOpen', payload: false })} className="absolute top-8 right-8 p-4 text-[var(--text-1)]"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
           <div className="flex flex-col gap-10 text-center">
             {([
-              { label: 'Home', active: prepStep === 1 && activeView !== 'profile', action: () => { ctxSetPrepStep(1); ctxSetActiveView('terminal'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } },
-              { label: 'Pinaka', active: prepStep === 5 && currentModel === 'pinaka', action: () => { setCurrentModel('pinaka'); setActiveSessionId(null); ctxSetPrepStep(5); ctxSetActiveView('terminal'); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } },
-              { label: 'Trishul', active: prepStep === 5 && currentModel === 'trishul', action: () => { setCurrentModel('trishul'); setActiveSessionId(null); ctxSetPrepStep(5); ctxSetActiveView('trishul'); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } },
+              { label: 'Home', active: prepStep === 1 && activeView !== 'profile' && activeView !== 'about', action: () => { ctxSetPrepStep(1); ctxSetActiveView('terminal'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } },
+              { label: 'Pinaka', active: prepStep === 5 && currentModel === 'pinaka' && activeView !== 'about' && activeView !== 'profile', action: () => { setCurrentModel('pinaka'); setActiveSessionId(null); ctxSetPrepStep(5); ctxSetActiveView('terminal'); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } },
+              { label: 'Trishul', active: prepStep === 5 && currentModel === 'trishul' && activeView !== 'about' && activeView !== 'profile', action: () => { setCurrentModel('trishul'); setActiveSessionId(null); ctxSetPrepStep(5); ctxSetActiveView('trishul'); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } },
             ] as Array<{ label: string; active: boolean; action: () => void }>).map((nav) => (
               <button key={nav.label} onClick={() => { nav.action(); dispatch({ type: 'ui/setMobileMenuOpen', payload: false }); }} className="text-3xl font-black uppercase tracking-widest transition-all" style={{ color: nav.active ? 'var(--accent)' : 'var(--text-1)' }}>{nav.label}</button>
             ))}

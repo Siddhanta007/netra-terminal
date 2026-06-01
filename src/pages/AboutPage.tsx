@@ -1,3 +1,5 @@
+import Footer from '../components/Layout/Footer';
+
 const RESEARCH_INTERESTS = [
   { label: 'Market Microstructure', color: '#4169E1' },
   { label: 'Systematic Strategy Development', color: '#7c3aed' },
@@ -80,7 +82,7 @@ export default function AboutPage() {
         </svg>
       </div>
 
-      <div style={{ maxWidth: '1100px', width: '100%', margin: '0 auto', padding: '64px 48px 100px', position: 'relative', zIndex: 1 }}>
+      <div style={{ maxWidth: '1280px', width: '100%', margin: '0 auto', padding: '64px 48px 0', position: 'relative', zIndex: 1 }}>
 
         {/* ── HERO ── */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px', background: 'rgba(15,23,42,0.06)', marginBottom: '2px', boxShadow: '0 4px 40px rgba(0,0,0,0.08)' }}>
@@ -220,13 +222,8 @@ export default function AboutPage() {
           </div>
         </div>
 
-        {/* ── FOOTER ── */}
-        <div style={{ borderTop: '1px solid rgba(65,105,225,0.15)', paddingTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em', color: '#4169E1' }}>Sri Krishna · Quant ML Research · 2025</span>
-          <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em', color: 'rgba(15,23,42,0.3)', fontFamily: 'monospace' }}>NETRA v2.0</span>
-        </div>
-
       </div>
+      <Footer />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import analysisReducer from './slices/analysisSlice';
 import chatReducer from './slices/chatSlice';
 import logsReducer from './slices/logsSlice';
 import sessionReducer from './slices/sessionSlice';
+import sessionRegistryReducer from './slices/sessionRegistrySlice';
 
 export const store = configureStore({
   reducer: {
@@ -15,6 +16,7 @@ export const store = configureStore({
     chat: chatReducer,
     logs: logsReducer,
     session: sessionReducer,
+    sessionRegistry: sessionRegistryReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(localStorageMiddleware),

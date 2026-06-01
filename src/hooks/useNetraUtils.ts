@@ -18,7 +18,7 @@ export function useNetraUtils() {
     const token = import.meta.env.VITE_HF_TOKEN as string | undefined;
     const headers: Record<string, string> = { ...extraHeaders };
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    if (session) headers['x-user'] = session;
+    if (session) headers['x-user'] = session.userName;
     return headers;
   }, [session]);
 
