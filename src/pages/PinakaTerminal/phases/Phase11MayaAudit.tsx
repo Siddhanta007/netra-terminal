@@ -1,3 +1,5 @@
+// Maya Audit phase — posts the completed trade for AI post-trade review.
+
 import React from 'react';
 import { useNetra } from '../../../context/NetraContext';
 import NetraAILabs from '../../../components/Templates/NetraAILabs';

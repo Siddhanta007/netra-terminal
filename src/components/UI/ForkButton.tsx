@@ -1,3 +1,5 @@
+// Small 'fork' icon button — branches a new session from the current phase.
+
 import React from 'react';
 
 interface ForkButtonProps {

@@ -1,3 +1,5 @@
+// Hook — trade-session lifecycle: create, load, fork, persist and reset a session and its full analysis state.
+
 import { useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
@@ -8,14 +10,48 @@ import {
   setHighestStep, setSelections, setNotes, setInterSelections, setStrikeSelections,
   setFinalCommand, setNetraOutput, setSysRecommendation, setSelectedWeaponId,
   setCommandLocked, setWeaponLocked, setStepTimestamps, setImageDescription,
-  setWeaponPrediction,
+  setWeaponPrediction, setStateTimeline,
 } from '../store/slices/analysisSlice';
 import { setTradeName, setActiveEditLog, setEditFormData, setAuditData, setIsAuditing } from '../store/slices/logsSlice';
 import { registerSession, updateSession, setActiveRegistryId } from '../store/slices/sessionRegistrySlice';
 import { saveState } from '../utils/storage';
 import { API_BASE } from '../utils/constants';
 import { useNetraUtils } from './useNetraUtils';
-import { TradeLog, SessionMeta } from '../types';
+import { TradeLog, SessionMeta, TradePhase2, TradePhase3, TradePhase4, TradePhase8, TradePhase9Card, TradePhase1 } from '../types';
+
+// Resolve session fields from new phase structure (primary) or old session_state blob (fallback)
+function resolveLogState(log: TradeLog) {
+  const s = log.session_state;
+  const p2 = log.phase2 as TradePhase2 | undefined;
+  const p3 = log.phase3 as TradePhase3 | undefined;
+  const p4 = log.phase4 as TradePhase4 | undefined;
+  const p8 = log.phase8 as TradePhase8 | undefined;
+  const finalCmd = ((log.phase6 as Record<string,unknown> | undefined)?.command as string ?? s?.finalCommand ?? null);
+  const dims = p8?.dimensions ?? {};
+  return {
+    highestStep:   (log.highestStep  ?? s?.highestStep  ?? 1) as number,
+    stepTimestamps:(log.stepTimestamps ?? s?.stepTimestamps ?? {}) as Record<string, string>,
+    realBias:      p2?.selections ?? (s?.selections?.realBias ?? {}) as Record<string,string>,
+    htfStructure:  p3?.selections ?? (s?.selections?.htfStructure ?? {}) as Record<string,string>,
+    marketPulse:   p4?.marketPulse ?? (s?.selections?.marketPulse ?? {}) as Record<string,string>,
+    liquidityCtx:  p4?.liquidityContext ?? (s?.selections?.liquidityContext ?? {}) as Record<string,string>,
+    note2:  p2?.note ?? s?.notes?.realBias ?? '',
+    note3:  p3?.note ?? s?.notes?.htfStructure ?? '',
+    note4mp:p4?.marketPulse_note ?? s?.notes?.marketPulse ?? '',
+    note4lq:p4?.liquidityContext_note ?? s?.notes?.liquidityContext ?? '',
+    netraOut:  (log.phase5 ?? s?.netraOutput ?? null),
+    sysRec:    ((log.phase6 as Record<string,unknown> | undefined)?.recommendation ?? s?.sysRecommendation ?? null),
+    finalCmd,
+    wpPred:    (log.phase7 ?? s?.weaponPrediction ?? null),
+    weaponId:  (p8?.weapon_id ?? s?.selectedWeaponId ?? null) as string | null,
+    strikeSel: finalCmd === 'STRIKE'       ? dims : (s?.strikeSelections ?? {}),
+    interSel:  finalCmd === 'INTERCEPTION' ? dims : (s?.interSelections  ?? {}),
+    imgDesc:   ((log.phase1 as TradePhase1 | undefined)?.image_description ?? (s as Record<string,unknown> | undefined)?.imageDescription ?? null) as string | null,
+    audit:     (log.phase10 ?? (s as Record<string,unknown> | undefined)?.auditData ?? null),
+    assetName: (log.assetName ?? s?.assetName ?? (log.phase9?.[0] as TradePhase9Card | undefined)?.asset ?? '') as string,
+    stateTimeline: ((log as Record<string, unknown>).state_timeline ?? []) as Array<{ state_id: string; ts: string }>,
+  };
+}
 
 export function useSessionManager() {
   const dispatch = useDispatch<AppDispatch>();
@@ -41,11 +77,15 @@ export function useSessionManager() {
     finalCommand: null as string | null,
     netraOutput: null as RootState['analysis']['netraOutput'],
     sysRecommendation: null as unknown,
+    weaponPrediction: null as RootState['analysis']['weaponPrediction'],
     selectedWeaponId: null as string | null,
     stepTimestamps: {} as Record<string, string>,
     tradeName: '',
     activeSessionId: null as number | null,
     assetName: '',
+    imageDescription: null as string | null,
+    auditData: null as RootState['logs']['auditData'],
+    stateTimeline: [] as Array<{ state_id: string; ts: string }>,
   });
 
   // Keep ref in sync with selectors on every render
@@ -55,14 +95,19 @@ export function useSessionManager() {
   const finalCommand = useSelector((s: RootState) => s.analysis.finalCommand);
   const netraOutput = useSelector((s: RootState) => s.analysis.netraOutput);
   const sysRecommendation = useSelector((s: RootState) => s.analysis.sysRecommendation);
+  const weaponPrediction = useSelector((s: RootState) => s.analysis.weaponPrediction);
   const selectedWeaponId = useSelector((s: RootState) => s.analysis.selectedWeaponId);
   const stepTimestamps = useSelector((s: RootState) => s.analysis.stepTimestamps);
   const tradeName = useSelector((s: RootState) => s.logs.tradeName);
+  const imageDescription = useSelector((s: RootState) => s.analysis.imageDescription);
+  const auditData = useSelector((s: RootState) => s.logs.auditData);
+  const stateTimeline = useSelector((s: RootState) => s.analysis.stateTimeline);
 
   analysisRef.current = {
     highestStep, selections, notes, interSelections, strikeSelections,
-    finalCommand, netraOutput, sysRecommendation, selectedWeaponId,
-    stepTimestamps, tradeName, activeSessionId, assetName: session?.assetName || '',
+    finalCommand, netraOutput, sysRecommendation, weaponPrediction,
+    selectedWeaponId, stepTimestamps, tradeName, activeSessionId,
+    assetName: session?.assetName || '', imageDescription, auditData, stateTimeline,
   };
 
   const resetTerminalState = useCallback(() => {
@@ -84,6 +129,7 @@ export function useSessionManager() {
     dispatch(setIsAuditing(false));
     dispatch(setImageDescription(null));
     dispatch(setWeaponPrediction(null));
+    dispatch(setStateTimeline([]));
   }, [dispatch]);
 
   const buildSessionMeta = useCallback((log: TradeLog, parentId: string | null = null, forkPoint: number | null = null): SessionMeta => ({
@@ -103,27 +149,29 @@ export function useSessionManager() {
       const res = await fetch(`${API_BASE}/api/logs/${encodeURIComponent(id)}`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Not found');
       const log: TradeLog = await res.json();
-      const state = log.session_state;
-      if (!state) return;
 
-      dispatch(setHighestStep(state.highestStep || 1));
-      dispatch(setSelections(state.selections || { realBias: {}, htfStructure: {}, marketPulse: {}, liquidityContext: {} }));
-      dispatch(setNotes(state.notes || { realBias: '', htfStructure: '', marketPulse: '', liquidityContext: '' }));
-      dispatch(setInterSelections(state.interSelections || { pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }));
-      dispatch(setStrikeSelections(state.strikeSelections || { impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' }));
-      dispatch(setFinalCommand(state.finalCommand || null));
-      dispatch(setNetraOutput(state.netraOutput || null));
-      dispatch(setSysRecommendation(state.sysRecommendation || null));
-      dispatch(setSelectedWeaponId(state.selectedWeaponId || null));
-      dispatch(setStepTimestamps(state.stepTimestamps || {}));
-      dispatch(setTradeName(log.name || state.tradeName || ''));
-      const assetName = log.phase2?.trading_asset || state.assetName || log.phase1?.asset_ticker || '';
-      dispatch(setSession({ userName: session?.userName || 'User', assetName: assetName as string, tradeName: log.name || state.tradeName || '' }));
+      const r = resolveLogState(log);
+      dispatch(setHighestStep(r.highestStep));
+      dispatch(setSelections({ realBias: r.realBias, htfStructure: r.htfStructure, marketPulse: r.marketPulse, liquidityContext: r.liquidityCtx }));
+      dispatch(setNotes({ realBias: r.note2, htfStructure: r.note3, marketPulse: r.note4mp, liquidityContext: r.note4lq }));
+      dispatch(setStrikeSelections(r.strikeSel as Parameters<typeof setStrikeSelections>[0]));
+      dispatch(setInterSelections(r.interSel   as Parameters<typeof setInterSelections>[0]));
+      dispatch(setFinalCommand(r.finalCmd));
+      dispatch(setNetraOutput(r.netraOut as Parameters<typeof setNetraOutput>[0] | null));
+      dispatch(setSysRecommendation(r.sysRec));
+      dispatch(setWeaponPrediction(r.wpPred as Parameters<typeof setWeaponPrediction>[0] | null));
+      dispatch(setSelectedWeaponId(r.weaponId));
+      dispatch(setStepTimestamps(r.stepTimestamps));
+      dispatch(setTradeName(log.name || ''));
+      if (r.imgDesc) dispatch(setImageDescription(r.imgDesc));
+      if (r.audit)   dispatch(setAuditData(r.audit as Parameters<typeof setAuditData>[0]));
+      dispatch(setStateTimeline(r.stateTimeline));
+      dispatch(setSession({ userName: session?.userName || 'User', assetName: r.assetName, tradeName: log.name || '' }));
       dispatch(setActiveSessionId(log.id));
       saveState('activeSessionId', log.id);
       dispatch(setActiveView('terminal'));
       dispatch(setActiveEditLog(log));
-      dispatch(setEditFormData({ ...log.phase2, ...log.phase3, ...log.phase4, trade_name: log.name }));
+      dispatch(setEditFormData({ entry_price: log.phase9?.[0]?.entry_price, stop_loss: log.phase9?.[0]?.stop_loss, exit_price: log.phase9?.[0]?.exit_price, outcome: log.phase9?.[0]?.outcome, trade_name: log.name }));
       dispatch(setIsLoggerOpen(true));
       dispatch(setPrepStep(2));
       dispatch(setActiveRegistryId(id));
@@ -207,57 +255,49 @@ export function useSessionManager() {
   }, [dispatch, getAuthHeaders, sessionInput, session, currentModel, resetTerminalState, navigate, showToast, buildSessionMeta]);
 
   const resumeSession = useCallback((log: TradeLog) => {
-    if (!log?.session_state) return;
-    const state = log.session_state;
-    dispatch(setHighestStep(state.highestStep || 1));
-    dispatch(setSelections(state.selections || { realBias: {}, htfStructure: {}, marketPulse: {}, liquidityContext: {} }));
-    dispatch(setNotes(state.notes || { realBias: '', htfStructure: '', marketPulse: '', liquidityContext: '' }));
-    dispatch(setInterSelections(state.interSelections || { pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }));
-    dispatch(setStrikeSelections(state.strikeSelections || { impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' }));
-    dispatch(setFinalCommand(state.finalCommand || null));
-    dispatch(setNetraOutput(state.netraOutput || null));
-    dispatch(setSysRecommendation(state.sysRecommendation || null));
-    dispatch(setSelectedWeaponId(state.selectedWeaponId || null));
-    dispatch(setStepTimestamps(state.stepTimestamps || {}));
-    dispatch(setTradeName(log.name || state.tradeName || ''));
-    const assetName = log.phase2?.trading_asset || state.assetName || log.phase1?.asset_ticker || '';
+    const r = resolveLogState(log);
+    dispatch(setHighestStep(r.highestStep));
+    dispatch(setSelections({ realBias: r.realBias, htfStructure: r.htfStructure, marketPulse: r.marketPulse, liquidityContext: r.liquidityCtx }));
+    dispatch(setNotes({ realBias: r.note2, htfStructure: r.note3, marketPulse: r.note4mp, liquidityContext: r.note4lq }));
+    dispatch(setStrikeSelections(r.strikeSel as Parameters<typeof setStrikeSelections>[0]));
+    dispatch(setInterSelections(r.interSel   as Parameters<typeof setInterSelections>[0]));
+    dispatch(setFinalCommand(r.finalCmd));
+    dispatch(setNetraOutput(r.netraOut as Parameters<typeof setNetraOutput>[0] | null));
+    dispatch(setSysRecommendation(r.sysRec));
+    dispatch(setWeaponPrediction(r.wpPred as Parameters<typeof setWeaponPrediction>[0] | null));
+    dispatch(setSelectedWeaponId(r.weaponId));
+    dispatch(setStepTimestamps(r.stepTimestamps));
+    dispatch(setTradeName(log.name || ''));
+    if (r.imgDesc) dispatch(setImageDescription(r.imgDesc));
+    if (r.audit)   dispatch(setAuditData(r.audit as Parameters<typeof setAuditData>[0]));
+    dispatch(setStateTimeline(r.stateTimeline));
     if (window.innerWidth < 1024) dispatch(setIsLoggerOpen(false));
-    dispatch(setSession({ userName: session?.userName || 'User', assetName: assetName as string, tradeName: log.name || state.tradeName || '' }));
+    dispatch(setSession({ userName: session?.userName || 'User', assetName: r.assetName, tradeName: log.name || '' }));
     dispatch(setActiveSessionId(log.id));
     saveState('activeSessionId', log.id);
     dispatch(setActiveView('terminal'));
     dispatch(setActiveEditLog(log));
-    dispatch(setEditFormData({ ...log.phase2, ...log.phase3, ...log.phase4, trade_name: log.name }));
+    dispatch(setEditFormData({ entry_price: log.phase9?.[0]?.entry_price, stop_loss: log.phase9?.[0]?.stop_loss, exit_price: log.phase9?.[0]?.exit_price, outcome: log.phase9?.[0]?.outcome, trade_name: log.name }));
     dispatch(setIsLoggerOpen(true));
     dispatch(setPrepStep(2));
     dispatch(registerSession(buildSessionMeta(log, null, null)));
     dispatch(setActiveRegistryId(String(log.id)));
-    showToast(`Resumed: ${state.tradeName || log.id}`);
+    showToast(`Resumed: ${log.name || log.id}`);
     navigate('/mission/pinaka');
   }, [dispatch, session, navigate, showToast, buildSessionMeta]);
 
   const forkSession = useCallback((log: TradeLog, newName: string) => {
     if (isGuest) { showToast('Demo mode — fork disabled', 'error'); return; }
-    if (!log?.session_state) return;
-    const state = log.session_state;
-    
-    const defaultName = `FORK_${log.name || 'Trade'}`;
-    const finalName = newName || defaultName;
-    
+    const r = resolveLogState(log);
+    const finalName = newName || `FORK_${log.name || 'Trade'}`;
     const payload = {
       model_id: log.model_id || currentModel,
       username: session?.userName || 'Unknown',
-      realBias: log.realBias || '-',
-      htfStructure: log.htfStructure || '-',
-      marketPulse: log.marketPulse || '-',
-      liquidityContext: log.liquidityContext || '-',
       weapon: log.weapon || 'FORKED',
-      protocol: log.protocol || 'PINAKA',
+      protocol: 'PINAKA',
       trade_name: finalName,
-      asset_ticker: log.phase1?.asset_ticker || state.assetName || '',
-      session_state: state,
+      asset_ticker: r.assetName,
     };
-
     fetch(`${API_BASE}/api/logs`, {
       method: 'POST',
       headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
@@ -265,26 +305,29 @@ export function useSessionManager() {
     })
       .then((res) => { if (!res.ok) throw new Error('Failed to fork session'); return res.json(); })
       .then((data: TradeLog) => {
-        dispatch(setHighestStep(state.highestStep || 1));
-        dispatch(setSelections(state.selections || { realBias: {}, htfStructure: {}, marketPulse: {}, liquidityContext: {} }));
-        dispatch(setNotes(state.notes || { realBias: '', htfStructure: '', marketPulse: '', liquidityContext: '' }));
-        dispatch(setInterSelections(state.interSelections || { pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }));
-        dispatch(setStrikeSelections(state.strikeSelections || { impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' }));
-        dispatch(setFinalCommand(state.finalCommand || null));
-        dispatch(setNetraOutput(state.netraOutput || null));
-        dispatch(setSysRecommendation(state.sysRecommendation || null));
-        dispatch(setSelectedWeaponId(state.selectedWeaponId || null));
-        dispatch(setStepTimestamps(state.stepTimestamps || {}));
+        dispatch(setHighestStep(r.highestStep));
+        dispatch(setSelections({ realBias: r.realBias, htfStructure: r.htfStructure, marketPulse: r.marketPulse, liquidityContext: r.liquidityCtx }));
+        dispatch(setNotes({ realBias: r.note2, htfStructure: r.note3, marketPulse: r.note4mp, liquidityContext: r.note4lq }));
+        dispatch(setStrikeSelections(r.strikeSel as Parameters<typeof setStrikeSelections>[0]));
+        dispatch(setInterSelections(r.interSel   as Parameters<typeof setInterSelections>[0]));
+        dispatch(setFinalCommand(r.finalCmd));
+        dispatch(setNetraOutput(r.netraOut as Parameters<typeof setNetraOutput>[0] | null));
+        dispatch(setSysRecommendation(r.sysRec));
+        dispatch(setWeaponPrediction(r.wpPred as Parameters<typeof setWeaponPrediction>[0] | null));
+        dispatch(setSelectedWeaponId(r.weaponId));
+        dispatch(setStepTimestamps(r.stepTimestamps));
+        if (r.imgDesc) dispatch(setImageDescription(r.imgDesc));
+        if (r.audit)   dispatch(setAuditData(r.audit as Parameters<typeof setAuditData>[0]));
+      dispatch(setStateTimeline(r.stateTimeline));
         dispatch(setTradeName(data.name));
         dispatch(setActiveSessionId(data.id));
         saveState('activeSessionId', data.id);
-        dispatch(setSession({ userName: session?.userName || 'User', assetName: payload.asset_ticker, tradeName: data.name }));
+        dispatch(setSession({ userName: session?.userName || 'User', assetName: r.assetName, tradeName: data.name }));
         dispatch(setActiveView('terminal'));
         dispatch(setActiveEditLog(data));
-        dispatch(setEditFormData({ ...data.phase2, ...data.phase3, ...data.phase4, trade_name: data.name }));
+        dispatch(setEditFormData({ entry_price: log.phase9?.[0]?.entry_price, stop_loss: log.phase9?.[0]?.stop_loss, trade_name: data.name }));
         dispatch(setIsLoggerOpen(true));
         dispatch(setPrepStep(2));
-        // Register parent + forked child in session tree
         dispatch(registerSession(buildSessionMeta(log, null, null)));
         dispatch(registerSession(buildSessionMeta(data, String(log.id), null)));
         dispatch(setActiveRegistryId(String(data.id)));
@@ -292,7 +335,7 @@ export function useSessionManager() {
         navigate('/mission/pinaka');
       })
       .catch((err: Error) => showToast(`Fork Failure: ${err.message}`, 'error'));
-  }, [dispatch, session, currentModel, navigate, showToast, getAuthHeaders, buildSessionMeta]);
+  }, [dispatch, session, isGuest, currentModel, navigate, showToast, getAuthHeaders, buildSessionMeta]);
 
   const forkCurrentSession = useCallback((phaseNum: number, newName: string) => {
     if (isGuest) { showToast('Demo mode — fork disabled', 'error'); return; }
@@ -344,7 +387,10 @@ export function useSessionManager() {
         dispatch(setFinalCommand(snap.finalCommand));
         dispatch(setNetraOutput(snap.netraOutput));
         dispatch(setSysRecommendation(snap.sysRecommendation));
+        dispatch(setWeaponPrediction(snap.weaponPrediction));
         dispatch(setSelectedWeaponId(snap.selectedWeaponId));
+        if (snap.imageDescription) dispatch(setImageDescription(snap.imageDescription));
+        if (snap.auditData) dispatch(setAuditData(snap.auditData));
         dispatch(setStepTimestamps(snap.stepTimestamps));
         dispatch(setTradeName(data.name));
         dispatch(setActiveSessionId(data.id));
@@ -418,27 +464,107 @@ export function useSessionManager() {
   const saveSession = useCallback(() => {
     const snap = analysisRef.current;
     if (!snap.activeSessionId) return;
+
+    // Read live trade cards from localStorage for phase9
+    const phase9 = (() => {
+      try {
+        const raw = localStorage.getItem('netra_trade_cards_v1');
+        if (!raw) return null;
+        const cards = JSON.parse(raw) as Array<Record<string, unknown>>;
+        const active = cards.filter(c => c.entry);
+        if (!active.length) return null;
+        return active.map((c, i) => ({
+          trade_index:           i + 1,
+          asset:                 [snap.assetName, c.assetSuffix].filter(Boolean).join(' ') || null,
+          direction:             c.side,
+          entry_price:           c.entry   || null,
+          stop_loss:             c.sl      || null,
+          quantity:              c.qty     || null,
+          additional_cost:       c.cost    || null,
+          t1: c.t1 || null, t2: c.t2 || null, t3: c.t3 || null, t4: c.t4 || null,
+          entry_time:            c.entryTime  || null,
+          exit_time:             c.exitTime   || null,
+          add_entries:           c.addEntries   || [],
+          partial_exits:         c.partialExits || [],
+          exit_price:            c.exitPrice   || null,
+          exit_type:             c.exitType    || null,
+          trade_status:          c.tradeStatus || null,
+          holding_time_minutes:  (() => {
+            const et = c.entryTime as string; const xt = c.exitTime as string;
+            if (!et || !xt) return null;
+            const [eh = 0, em = 0] = et.split(':').map(Number);
+            const [xh = 0, xm = 0] = xt.split(':').map(Number);
+            const m = (xh * 60 + xm) - (eh * 60 + em);
+            return m > 0 ? m : null;
+          })(),
+          note:   c.notes  || null,
+          closed: c.closed || false,
+        }));
+      } catch { return null; }
+    })();
+
+    const payload = {
+      highestStep:    snap.highestStep,
+      tradeName:      snap.tradeName,
+      assetName:      snap.assetName,
+      stepTimestamps: snap.stepTimestamps,
+      state_timeline: snap.stateTimeline,
+
+      phase1: snap.imageDescription
+        ? { image_description: snap.imageDescription }
+        : null,
+
+      phase2: snap.selections.realBias
+        ? { selections: snap.selections.realBias, note: snap.notes.realBias }
+        : null,
+
+      phase3: snap.selections.htfStructure
+        ? { selections: snap.selections.htfStructure, note: snap.notes.htfStructure }
+        : null,
+
+      phase4: (snap.selections.marketPulse || snap.selections.liquidityContext)
+        ? {
+            marketPulse:          snap.selections.marketPulse,
+            liquidityContext:      snap.selections.liquidityContext,
+            marketPulse_note:     snap.notes.marketPulse,
+            liquidityContext_note: snap.notes.liquidityContext,
+          }
+        : null,
+
+      phase5: snap.netraOutput ?? null,
+
+      phase6: snap.finalCommand
+        ? {
+            command:        snap.finalCommand,
+            confirmed_at:   snap.stepTimestamps?.command ?? null,
+            recommendation: snap.sysRecommendation ?? null,
+          }
+        : null,
+
+      phase7: snap.weaponPrediction ?? null,
+
+      phase8: snap.selectedWeaponId
+        ? {
+            weapon_id:  snap.selectedWeaponId,
+            dimensions: snap.finalCommand === 'STRIKE'
+              ? snap.strikeSelections
+              : snap.interSelections,
+          }
+        : null,
+
+      phase9,
+
+      // phase10 is written separately by useAudit after audit completes
+    };
+
     fetch(`${API_BASE}/api/logs/${encodeURIComponent(snap.activeSessionId)}/state`, {
       method: 'PUT',
       headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({
-        highestStep: snap.highestStep,
-        selections: snap.selections,
-        notes: snap.notes,
-        interSelections: snap.interSelections,
-        strikeSelections: snap.strikeSelections,
-        finalCommand: snap.finalCommand,
-        netraOutput: snap.netraOutput,
-        sysRecommendation: snap.sysRecommendation,
-        selectedWeaponId: snap.selectedWeaponId,
-        stepTimestamps: snap.stepTimestamps,
-        tradeName: snap.tradeName,
-        assetName: snap.assetName,
-      }),
+      body: JSON.stringify(payload),
     })
       .then(() => showToast('Session Saved'))
       .catch(() => showToast('Save failed', 'error'));
-  // analysisRef is a ref — intentionally omitted from deps (always current)
+  // analysisRef is a ref — intentionally omitted from deps
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getAuthHeaders, showToast]);
 

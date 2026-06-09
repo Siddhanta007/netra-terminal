@@ -1,9 +1,11 @@
+// Hook — runs the AI analysis pipeline: NETRA recognition (evaluate-netra) and weapon prediction (predict-weapon), with abort control.
+
 import { useRef, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '../store';
 import {
   setIsEvaluating, setNetraOutput, setIsPredictingWeapon, setWeaponPrediction,
-  setSysRecommendation,
+  setSysRecommendation, appendStateRecognition,
 } from '../store/slices/analysisSlice';
 import { API_BASE } from '../utils/constants';
 import { useNetraUtils } from './useNetraUtils';
@@ -96,6 +98,11 @@ export function useAnalysisFlow() {
       .then((envelope: { data?: Record<string, unknown>; thinking?: string }) => {
         const result = { ...(envelope?.data ?? envelope), thinking: envelope?.thinking ?? '' };
         dispatch(setNetraOutput(result as Parameters<typeof setNetraOutput>[0]));
+        // Record the recognised state into the session path timeline
+        const r = result as Record<string, unknown>;
+        const rec = r.recognized_state as { state_id?: string } | undefined;
+        const stateId = rec?.state_id || (r.state_id as string | undefined);
+        if (stateId) dispatch(appendStateRecognition(stateId));
         dispatch(setIsEvaluating(false));
         markGuestAiUsed();
         showToast('Neural Synthesis Complete');
@@ -114,7 +121,7 @@ export function useAnalysisFlow() {
     dispatch(setIsEvaluating(false));
   }, [dispatch]);
 
-  const triggerWeaponPrediction = useCallback(() => {
+  const triggerWeaponPrediction = useCallback((thought?: string) => {
     if (isPredictingWeapon) return;
     if (!checkGuestLimit()) { showToast('Guest limit reached — sign in to continue', 'error'); return; }
     dispatch(setIsPredictingWeapon(true));
@@ -131,6 +138,7 @@ export function useAnalysisFlow() {
       command: finalCommand,
       sts_dims: finalCommand === 'STRIKE' ? strikeSelections : interSelections,
       notes: notes.command,
+      trader_thought: thought || undefined,
       strategy_reasoning: netraOutput?.analysis,
       provider: providerVal,
       model_config: { ...modelConfig, model_id: modelIdVal },

@@ -1,3 +1,5 @@
+// Redux slice — the registry of saved trade sessions (the fork/branch tree) and the active one.
+
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { SessionMeta } from '../../types';
 import { loadState } from '../../utils/storage';

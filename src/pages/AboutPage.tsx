@@ -1,3 +1,5 @@
+// Marketing 'About' page.
+
 import Footer from '../components/Layout/Footer';
 
 /* ── tokens ─────────────────────────────────────────────────────── */
@@ -99,13 +101,6 @@ const AGENTS = [
   { n: '05', name: 'Auditor',       desc: 'Post-trade: compares execution against doctrine, flags deviations.' },
 ];
 
-const TRISHUL_PILLARS = [
-  { n: '01', label: 'Regime Detection',     desc: 'Classify market regime — trending, ranging, or volatile — before any sizing decision.' },
-  { n: '02', label: 'Positional Framework', desc: 'Multi-day swing logic. Designed for institutional-style entries, not intraday noise.' },
-  { n: '03', label: 'Quant Layer',          desc: 'Statistical edge measurement. Entries only when expectancy is demonstrable over a sample.' },
-  { n: '04', label: 'Risk Architecture',    desc: 'Kelly-informed sizing, drawdown controls, correlation limits across open positions.' },
-];
-
 /* ════════════════════════════════════════════════════════════════════
    PAGE
 ════════════════════════════════════════════════════════════════════ */
@@ -127,17 +122,17 @@ export default function AboutPage() {
           {/* name + pitch */}
           <div style={{ background: '#fff4ed', padding: '48px 52px', border: '1px solid rgba(249,115,22,0.15)' }}>
             <div style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.32em', color: MUTED, marginBottom: '24px' }}>
-              Working Professional
+              Quant Researcher · Systems Builder
             </div>
             <h1 style={{ fontFamily: SERIF, fontSize: '84px', fontWeight: 700, color: NAVY, letterSpacing: '-0.04em', lineHeight: 0.9, margin: '0 0 28px 0' }}>
               Sri<br />Krishna
             </h1>
             <div style={{ width: '36px', height: '2px', background: BLUE, marginBottom: '28px' }} />
             <p style={{ fontSize: '16px', lineHeight: 1.85, color: TEXT, margin: '0 0 18px 0', maxWidth: '500px' }}>
-              I study how markets move — not from a course, but by watching price. My focus right now is statistics, time series analysis, and injecting ML into systematic strategies.
+              I reverse-engineer how markets actually move — from price itself, not a syllabus — and turn that read into systematic, rules-first strategies. Then I build the software that runs them end to end.
             </p>
             <p style={{ fontSize: '14px', lineHeight: 1.85, color: MUTED, margin: '0 0 40px 0', maxWidth: '500px' }}>
-              I want to work in quant research or ML engineering where the quality of the model matters more than the resume. I don't have the pedigree. I have the work.
+              Range is the edge: I do the statistics and the ML, and I ship the production system around it — the doctrine, the multi-agent AI engine, the entire platform you're looking at right now. Headed into quant research and ML engineering, where the work speaks louder than the résumé.
             </p>
             <div style={{ display: 'flex', gap: '12px' }}>
               <a href="https://github.com/Siddhanta007" target="_blank" rel="noopener noreferrer"
@@ -262,54 +257,14 @@ export default function AboutPage() {
 
 
         {/* ════════════════════════════════════════
-            TRISHUL
-        ════════════════════════════════════════ */}
-        <Eyebrow label="Model · 02 · Trishul" color={ORANGE} />
-
-        {/* Trishul hero — full width */}
-        <div style={{ marginBottom: '24px' }}>
-
-          {/* description card */}
-          <div style={{ background: ORANGE_BG, padding: '44px 48px', border: `1px solid ${ORANGE}22` }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-              <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: ORANGE }} />
-              <span style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.2em', color: ORANGE }}>In Design · Swing · Positional</span>
-            </div>
-            <h2 style={{ fontFamily: SERIF, fontSize: '52px', fontWeight: 700, color: NAVY, letterSpacing: '-0.03em', lineHeight: 0.95, margin: '0 0 20px 0' }}>TRISHUL</h2>
-            <div style={{ width: '32px', height: '2px', background: ORANGE, marginBottom: '24px' }} />
-            <p style={{ fontSize: '15px', lineHeight: 1.8, color: TEXT, margin: '0 0 16px 0' }}>
-              A quant-informed positional swing model. Same doctrine-first architecture — but built on statistical edge measurement, regime detection, and institutional-grade risk management.
-            </p>
-            <p style={{ fontSize: '13px', lineHeight: 1.8, color: MUTED, margin: 0 }}>
-              Where Pinaka is rules and discipline, Trishul is rules and math. Being designed as the author builds deeper knowledge in time series and ML.
-            </p>
-          </div>
-        </div>
-
-        {/* Trishul pillars */}
-        <div style={{ marginBottom: '88px' }}>
-          <div style={{ background: ORANGE_BG, padding: '18px 40px', borderBottom: `2px solid ${ORANGE}44` }}>
-            <span style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: ORANGE }}>Design Pillars</span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2px', background: `${ORANGE}18` }}>
-            {TRISHUL_PILLARS.map(p => (
-              <div key={p.label} style={{ background: ORANGE_BG, padding: '28px 24px', borderBottom: `2px solid ${ORANGE}33` }}>
-                <div style={{ fontFamily: MONO, fontSize: '11px', fontWeight: 900, color: ORANGE, marginBottom: '10px' }}>{p.n}</div>
-                <div style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: NAVY, marginBottom: '8px' }}>{p.label}</div>
-                <p style={{ fontSize: '12px', color: MUTED, lineHeight: 1.65, margin: 0 }}>{p.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-
-        {/* ════════════════════════════════════════
-            HORIZON
+            HORIZON — the model roadmap (Trishul leads)
         ════════════════════════════════════════ */}
         <Eyebrow label="On the Horizon" color={MUTED} />
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px', marginBottom: '88px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '88px' }}>
           {[
+            { n: '02', name: 'TRISHUL',  sub: 'Swing · Positional · Quant',     color: ORANGE, bg: ORANGE_BG,
+              desc: 'A quant-informed positional swing model — same doctrine-first spine as Pinaka, built on statistical edge measurement, regime detection, and institutional-grade risk. In active design as the research deepens.' },
             { n: '03', name: 'DRISHTI',  sub: 'Market Vision · Options Flow',   color: '#8b5cf6', bg: '#f3f0ff',
               desc: 'OI analysis, unusual flow detection, and IV regime interpretation. For options traders who want to read the table before placing a bet.' },
             { n: '04', name: 'CHAKRA',   sub: 'Portfolio · Correlation Engine', color: '#0ea5e9', bg: '#f0f9ff',

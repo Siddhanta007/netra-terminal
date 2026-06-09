@@ -1,3 +1,5 @@
+// Redux slice — the live analysis pipeline: phase progress, dimension selections, notes, recognised NETRA output, and command lock.
+
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { loadState } from '../../utils/storage';
 import {
@@ -25,6 +27,8 @@ interface AnalysisState {
   isUploadingImage: boolean;
   analyticsData: unknown;
   stepTimestamps: Record<string, string>;
+  weaponStageLog: Array<{ stage: string; ts: string }>;
+  stateTimeline: Array<{ state_id: string; ts: string }>;
   // Mission Control Data
   rAmount: string;
   dailyLossLimit: string;
@@ -50,6 +54,8 @@ const initialState: AnalysisState = {
   interSelections: loadState('interSelections', { pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }),
   strikeSelections: loadState('strikeSelections', { impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' }),
   saturationSelections: loadState('saturationSelections', { expansionQuality: '', pullbackQuality: '', followThrough: '', structuralFatigue: '', liquidityConsumption: '', emotionalParticipation: '' }),
+  weaponStageLog: loadState('weaponStageLog', [] as Array<{ stage: string; ts: string }>),
+  stateTimeline: loadState('stateTimeline', [] as Array<{ state_id: string; ts: string }>),
   selectedWeaponId: loadState('selectedWeaponId', null),
   isEvaluating: false,
   isPredictingWeapon: false,
@@ -142,6 +148,16 @@ export const analysisSlice = createSlice({
     setIsExpiryDay: (state, action: PayloadAction<boolean>) => { state.isExpiryDay = action.payload; },
     setExpiryCutoff: (state, action: PayloadAction<string>) => { state.expiryCutoff = action.payload; },
     setRulesAcknowledged: (state, action: PayloadAction<boolean[]>) => { state.rulesAcknowledged = action.payload; },
+    setWeaponStageLog: (state, action: PayloadAction<Array<{ stage: string; ts: string }>>) => { state.weaponStageLog = action.payload; },
+    appendWeaponStage: (state, action: PayloadAction<{ stage: string; ts: string }>) => { state.weaponStageLog = [...state.weaponStageLog, action.payload]; },
+    setStateTimeline: (state, action: PayloadAction<Array<{ state_id: string; ts: string }>>) => { state.stateTimeline = action.payload; },
+    appendStateRecognition: (state, action: PayloadAction<string>) => {
+      // Append only when the recognised state actually changed (collapse repeats)
+      const last = state.stateTimeline[state.stateTimeline.length - 1];
+      if (!last || last.state_id !== action.payload) {
+        state.stateTimeline = [...state.stateTimeline, { state_id: action.payload, ts: new Date().toISOString() }];
+      }
+    },
   },
 });
 
@@ -165,6 +181,8 @@ export const {
   setIsUploadingImage,
   setAnalyticsData,
   setStepTimestamps,
+  setStateTimeline,
+  appendStateRecognition,
   setRAmount,
   setDailyLossLimit,
   setDailyLossHit,
@@ -175,6 +193,8 @@ export const {
   setIsExpiryDay,
   setExpiryCutoff,
   setRulesAcknowledged,
+  setWeaponStageLog,
+  appendWeaponStage,
 } = analysisSlice.actions;
 
 export default analysisSlice.reducer;

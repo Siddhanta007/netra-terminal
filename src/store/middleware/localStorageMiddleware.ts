@@ -1,3 +1,5 @@
+// Redux middleware — persists whitelisted analysis/session state to localStorage after each mapped action.
+
 import { Middleware } from '@reduxjs/toolkit';
 import { saveState } from '../../utils/storage';
 import { SessionMeta } from '../../types';
@@ -7,6 +9,8 @@ interface RegistrySlice {
   activeId: string | null;
 }
 type StateWithRegistry = { sessionRegistry: RegistrySlice };
+type StateWithChat = { chat: { sources: string[] } };
+type StateWithAnalysis = { analysis: { stateTimeline: unknown } };
 
 // Maps action type → localStorage key. Only listed keys are persisted.
 const PERSIST_MAP: Record<string, string> = {
@@ -27,6 +31,8 @@ const PERSIST_MAP: Record<string, string> = {
   'session/setSession': 'session',
   'session/setActiveSessionId': 'activeSessionId',
   'ui/setDarkMode': 'darkMode',
+  'chat/setSources': 'chatSources',
+  'chat/setChatId': 'chatId',
 };
 
 // These actions persist the full derived state slice, not just the payload.
@@ -49,6 +55,16 @@ export const localStorageMiddleware: Middleware = (storeAPI) => (next) => (actio
     const state = storeAPI.getState() as StateWithRegistry;
     saveState('sessionRegistryActiveId', state.sessionRegistry.activeId);
     saveState('sessionRegistry', state.sessionRegistry.sessions);
+    return result;
+  }
+  if (actionType === 'chat/toggleSource') {
+    const state = storeAPI.getState() as StateWithChat;
+    saveState('chatSources', state.chat.sources);
+    return result;
+  }
+  if (actionType === 'analysis/appendStateRecognition' || actionType === 'analysis/setStateTimeline') {
+    const state = storeAPI.getState() as StateWithAnalysis;
+    saveState('stateTimeline', state.analysis.stateTimeline);
     return result;
   }
 

@@ -1,3 +1,5 @@
+// Macro Mapping phase — strategic chart marks plus the HTF risk gate (CONTINUE/REDUCE/STOP).
+
 import { useState } from 'react';
 import { useNetra } from '../../context/NetraContext';
 import { useHTFGate } from '../../hooks/useReduceFlag';
@@ -87,7 +89,7 @@ export function BiasDimensions() {
 
   const dims     = SYSTEM_DATA.realBias?.dimensions || [];
   const rb       = (selections.realBias || {}) as Record<string, string>;
-  const isLocked = highestStep > 2;
+  const isLocked = highestStep > 1;
 
   const setRb = (key: string, val: string) => {
     if (isLocked) return;
@@ -196,7 +198,65 @@ export function HTFDimensions() {
   );
 }
 
-// ─── Shared footer: notes + Edit / Reset / Confirm MM ────────────────────────
+// ─── Pre-Session Context footer ──────────────────────────────────────────────
+
+export function PreSessionActions() {
+  const {
+    SYSTEM_DATA, selections, setSelections,
+    notes, setNotes,
+    highestStep, confirmStep, editStep,
+    stepTimestamps,
+  } = useNetra();
+
+  const [editing, setEditing] = useState(false);
+  const isLocked = highestStep > 1 && !editing;
+
+  const biasDims = SYSTEM_DATA.realBias?.dimensions || [];
+  const rb       = (selections.realBias || {}) as Record<string, string>;
+  const allBias  = biasDims.length > 0 && biasDims.every(d => !!rb[d.id]);
+  const hasData  = Object.keys(rb).length > 0;
+  const canConfirm = !isLocked && allBias;
+
+  const handleEdit  = () => { setEditing(false); editStep(1); };
+  const handleReset = () => {
+    if (isLocked) return;
+    setSelections({ ...selections, realBias: {} });
+    setNotes({ ...notes, realBias: '' });
+  };
+
+  return (
+    <>
+      <div style={{ borderTop: '1px solid var(--border-strong)', margin: '16px 0 0 0' }} />
+      <div className="flex gap-4 items-start pt-4">
+        <textarea
+          value={notes.realBias || ''}
+          onChange={e => setNotes({ ...notes, realBias: e.target.value })}
+          placeholder="Pre-session notes — directional bias, correlated market, displacement context..."
+          disabled={isLocked}
+          className="flex-1 bg-transparent outline-none resize-none text-[12px] text-[var(--text-2)] placeholder:text-[var(--text-4)] leading-relaxed min-h-[44px]"
+        />
+        <div className="flex gap-2 shrink-0">
+          <button onClick={handleEdit} className="btn-edit w-20" disabled={!isLocked}>Edit</button>
+          <button onClick={handleReset} className="btn-reset w-20" disabled={isLocked || !hasData}>Reset</button>
+          <button
+            onClick={() => confirmStep(1)}
+            className={`${isLocked ? 'btn-confirmed' : 'btn-confirm'} w-36`}
+            disabled={!canConfirm}
+          >
+            {isLocked ? '✓ Confirmed' : 'Confirm Context'}
+          </button>
+        </div>
+      </div>
+      {stepTimestamps.realBias && (
+        <div className="text-right text-[9px] font-mono text-[var(--text-4)] mt-1">
+          Locked: {stepTimestamps.realBias}
+        </div>
+      )}
+    </>
+  );
+}
+
+// ─── Macro Mapping footer: HTF-only confirm ───────────────────────────────────
 
 export function MacroMappingActions() {
   const {
@@ -212,36 +272,30 @@ export function MacroMappingActions() {
   const isStop   = htfGate === 'STOP';
   const isLocked = highestStep > 2 && !editing;
 
-  const biasDims      = SYSTEM_DATA.realBias?.dimensions || [];
-  const rb            = (selections.realBias || {}) as Record<string, string>;
-  const allBias       = biasDims.length > 0 && biasDims.every(d => !!rb[d.id]);
+  const htfDims    = SYSTEM_DATA.htfStructure?.dimensions || [];
+  const htf        = (selections.htfStructure || {}) as Record<string, string>;
+  const allHTF     = htfDims.length === 0 || htfDims.every(d => !!htf[d.id]);
+  const hasAnyData = Object.keys(htf).length > 0;
+  const canConfirm = !isLocked && !isStop && allHTF;
+  const lockedAt   = stepTimestamps.htfStructure;
 
-  const htfDims       = SYSTEM_DATA.htfStructure?.dimensions || [];
-  const htf           = (selections.htfStructure || {}) as Record<string, string>;
-  const allHTF        = htfDims.length === 0 || htfDims.every(d => !!htf[d.id]);
-
-  const hasAnyData    = Object.keys(rb).length > 0 || Object.keys(htf).length > 0;
-  const canConfirm    = !isLocked && !isStop && allBias && allHTF;
-  const lockedAt      = stepTimestamps.htfStructure || stepTimestamps.realBias;
-
-  const handleConfirm = () => { confirmStep(1); confirmStep(2); };
-  const handleEdit    = () => { setEditing(false); editStep(1); };
-  const handleReset   = () => {
+  const handleEdit  = () => { setEditing(false); editStep(2); };
+  const handleReset = () => {
     if (isLocked) return;
-    setSelections({ ...selections, realBias: {}, htfStructure: {} });
-    setNotes({ ...notes, realBias: '' });
+    setSelections({ ...selections, htfStructure: {} });
   };
+  const handleConfirm = () => { confirmStep(1); confirmStep(2); };
 
   return (
     <>
       <div style={{ borderTop: '1px solid var(--border-strong)', margin: '16px 0 0 0' }} />
       <div className="flex gap-4 items-start pt-4">
         <textarea
-          value={notes.realBias || ''}
-          onChange={e => setNotes({ ...notes, realBias: e.target.value })}
-          placeholder="Macro mapping notes — bias direction, structural context, leg maturity, destination proximity..."
+          value={notes.htfStructure || ''}
+          onChange={e => setNotes({ ...notes, htfStructure: e.target.value })}
+          placeholder="HTF structure notes — structural context, leg maturity, compression state..."
           disabled={isLocked}
-          className="flex-1 bg-transparent outline-none resize-none text-[12px] text-[var(--text-2)] placeholder:text-[var(--text-4)] leading-relaxed min-h-[52px]"
+          className="flex-1 bg-transparent outline-none resize-none text-[12px] text-[var(--text-2)] placeholder:text-[var(--text-4)] leading-relaxed min-h-[44px]"
         />
         <div className="flex gap-2 shrink-0">
           <button onClick={handleEdit} className="btn-edit w-20" disabled={!isLocked}>Edit</button>
@@ -251,7 +305,7 @@ export function MacroMappingActions() {
             className={`${isLocked ? 'btn-confirmed' : 'btn-confirm'} w-36`}
             disabled={!canConfirm}
           >
-            {isLocked ? '✓ Confirmed' : 'Confirm MM'}
+            {isLocked ? '✓ Confirmed' : 'Confirm HTF'}
           </button>
         </div>
       </div>

@@ -1,3 +1,5 @@
+// Global overlay host — renders the toast and the confirm modal above all routes.
+
 import { useNetra } from '../../context/NetraContext';
 
 export default function GlobalOverlay() {

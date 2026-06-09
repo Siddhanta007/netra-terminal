@@ -1,3 +1,5 @@
+// React error boundary — catches render errors in the subtree and shows a fallback UI.
+
 import { Component, ErrorInfo, ReactNode } from 'react';
 
 interface Props {

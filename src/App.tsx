@@ -1,3 +1,5 @@
+// App — top-level router + the Pinaka terminal shell. Lays out the phase cards
+// (P1–P8), the Maya chat sidebar, the trade logger, modals, and the marketing routes.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, Navigate } from 'react-router-dom';
@@ -6,7 +8,6 @@ import { useNetra } from './context/NetraContext';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from './store';
 import { setSelectedModel, setModelConfig } from './store/slices/modelSlice';
-import { setIncludeData, setIncludeDoctrine, setChatInput } from './store/slices/chatSlice';
 import { setTradeName, setLogSearchTerm, setLogFilterOutcome, setLogSortOrder } from './store/slices/logsSlice';
 import { setSessionInput, setSession } from './store/slices/sessionSlice';
 import { setPrepStep, setActiveView, setIsLoggerOpen } from './store/slices/uiSlice';
@@ -15,16 +16,13 @@ import Login from './components/Auth/Login';
 import GlobalOverlay from './components/Layout/GlobalOverlay';
 import MayaChatPanel from './components/Layout/MayaChatPanel';
 import Phase0Vision from './pages/PinakaTerminal/phases/Phase0Vision';
-import { StrategicMarkingChecklist, STRATEGIC_MARKS_TOTAL, BiasDimensions, HTFDimensions, MacroMappingActions } from './pages/PinakaTerminal/PhaseMacroMap';
+import { StrategicMarkingChecklist, STRATEGIC_MARKS_TOTAL, BiasDimensions, HTFDimensions, MacroMappingActions, PreSessionActions } from './pages/PinakaTerminal/PhaseMacroMap';
 import Phase3MarketPulse from './pages/PinakaTerminal/phases/Phase3MarketPulse';
 import Phase5Synthesis from './pages/PinakaTerminal/phases/Phase5Synthesis';
 import Phase6Command from './pages/PinakaTerminal/phases/Phase6Command';
-import Phase8WeaponIntel from './pages/PinakaTerminal/phases/Phase8WeaponIntel';
-import Phase9WeaponArmory from './pages/PinakaTerminal/phases/Phase9WeaponArmory';
 import Phase10MissionControl from './pages/PinakaTerminal/phases/Phase10MissionControl';
 import Phase11MayaAudit from './pages/PinakaTerminal/phases/Phase11MayaAudit';
 
-import Phase9OperationalIntelligence from './pages/PinakaTerminal/phases/Phase9OperationalIntelligence';
 import MarketTypeSelector from './pages/PinakaTerminal/MarketTypeSelector';
 import ProfilePage from './pages/ProfilePage';
 import AboutPage from './pages/AboutPage';
@@ -32,100 +30,7 @@ import ForkButton from './components/UI/ForkButton';
 import Footer from './components/Layout/Footer';
 import ModelPage from './pages/ModelPage';
 import { MODEL_DATA } from './utils/modelData';
-
-// ─── Protocol sub-views ───────────────────────────────────────────────────────
-
-function TimeInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span style={{ fontSize: '10px', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#ffffff', opacity: 0.7 }}>{label}</span>
-      <input
-        type="time"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="h-8 px-2 rounded-none bg-[var(--surface-2)] border border-[var(--border)] text-[13px] text-[#ffffff] font-mono focus:border-[#4169E1] outline-none"
-      />
-    </div>
-  );
-}
-
-function NumInput({ label, value, onChange, prefix }: { label: string; value: string; onChange: (v: string) => void; prefix?: string }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span style={{ fontSize: '10px', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#ffffff', opacity: 0.7 }}>{label}</span>
-      <div className="flex items-center gap-1">
-        {prefix && <span style={{ fontSize: '12px', color: '#ffffff', fontWeight: 700 }}>{prefix}</span>}
-        <input
-          type="number"
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          className="h-8 w-full px-2 rounded-none bg-[var(--surface-2)] border border-[var(--border)] text-[13px] text-[#ffffff] font-mono tabular-nums focus:border-[#4169E1] outline-none"
-          placeholder="0"
-        />
-      </div>
-    </div>
-  );
-}
-
-function NoEngagementProtocol() {
-  return (
-    <div className="flex flex-col items-center justify-center p-16 lg:p-32 rounded-xl relative overflow-hidden group premium-shadow" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
-      <div className="text-[var(--text-1)] font-sans text-4xl lg:text-7xl font-bold tracking-tight uppercase mb-6 text-center relative z-10">Stand Down</div>
-      <div className="text-[var(--text-3)] font-sans text-[11px] font-semibold tracking-widest uppercase text-center max-w-2xl leading-relaxed mb-10 relative z-10">
-        Capital Preservation Mode <span className="mx-2 text-[var(--border-strong)]">///</span> The system detects conflicting data streams or an absence of structural asymmetry.
-      </div>
-      <div className="text-red-500 font-sans text-xs font-bold uppercase tracking-widest text-center py-4 px-8 border border-red-500/20 bg-red-500/5 rounded-lg relative z-10">Override Active. Do Not Deploy Capital.</div>
-    </div>
-  );
-}
-
-// Fixed: previously used undefined <WeaponArmory> — Phase9WeaponArmory reads finalCommand from context
-function StrikeProtocol() {
-  return (
-    <div className="space-y-8 animate-in slide-in-from-bottom-10 fade-in duration-700">
-      <Phase9WeaponArmory />
-    </div>
-  );
-}
-
-function InterceptionProtocol() {
-  return (
-    <div className="space-y-8 animate-in slide-in-from-bottom-10 fade-in duration-700">
-      <Phase9WeaponArmory />
-    </div>
-  );
-}
-
-// ─── Shared page corners (blue TR + amber BL heptagonal) ─────────────────────
-function PageCorners() {
-  const radii = [80, 150, 220, 295, 370, 445, 520];
-  const strokeWidths = [5, 3.5, 2.5, 2, 1.5, 1, 0.7];
-  const strokeOpacities = [1, 0.7, 0.5, 0.35, 0.22, 0.14, 0.08];
-  return (
-    <>
-      <div style={{ position: 'fixed', top: 0, right: 0, width: '560px', height: '560px', pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-        <svg width="560" height="560" viewBox="0 0 560 560" fill="none">
-          {radii.map((r, i) => {
-            const pts = Array.from({ length: 7 }, (_, k) => { const a = (-90 + k * 360 / 7) * Math.PI / 180; return `${(560 + r * Math.cos(a)).toFixed(1)},${(r * Math.sin(a)).toFixed(1)}`; }).join(' ');
-            return <polygon key={r} points={pts} stroke="#2563eb" strokeWidth={strokeWidths[i]} strokeOpacity={strokeOpacities[i]} fill={i < 3 ? `rgba(37,99,235,${[0.1,0.05,0.02][i]})` : 'none'} strokeDasharray={i === 3 || i === 5 ? '10 7' : 'none'} />;
-          })}
-          <circle cx="560" cy="0" r="9" fill="#2563eb" fillOpacity="0.9" />
-          <circle cx="560" cy="0" r="18" fill="none" stroke="#2563eb" strokeWidth="1.5" strokeOpacity="0.4" />
-        </svg>
-      </div>
-      <div style={{ position: 'fixed', bottom: 0, left: 0, width: '500px', height: '500px', pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-        <svg width="500" height="500" viewBox="0 0 500 500" fill="none">
-          {radii.map((r, i) => {
-            const pts = Array.from({ length: 7 }, (_, k) => { const a = (90 + k * 360 / 7) * Math.PI / 180; return `${(r * Math.cos(a)).toFixed(1)},${(500 + r * Math.sin(a)).toFixed(1)}`; }).join(' ');
-            return <polygon key={r} points={pts} stroke="#f59e0b" strokeWidth={strokeWidths[i]} strokeOpacity={strokeOpacities[i]} fill={i < 3 ? `rgba(245,158,11,${[0.1,0.05,0.02][i]})` : 'none'} strokeDasharray={i === 3 || i === 5 ? '10 7' : 'none'} />;
-          })}
-          <circle cx="0" cy="500" r="9" fill="#f59e0b" fillOpacity="0.9" />
-          <circle cx="0" cy="500" r="18" fill="none" stroke="#f59e0b" strokeWidth="1.5" strokeOpacity="0.4" />
-        </svg>
-      </div>
-    </>
-  );
-}
+import { TimeInput, NumInput, PageCorners } from './app/widgets';
 
 // ─── Main terminal component ──────────────────────────────────────────────────
 
@@ -234,8 +139,6 @@ export default function NetraTerminal() {
   const selectedModel = useSelector((s: RootState) => s.model.selectedModel);
   const AVAILABLE_MODELS = useSelector((s: RootState) => s.model.availableModels);
   const modelConfig = useSelector((s: RootState) => s.model.modelConfig);
-  const includeData = useSelector((s: RootState) => s.chat.includeData);
-  const includeDoctrine = useSelector((s: RootState) => s.chat.includeDoctrine);
   const isAiLoading = useSelector((s: RootState) => s.chat.isAiLoading);
   const isUploadingImage = useSelector((s: RootState) => s.analysis.isUploadingImage);
   const isMobileMenuOpen = useSelector((s: RootState) => s.ui.isMobileMenuOpen);
@@ -1352,7 +1255,7 @@ export default function NetraTerminal() {
                   {/* P0: VISION */}
                   <div className="phase-card" data-phase="0" data-active={highestStep === 0 ? 'true' : undefined}>
                     <div className="phase-card-header">
-                      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P0</span>
+                      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P1</span>
                       <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
                       <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>VISION</span>
                       <div style={{ flex: 1 }} />
@@ -1365,23 +1268,42 @@ export default function NetraTerminal() {
                     <div className="phase-card-body" style={{ padding: '12px' }}><Phase0Vision /></div>
                   </div>
 
-                  {/* MACRO MAPPING — Strategic Marking + Bias + HTF Structure */}
+                  {/* P1: PRE-SESSION CONTEXT */}
                   {highestStep >= 1 && (
-                    <div className="phase-card mm-card phase-theme-1" data-phase="1" data-active={highestStep <= 2 ? 'true' : undefined}>
+                    <div className="phase-card phase-theme-1" data-phase="1" data-active={highestStep === 1 ? 'true' : undefined}>
+                      <div className="phase-card-header">
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.25em' }}>P2</span>
+                        <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>PRE-SESSION CONTEXT</span>
+                        <div style={{ flex: 1 }} />
+                        {highestStep > 1
+                          ? <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.1em' }}>✓ LOCKED</span>
+                          : <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Correlated Markets · Displacement · Session Profile</span>
+                        }
+                      </div>
+                      <div className="phase-card-body">
+                        <BiasDimensions />
+                        <PreSessionActions />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* MACRO MAPPING — Strategic Marking + HTF Structure */}
+                  {highestStep >= 1 && (
+                    <div className="phase-card mm-card phase-theme-1" data-phase="2" data-active={highestStep <= 2 ? 'true' : undefined}>
 
                       {/* Card header */}
                       <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.25em' }}>MM</span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.25em' }}>P3</span>
                         <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>MACRO MAPPING</span>
                         <div style={{ flex: 1 }} />
                         {highestStep > 2
                           ? <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.1em' }}>✓ LOCKED</span>
-                          : <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Pre-Market Analysis</span>
+                          : <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Strategic Marking · HTF Structure</span>
                         }
                       </div>
 
-                      {/* Single body — sections separated by labeled rules */}
                       <div className="phase-card-body">
 
                         {/* ── Component 1: Strategic Marking ── */}
@@ -1404,22 +1326,12 @@ export default function NetraTerminal() {
                           onToggle={(id) => setSmcChecked(c => ({ ...c, [id]: !c[id] }))}
                         />
 
-                        {/* ── Component 2: Bias ── */}
+                        {/* ── Component 2: HTF Structure ── */}
                         <div style={{
                           margin: '28px 0 12px 0', display: 'flex', alignItems: 'center', gap: '10px',
                           borderLeft: '3px solid var(--phase-accent)', paddingLeft: '10px',
                         }}>
-                          <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '11px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase', flexShrink: 0 }}>Component 2 — Bias</span>
-                          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
-                        </div>
-                        <BiasDimensions />
-
-                        {/* ── Component 3: HTF Structure ── */}
-                        <div style={{
-                          margin: '28px 0 12px 0', display: 'flex', alignItems: 'center', gap: '10px',
-                          borderLeft: '3px solid var(--phase-accent)', paddingLeft: '10px',
-                        }}>
-                          <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '11px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase', flexShrink: 0 }}>Component 3 — HTF Structure</span>
+                          <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '11px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase', flexShrink: 0 }}>Component 2 — HTF Structure</span>
                           <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
                           <ForkButton onClick={() => {
                             setForkModalState({ isOpen: true, phaseNum: 2, defaultName: `FORK_${tradeName || 'Trade'}_HTF` });
@@ -1428,7 +1340,6 @@ export default function NetraTerminal() {
                         </div>
                         <HTFDimensions />
 
-                        {/* ── Shared footer ── */}
                         <MacroMappingActions />
 
                       </div>
@@ -1439,7 +1350,7 @@ export default function NetraTerminal() {
                   {highestStep >= 3 && (
                     <div className="phase-card mp-card phase-theme-3" data-phase="3" data-active={highestStep === 3 ? 'true' : undefined}>
                       <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P3</span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P4</span>
                         <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>MARKET PULSE</span>
                         <div style={{ flex: 1 }} />
@@ -1461,7 +1372,7 @@ export default function NetraTerminal() {
                   {highestStep >= 4 && (
                     <div className="phase-card" data-phase="5" data-active={highestStep === 4 ? 'true' : undefined}>
                       <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P4</span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P5</span>
                         <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>SYNTHESIS</span>
                         <div style={{ flex: 1 }} />
@@ -1475,7 +1386,7 @@ export default function NetraTerminal() {
                   {highestStep >= 4 && (
                     <div className="phase-card cmd-card phase-theme-2" data-phase="6" data-active={highestStep === 4 ? 'true' : undefined}>
                       <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P5</span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P6</span>
                         <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>COMMAND</span>
                         <div style={{ flex: 1 }} />
@@ -1492,62 +1403,24 @@ export default function NetraTerminal() {
                     </div>
                   )}
 
-                  {/* P7: WEAPON INTEL */}
-                  {highestStep >= 5 && (
-                    <div className="phase-card" data-phase="7" data-active={highestStep === 5 ? 'true' : undefined}>
-                      <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P6</span>
-                        <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>MISSION INTEL</span>
-                        <div style={{ flex: 1 }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.22em', textTransform: 'uppercase' }}>MAYA</span>
-                      </div>
-                      <div className="phase-card-body" style={{ padding: '12px' }}><Phase8WeaponIntel /></div>
-                    </div>
-                  )}
-
-                  {/* P8: WEAPON ARMORY */}
-                  {highestStep >= 5 && (
-                    <div className="phase-card wap-card phase-theme-5" data-phase="8" data-active={highestStep === 5 ? 'true' : undefined}>
-                      <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P7</span>
-                        <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>WEAPON ARMORY</span>
-                        <div style={{ flex: 1 }} />
-                        <ForkButton onClick={() => {
-                          setForkModalState({ isOpen: true, phaseNum: 5, defaultName: `FORK_${tradeName || 'Trade'}_P5` });
-                          setForkInputName(`FORK_${tradeName || 'Trade'}_P5`);
-                        }} size="sm" style={{ marginRight: '8px' }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Entry Model Selection</span>
-                      </div>
-                      <div className="phase-card-body"><Phase9WeaponArmory /></div>
-                    </div>
-                  )}
-
-
-
-                  {/* P10: TRADING DATA */}
+                  {/* P7: TRADING DATA — weapon + trade hybrid */}
                   {highestStep >= 6 && (
                     <div className="phase-card" data-phase="9" data-active={highestStep === 6 ? 'true' : undefined}>
                       <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P8</span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P7</span>
                         <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>TRADING DATA</span>
                         <div style={{ flex: 1 }} />
-                        <ForkButton onClick={() => {
-                          setForkModalState({ isOpen: true, phaseNum: 6, defaultName: `FORK_${tradeName || 'Trade'}_P6` });
-                          setForkInputName(`FORK_${tradeName || 'Trade'}_P6`);
-                        }} size="sm" style={{ marginRight: '8px' }} />
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Trade Execution Record</span>
                       </div>
                       <div className="phase-card-body"><Phase10MissionControl /></div>
                     </div>
                   )}
-                  {/* P11: MAYA AUDIT */}
+                  {/* P8: MAYA AUDIT */}
                   {highestStep >= 6 && (
                     <div className="phase-card" data-phase="10" data-active={highestStep === 7 ? 'true' : undefined}>
                       <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P9</span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P8</span>
                         <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>MAYA AUDIT</span>
                         <div style={{ flex: 1 }} />
@@ -1557,13 +1430,6 @@ export default function NetraTerminal() {
                     </div>
                   )}
 
-                  {highestStep >= 9 && (
-                    <div className="space-y-6 animate-in slide-in-from-bottom-10 fade-in duration-700">
-                      {(finalCommand || netraOutput?.cmd) === 'NO ENGAGEMENT' && <NoEngagementProtocol />}
-                      {(finalCommand || netraOutput?.cmd) === 'STRIKE' && <StrikeProtocol />}
-                      {(finalCommand || netraOutput?.cmd) === 'INTERCEPTION' && <InterceptionProtocol />}
-                    </div>
-                  )}
                   <footer className="desktop-only" style={{ width: '100%', background: 'transparent', borderTop: '1px solid var(--border)', padding: '40px 0 60px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: 0.5, marginTop: '80px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '36px' }}>
                       {[{ n: 'TradingView', u: 'https://in.tradingview.com/chart' }, { n: 'NSE Option Chain', u: 'https://www.nseindia.com/option-chain' }, { n: 'Market News', u: 'https://twitter.com/deitaone' }, { n: 'Economic Calendar', u: 'https://www.investing.com/economic-calendar/' }].map(link => (

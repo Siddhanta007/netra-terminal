@@ -1,20 +1,25 @@
+// Redux slice — the Maya chat panel: message history, input, active knowledge sources, and loading flag.
+
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { ChatMessage } from '../../types';
+import { loadState } from '../../utils/storage';
+
+export type ChatSource = 'terminal' | 'doctrine' | 'historical' | 'information';
 
 interface ChatState {
   chatHistory: ChatMessage[];
   chatInput: string;
   isAiLoading: boolean;
-  includeData: boolean;
-  includeDoctrine: boolean;
+  sources: ChatSource[];
+  chatId: string | null;
 }
 
 const initialState: ChatState = {
   chatHistory: [],
   chatInput: '',
   isAiLoading: false,
-  includeData: false,
-  includeDoctrine: false,
+  sources: loadState<ChatSource[]>('chatSources', ['information']),
+  chatId: loadState<string | null>('chatId', null),
 };
 
 export const chatSlice = createSlice({
@@ -33,11 +38,17 @@ export const chatSlice = createSlice({
     setIsAiLoading: (state, action: PayloadAction<boolean>) => {
       state.isAiLoading = action.payload;
     },
-    setIncludeData: (state, action: PayloadAction<boolean>) => {
-      state.includeData = action.payload;
+    setSources: (state, action: PayloadAction<ChatSource[]>) => {
+      state.sources = action.payload;
     },
-    setIncludeDoctrine: (state, action: PayloadAction<boolean>) => {
-      state.includeDoctrine = action.payload;
+    toggleSource: (state, action: PayloadAction<ChatSource>) => {
+      const s = action.payload;
+      state.sources = state.sources.includes(s)
+        ? state.sources.filter(x => x !== s)
+        : [...state.sources, s];
+    },
+    setChatId: (state, action: PayloadAction<string | null>) => {
+      state.chatId = action.payload;
     },
   },
 });
@@ -47,8 +58,9 @@ export const {
   appendChatMessage,
   setChatInput,
   setIsAiLoading,
-  setIncludeData,
-  setIncludeDoctrine,
+  setSources,
+  toggleSource,
+  setChatId,
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

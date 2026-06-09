@@ -1,3 +1,5 @@
+// Redux slice — the active trading session: asset/user metadata, login + guest flags, and the session input form.
+
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { loadState } from '../../utils/storage';
 import { Session, SessionInput } from '../../types';

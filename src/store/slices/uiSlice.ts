@@ -1,3 +1,5 @@
+// Redux slice — UI chrome: panels, overlays, prep step, theme, toasts, confirm modal, and active view.
+
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { loadState, saveState } from '../../utils/storage';
 import { Toast, ConfirmModal, ActiveView } from '../../types';

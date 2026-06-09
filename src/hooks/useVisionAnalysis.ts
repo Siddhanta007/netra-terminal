@@ -1,3 +1,5 @@
+// Hook — uploads chart images and gets a vision-model description used as context by the other agents.
+
 import { useState, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '../store';

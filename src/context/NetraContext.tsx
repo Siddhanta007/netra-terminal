@@ -1,3 +1,6 @@
+// NetraContext — the single hub the whole terminal reads from. Composes Redux state with the
+// analysis / chat / session / vision / audit hooks and exposes them as one `useNetra()` API.
+
 import { createContext, useContext, useEffect, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '../store';
@@ -26,6 +29,8 @@ import {
   setIsExpiryDay as setIsExpiryDayAction,
   setExpiryCutoff as setExpiryCutoffAction,
   setRulesAcknowledged as setRulesAcknowledgedAction,
+  appendWeaponStage as appendWeaponStageAction,
+  setWeaponStageLog as setWeaponStageLogAction,
 } from '../store/slices/analysisSlice';
 import {
   setAvailableModels as setAvailableModelsAction,
@@ -55,9 +60,8 @@ import {
 import {
   setChatHistory as setChatHistoryAction,
   setChatInput as setChatInputAction,
-  setIncludeData as setIncludeDataAction,
-  setIncludeDoctrine as setIncludeDoctrineAction,
   setIsAiLoading as setIsAiLoadingAction,
+  ChatSource,
 } from '../store/slices/chatSlice';
 import { setSession as setSessionAction, setActiveSessionId as setActiveSessionIdAction } from '../store/slices/sessionSlice';
 import { API_BASE, WEIGHTS, SCORES, STEP_NAMES, DEBOUNCE_MS } from '../utils/constants';
@@ -177,10 +181,10 @@ export interface NetraContextValue {
   setChatInput: (v: string) => void;
   isAiLoading: boolean;
   setIsAiLoading: (v: boolean) => void;
-  includeData: boolean;
-  setIncludeData: (v: boolean) => void;
-  includeDoctrine: boolean;
-  setIncludeDoctrine: (v: boolean) => void;
+  sources: ChatSource[];
+  toggleSource: (s: ChatSource) => void;
+  startNewChat: () => void;
+  summarizeNow: () => void;
   handleSendMessage: () => void;
   // UI state
   darkMode: boolean;
@@ -207,10 +211,13 @@ export interface NetraContextValue {
   getNCSBreakdown: () => Array<{ dim: string; selection: string; raw: number; weight: number; contrib: number }>;
   triggerNeuralSynthesis: () => void;
   stopSynthesis: () => void;
-  triggerWeaponPrediction: () => void;
+  triggerWeaponPrediction: (thought?: string) => void;
   stopWeaponPrediction: () => void;
   isPredictingWeapon: boolean;
   weaponPrediction: WeaponPrediction | null;
+  weaponStageLog: Array<{ stage: string; ts: string }>;
+  appendWeaponStage: (stage: string) => void;
+  clearWeaponStageLog: () => void;
   auditData: AuditData | null;
   setAuditData: (v: AuditData | null) => void;
   isAuditing: boolean;
@@ -244,6 +251,11 @@ const EMPTY_SYS_DATA: SysData = {
   strikeDimensions: [],
   interceptionDimensions: [],
   saturationDimensions: [],
+  marketPulseExtras: { operationalMarks: [], activeLegOptions: [], subAuctionOptions: {} },
+  executionMarks: [],
+  weaponStages: [],
+  tradeStatuses: [],
+  exitTypes: [],
 };
 
 export function NetraProvider({ children }: { children: React.ReactNode }) {
@@ -274,6 +286,7 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
   const strikeSelections = useSelector((s: RootState) => s.analysis.strikeSelections);
   const saturationSelections = useSelector((s: RootState) => s.analysis.saturationSelections);
   const selectedWeaponId = useSelector((s: RootState) => s.analysis.selectedWeaponId);
+  const weaponStageLog = useSelector((s: RootState) => s.analysis.weaponStageLog);
   const stepTimestamps = useSelector((s: RootState) => s.analysis.stepTimestamps);
   const analyticsData = useSelector((s: RootState) => s.analysis.analyticsData);
   const rAmount = useSelector((s: RootState) => s.analysis.rAmount);
@@ -332,7 +345,9 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     const flatModels: AvailableModel[] = [];
     (data.providers || []).forEach((provider) => {
       provider.models.forEach((model) => {
-        const tagStr = model.tags.length > 0 ? `, ${model.tags.join(' & ')}` : '';
+        // "Agent" is a capability flag (filters the suggestion box) — not a display label.
+        const displayTags = model.tags.filter((t) => t !== 'Agent');
+        const tagStr = displayTags.length > 0 ? `, ${displayTags.join(' & ')}` : '';
         flatModels.push({
           name: `${provider.provider} : ${model.name}, ${model.cost} Cost${tagStr}`,
           id:   `${provider.provider.toLowerCase()}|${model.id}`,
@@ -625,10 +640,10 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     setChatInput: (v) => dispatch(setChatInputAction(v)),
     isAiLoading: chat_.isAiLoading,
     setIsAiLoading: (v) => dispatch(setIsAiLoadingAction(v)),
-    includeData: chat_.includeData,
-    setIncludeData: (v) => dispatch(setIncludeDataAction(v)),
-    includeDoctrine: chat_.includeDoctrine,
-    setIncludeDoctrine: (v) => dispatch(setIncludeDoctrineAction(v)),
+    sources: chat_.sources,
+    toggleSource: chat_.toggleSource,
+    startNewChat: chat_.startNewChat,
+    summarizeNow: chat_.summarizeNow,
     handleSendMessage: chat_.handleSendMessage,
     // UI
     darkMode,
@@ -679,6 +694,9 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     stopWeaponPrediction: analysis_.stopWeaponPrediction,
     isPredictingWeapon: analysis_.isPredictingWeapon,
     weaponPrediction: analysis_.weaponPrediction,
+    weaponStageLog,
+    appendWeaponStage: (stage: string) => dispatch(appendWeaponStageAction({ stage, ts: new Date().toISOString() })),
+    clearWeaponStageLog: () => dispatch(setWeaponStageLogAction([])),
     auditData: audit_.auditData,
     setAuditData: (v) => dispatch({ type: 'logs/setAuditData', payload: v }),
     isAuditing: audit_.isAuditing,

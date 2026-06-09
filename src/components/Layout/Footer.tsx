@@ -1,3 +1,5 @@
+// Site footer.
+
 export default function Footer({ accentColor = '#4169E1' }: { accentColor?: string }) {
   const year = new Date().getFullYear();
   return (

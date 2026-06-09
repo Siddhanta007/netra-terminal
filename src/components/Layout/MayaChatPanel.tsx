@@ -1,8 +1,10 @@
+// The Maya chat sidebar — markdown messages, model + knowledge-source selectors, and vision attachments.
+
 import { useState, useRef, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import ReactMarkdown from 'react-markdown';
 import { useNetra } from '../../context/NetraContext';
-import { setChatInput, setIncludeData } from '../../store/slices/chatSlice';
+import { setChatInput, ChatSource } from '../../store/slices/chatSlice';
 import { setSelectedModel, setModelConfig } from '../../store/slices/modelSlice';
 import { RootState, AppDispatch } from '../../store';
 
@@ -34,13 +36,20 @@ export default function MayaChatPanel() {
   const chatHistory = useSelector((s: RootState) => s.chat.chatHistory);
   const chatInput = useSelector((s: RootState) => s.chat.chatInput);
   const isAiLoading = useSelector((s: RootState) => s.chat.isAiLoading);
-  const includeData = useSelector((s: RootState) => s.chat.includeData);
+  const sources = useSelector((s: RootState) => s.chat.sources);
   const selectedModel = useSelector((s: RootState) => s.model.selectedModel);
   const modelConfig = useSelector((s: RootState) => s.model.modelConfig);
   const darkMode = useSelector((s: RootState) => s.ui.darkMode);
   const AVAILABLE_MODELS = useSelector((s: RootState) => s.model.availableModels);
 
-  const { handleSendMessage, uploadedVisionFiles, setUploadedVisionFiles } = useNetra();
+  const { handleSendMessage, toggleSource, startNewChat, summarizeNow, uploadedVisionFiles, setUploadedVisionFiles } = useNetra();
+
+  const SOURCE_OPTIONS: { id: ChatSource; label: string }[] = [
+    { id: 'terminal',    label: 'Terminal' },
+    { id: 'doctrine',    label: 'Doctrine' },
+    { id: 'historical',  label: 'History' },
+    { id: 'information', label: 'Info' },
+  ];
 
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -263,15 +272,35 @@ export default function MayaChatPanel() {
                 </select>
               </div>
 
-              {/* Include Data toggle */}
+              {/* Source multiselect — user picks which knowledge the agent may use */}
+              {SOURCE_OPTIONS.map(opt => {
+                const on = sources.includes(opt.id);
+                return (
+                  <button
+                    key={opt.id}
+                    onClick={() => toggleSource(opt.id)}
+                    title={`Toggle ${opt.label} source`}
+                    style={{
+                      height: '26px', padding: '0 8px',
+                      border: `1px solid ${on ? '#6366f1' : t.toolbarBtnBorder}`,
+                      background: on ? 'rgba(99,102,241,0.12)' : 'none',
+                      color: on ? '#6366f1' : t.toolbarText,
+                      fontSize: '9px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase',
+                      cursor: 'pointer', transition: 'all 150ms',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+
+              {/* New chat thread */}
               <button
-                onClick={() => dispatch(setIncludeData(!includeData))}
-                title="Include trade data"
-                style={{ width: '26px', height: '26px', border: `1px solid ${includeData ? '#6366f1' : t.toolbarBtnBorder}`, background: includeData ? 'rgba(99,102,241,0.1)' : 'none', color: includeData ? '#6366f1' : t.toolbarText, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 150ms' }}
+                onClick={startNewChat}
+                title="Start a new chat thread"
+                style={{ width: '26px', height: '26px', border: `1px solid ${t.toolbarBtnBorder}`, background: 'none', color: t.toolbarText, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 150ms' }}
               >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-                </svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               </button>
             </div>
 

@@ -1,3 +1,5 @@
+// Redux store — combines every feature slice and wires the localStorage persistence middleware.
+
 import { configureStore } from '@reduxjs/toolkit';
 import { localStorageMiddleware } from './middleware/localStorageMiddleware';
 import uiReducer from './slices/uiSlice';

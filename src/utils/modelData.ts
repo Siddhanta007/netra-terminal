@@ -1,3 +1,5 @@
+// Static display content for the Model showcase page (per-model cards + slides).
+
 export interface ModelSlide {
   label: string;
   heading: string;

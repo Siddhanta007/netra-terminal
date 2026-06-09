@@ -1,3 +1,5 @@
+// Hook — derives the HTF risk gate (CONTINUE / REDUCE / STOP) from the higher-timeframe structure selections.
+
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 

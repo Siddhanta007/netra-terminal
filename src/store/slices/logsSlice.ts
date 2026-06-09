@@ -1,3 +1,5 @@
+// Redux slice — the trade-log list: search/filter/sort, the log being edited, and audit state.
+
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { TradeLog, EditFormData, AuditData } from '../../types';
 

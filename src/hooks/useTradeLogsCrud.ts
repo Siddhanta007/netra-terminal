@@ -1,3 +1,5 @@
+// Hook — CRUD for saved trade logs (list, edit, delete) against the backend.
+
 import { useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '../store';

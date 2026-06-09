@@ -1,3 +1,5 @@
+// Vision phase — upload a chart and get Maya's image description as analysis context.
+
 import { useNetra } from '../../../context/NetraContext';
 import NetraAILabs from '../../../components/Templates/NetraAILabs';
 

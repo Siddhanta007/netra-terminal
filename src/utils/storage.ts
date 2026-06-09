@@ -1,3 +1,5 @@
+// Typed localStorage helpers — namespaced under 'netra_', JSON-encoded, and error-safe.
+
 export const loadState = <T>(key: string, fallback: T): T => {
   try {
     const v = localStorage.getItem('netra_' + key);

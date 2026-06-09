@@ -1,3 +1,5 @@
+// Market-type selector — the command / market-type choice cards.
+
 import { ReactNode } from 'react';
 import { useNetra } from '../../context/NetraContext';
 

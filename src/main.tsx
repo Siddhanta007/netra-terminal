@@ -1,3 +1,5 @@
+// App entry point — mounts <App/> inside the Router, Redux <Provider>, and Google OAuth provider.
+
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';

@@ -1,3 +1,5 @@
+// Login screen — Google OAuth sign-in and guest entry.
+
 import { useState } from 'react';
 import { useNetra } from '../../context/NetraContext';
 import GlobalOverlay from '../Layout/GlobalOverlay';

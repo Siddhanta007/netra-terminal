@@ -5,23 +5,16 @@ import Phase7STS from './Phase7STS';
 
 // ─── Execution Mapping checklist (Tier 3 — 5M chart) ─────────────────────────
 
-const EXECUTION_MARKS = [
-  { id: 'fvg',    label: '5M Fair Value Gaps' },
-  { id: 'ob',     label: '5M Order Blocks' },
-  { id: 'eqhl',   label: 'Micro Equal Highs / Lows' },
-  { id: 'ladder', label: 'Liquidity Ladders' },
-  { id: 'swing',  label: 'Internal Micro Swings' },
-] as const;
-
 function ExecutionMarkingChecklist({
-  checked, toggle,
+  checked, toggle, marks,
 }: {
   checked: Record<string, boolean>;
   toggle: (id: string) => void;
+  marks: { id: string; label: string }[];
 }) {
   const [open, setOpen] = useState(false);
-  const done  = EXECUTION_MARKS.filter(m => checked[m.id]).length;
-  const total = EXECUTION_MARKS.length;
+  const done  = marks.filter(m => checked[m.id]).length;
+  const total = marks.length;
 
   return (
     <div style={{ marginBottom: '4px' }}>
@@ -46,7 +39,7 @@ function ExecutionMarkingChecklist({
           border: '1px solid var(--border-strong)',
           borderRadius: '4px', overflow: 'hidden', marginBottom: '12px',
         }}>
-          {EXECUTION_MARKS.map((m, i) => {
+          {marks.map((m, i) => {
             const isDone = !!checked[m.id];
             const isLastRow = i >= 3;
             const isRightEdge = (i + 1) % 3 === 0;
@@ -92,12 +85,15 @@ function ExecutionMarkingChecklist({
 
 export default function Phase6Command() {
   const {
+    SYSTEM_DATA,
     notes, setNotes,
     netraOutput, finalCommand, setFinalCommand,
     commandLocked, setCommandLocked,
     confirmStep, editStep,
     stepTimestamps,
   } = useNetra();
+
+  const executionMarks = SYSTEM_DATA.executionMarks || [];
 
   const reduceFlag = useReduceFlag();
   const recommendedCommand = netraOutput?.cmd || null;
@@ -140,7 +136,7 @@ export default function Phase6Command() {
 
       {/* ── Component 2: Execution Marking (only after command, not NO ENGAGEMENT) ── */}
       {finalCommand && finalCommand !== 'NO ENGAGEMENT' && (
-        <ExecutionMarkingChecklist checked={emChecked} toggle={toggleEm} />
+        <ExecutionMarkingChecklist checked={emChecked} toggle={toggleEm} marks={executionMarks} />
       )}
 
       {/* ── Component 3: STS Execution Tree ── */}

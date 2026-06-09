@@ -64,10 +64,22 @@ export interface NetraOutput {
 }
 
 export interface WeaponPrediction {
-  weapon?: string;
-  plan?: string;
+  // stance-based co-pilot schema
+  stance?: 'ENTER' | 'WAIT' | 'STAND_ASIDE' | string;
+  type?: 'weapon' | 'custom' | string;
+  name?: string;
+  entry?: string;
+  stop?: string;
+  target?: string;
+  wait_for?: string;
+  becomes?: string;
+  expected?: string;
+  confidence?: 'HIGH' | 'MEDIUM' | 'LOW' | string;
   reasoning?: string;
   thinking?: string;
+  // legacy
+  weapon?: string;
+  plan?: string;
   [key: string]: unknown;
 }
 
@@ -138,6 +150,9 @@ export interface TradeLogPhase4 {
   pl?: string | number;
   user_thought?: string;
   execution_rating?: number;
+  exit_type?: string;
+  trade_status?: string;
+  holding_time_minutes?: number;
   [key: string]: unknown;
 }
 
@@ -150,32 +165,80 @@ export interface SessionState {
   finalCommand: string | null;
   netraOutput: NetraOutput | null;
   sysRecommendation: unknown;
+  weaponPrediction: WeaponPrediction | null;
   selectedWeaponId: string | null;
   stepTimestamps: Record<string, string>;
   tradeName: string;
   assetName: string;
+  imageDescription: string | null;
+  auditData: AuditData | null;
 }
+
+// ─── New phase-structured trade log ──────────────────────────────────────────
+
+// ─── New phase-structured trade log ──────────────────────────────────────────
+
+// Typed phase interfaces — used by new code and for documentation
+export interface TradePhase1 { image_description?: string }
+export interface TradePhase2 { selections?: Record<string, string>; note?: string }
+export interface TradePhase3 { selections?: Record<string, string>; note?: string }
+export interface TradePhase4 { marketPulse?: Record<string, string>; liquidityContext?: Record<string, string>; marketPulse_note?: string; liquidityContext_note?: string }
+export interface TradePhase5 extends NetraOutput {}
+export interface TradePhase6 { command?: string; confirmed_at?: string; recommendation?: Record<string, unknown> }
+export interface TradePhase7 extends WeaponPrediction {}
+export interface TradePhase8 { weapon_id?: string; dimensions?: Record<string, string> }
+export interface TradePhase9Card {
+  trade_index?: number; asset?: string; direction?: string;
+  entry_price?: string; stop_loss?: string; quantity?: string; additional_cost?: string;
+  t1?: string; t2?: string; t3?: string; t4?: string;
+  entry_time?: string; exit_time?: string;
+  add_entries?: unknown[]; partial_exits?: unknown[];
+  weighted_avg_price?: number; breakeven?: number;
+  exit_price?: string; exit_type?: string; trade_status?: string;
+  holding_time_minutes?: number; pnl?: string; outcome?: string;
+  note?: string; closed?: boolean;
+}
+export interface TradePhase10 extends AuditData { execution_rating?: number; lessons?: string }
 
 export interface TradeLog {
   id: number;
   name: string;
-  username: string;
-  weapon: string;
-  timestamp: string;
+  username?: string;
+  created_by?: string;
+  weapon?: string;
   asset?: string;
-  // Top-level server-returned fields (also present nested in phase1)
+  timestamp: string;
   model_id?: string;
-  protocol?: string;
-  realBias?: string | Record<string, string>;
-  htfStructure?: string | Record<string, string>;
-  marketPulse?: string | Record<string, string>;
-  liquidityContext?: string | Record<string, string>;
-  phase1?: TradeLogPhase1;
-  phase2?: TradeLogPhase2;
-  phase3?: TradeLogPhase3;
-  phase4?: TradeLogPhase4;
+  highestStep?: number;
+  assetName?: string;
+  stepTimestamps?: Record<string, string>;
+  // New phase-structured data (Record<string,any> keeps existing UI code working)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  phase1?: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  phase2?: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  phase3?: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  phase4?: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  phase5?: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  phase6?: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  phase7?: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  phase8?: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  phase9?: Array<Record<string, any>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  phase10?: Record<string, any>;
+  // Backward-compat: old documents carry session_state blob
   session_state?: SessionState;
-  _stsData?: unknown;
+  // Quick trade fields
+  source?: string;
+  closed?: boolean;
+  [key: string]: unknown;
 }
 
 // ─── UI / State Types ─────────────────────────────────────────────────────────
@@ -273,6 +336,17 @@ export interface SystemWeapons {
   [key: string]: Weapon[] | undefined;
 }
 
+export interface ChecklistMark {
+  id: string;
+  label: string;
+}
+
+export interface MarketPulseExtras {
+  operationalMarks?: ChecklistMark[];
+  activeLegOptions?: string[];
+  subAuctionOptions?: Record<string, string[]>;
+}
+
 export interface SysData {
   weapons?: SystemWeapons;
   realBias?: { title?: string; dimensions: SystemDimension[] };
@@ -281,6 +355,13 @@ export interface SysData {
   liquidityContext?: { title?: string; dimensions: SystemDimension[] };
   strikeDimensions?: SystemDimension[];
   interceptionDimensions?: SystemDimension[];
+  saturationDimensions?: SystemDimension[];
+  // Backend-driven UI config (was hardcoded in phase components)
+  marketPulseExtras?: MarketPulseExtras;
+  executionMarks?: ChecklistMark[];
+  weaponStages?: string[];
+  tradeStatuses?: string[];
+  exitTypes?: string[];
   tactical_provider?: string;
   providers?: Array<{
     provider: string;

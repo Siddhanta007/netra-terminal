@@ -1,3 +1,5 @@
+// User profile page — account details and saved-session overview.
+
 import { useState } from 'react';
 import { useNetra } from '../context/NetraContext';
 import Footer from '../components/Layout/Footer';

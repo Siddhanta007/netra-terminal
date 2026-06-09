@@ -1,3 +1,5 @@
+// Hook — shared utilities: auth headers, toasts, active model/vision-model resolution, and the guest AI-usage limiter.
+
 import { useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '../store';

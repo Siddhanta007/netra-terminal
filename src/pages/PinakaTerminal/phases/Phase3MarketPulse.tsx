@@ -1,3 +1,5 @@
+// Market Pulse phase — the operational marking checklist and live dimension capture.
+
 import React, { useEffect, useState } from 'react';
 import { useNetra } from '../../../context/NetraContext';
 import { useNetraUtils } from '../../../hooks/useNetraUtils';
@@ -5,27 +7,20 @@ import { API_BASE } from '../../../utils/constants';
 
 // ─── Operational Marking checklist ───────────────────────────────────────────
 
-const OPERATIONAL_MARKS = [
-  { id: 'range',   label: 'Range / Active Leg' },
-  { id: 'struct',  label: 'Internal Structure' },
-  { id: 'bos',     label: 'BOS Points' },
-  { id: 'session', label: 'Session Levels' },
-  { id: 'mmc',     label: 'MMC / Inducement' },
-  { id: 'smc',     label: '15M Order Blocks' },
-] as const;
-
 const MONO_MP: React.CSSProperties = { fontFamily: 'Space Grotesk, Inter, sans-serif' };
 
 function OperationalMarkingChecklist({
   checked,
   toggle,
+  marks,
 }: {
   checked: Record<string, boolean>;
   toggle: (id: string) => void;
+  marks: { id: string; label: string }[];
 }) {
   const [open, setOpen] = useState(false);
-  const done  = OPERATIONAL_MARKS.filter(m => checked[m.id]).length;
-  const total = OPERATIONAL_MARKS.length;
+  const done  = marks.filter(m => checked[m.id]).length;
+  const total = marks.length;
 
   return (
     <div style={{ marginBottom: '20px' }}>
@@ -53,7 +48,7 @@ function OperationalMarkingChecklist({
           borderRadius: '0 0 5px 5px',
           marginBottom: '4px', overflow: 'hidden',
         }}>
-          {OPERATIONAL_MARKS.map((m, i) => {
+          {marks.map((m, i) => {
             const isDone = !!checked[m.id];
             const isLastRow = i >= 3;
             const isRightEdge = (i + 1) % 3 === 0;
@@ -112,7 +107,7 @@ export default function Phase3MarketPulse() {
   // ── A: Auction State & Energy ─────────────────────────────────────────────
   const mp = (selections.marketPulse || {}) as Record<string, string>;
   const auctionState = mp.auctionState || '';
-  const balanceType = mp.balanceType || '';
+  const subAuctionState = mp.subAuctionState || '';
   const activeLeg = mp.activeLeg || '';
   const momentum = mp.momentum || '';
   const resistance = mp.resistance || '';
@@ -122,30 +117,15 @@ export default function Phase3MarketPulse() {
     setSelections({ ...selections, marketPulse: { ...mp, [key]: val } });
   };
 
-  const activeLegOptions = auctionState === 'Balance'
-    ? ['Bullish', 'Bearish', 'Unknown']
-    : auctionState === 'Transitional'
-      ? ['Breaking Leg', 'Opposing Leg', 'Unknown']
-      : auctionState === 'Relocation (Against HTF)'
-        ? ['Counter-Expansion Leg', 'Recovery Leg', 'Unknown']
-        : ['Expansion Leg', 'Pullback Leg', 'Unknown'];
+  const mpExtras = SYSTEM_DATA.marketPulseExtras || {};
+  const SUB_AUCTION_OPTIONS = mpExtras.subAuctionOptions || {};
+  const ACTIVE_LEG_OPTIONS  = mpExtras.activeLegOptions  || [];
+  const OPERATIONAL_MARKS   = mpExtras.operationalMarks   || [];
 
-  const showBalanceType = auctionState === 'Balance';
-  const showActiveLeg = !!auctionState;
+  const showSubAuction = !!auctionState;
+  const showActiveLeg  = !!auctionState;
 
-  let showApproach = false;
-  if (auctionState === 'Balance') {
-    if (activeLeg === 'Bullish' || activeLeg === 'Bearish') showApproach = true;
-  } else if (
-    auctionState === 'Relocation (In HTF)' ||
-    auctionState === 'Relocation (Against HTF)' ||
-    auctionState === 'Transitional'
-  ) {
-    showApproach = true;
-  }
-
-  const isCompressionTrap = auctionState === 'Balance' && balanceType === 'Contracting' &&
-    (activeLeg === 'Bullish' || activeLeg === 'Bearish');
+  const isCompressionTrap = subAuctionState === 'Contracting Balance';
 
   // ── B: Liquidity Context (SYSTEM_DATA-driven) ─────────────────────────────
   const liq = (selections.liquidityContext || {}) as Record<string, string>;
@@ -156,8 +136,8 @@ export default function Phase3MarketPulse() {
   };
   const allLiqSelected = liqDims.every(d => !!liq[d.id]);
 
-  const objectiveCondition = liq.objectiveCondition || '';
-  const liquidityFreshness = liq.liquidityFreshness || '';
+  const objectiveCondition  = liq.objectiveCondition || '';
+  const objectiveFreshness  = liq.objectiveFreshness || '';
   const { getAuthHeaders } = useNetraUtils();
   const [liqGate, setLiqGate] = useState<{ gate: string; reason: string }>({ gate: 'PROCEED', reason: '' });
 
@@ -169,20 +149,18 @@ export default function Phase3MarketPulse() {
     fetch(`${API_BASE}/api/decision/liquidity-gate`, {
       method: 'POST',
       headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ tier: objectiveCondition, maturity: liquidityFreshness }),
+      body: JSON.stringify({ tier: objectiveCondition, maturity: objectiveFreshness }),
     })
       .then(r => r.json())
       .then(setLiqGate)
       .catch(() => {});
-  }, [objectiveCondition, liquidityFreshness]);
+  }, [objectiveCondition, objectiveFreshness]);
 
   const isNoEngagement = liqGate.gate === 'NO_ENGAGEMENT';
   const noEngagementReason = liqGate.reason;
 
   // ── Gate ──────────────────────────────────────────────────────────────────
-  const mpOk = !!auctionState && !!activeLeg &&
-    (!showBalanceType || !!balanceType) &&
-    (!showApproach || (!!momentum && !!resistance));
+  const mpOk = !!auctionState && !!activeLeg && !!momentum && !!resistance;
 
   const canConfirm = !isLocked && !isNoEngagement && mpOk && allLiqSelected;
 
@@ -202,7 +180,7 @@ export default function Phase3MarketPulse() {
     <div className="flex flex-col fade-up phase-theme-3">
 
       {/* ── COMPONENT 1: OPERATIONAL MARKING ── */}
-      <OperationalMarkingChecklist checked={opChecked} toggle={toggleOp} />
+      <OperationalMarkingChecklist checked={opChecked} toggle={toggleOp} marks={OPERATIONAL_MARKS} />
 
       {/* ── COMPONENT 2: AUCTION STATE ── */}
       {subLabel('Component 2 — Auction State')}
@@ -210,14 +188,12 @@ export default function Phase3MarketPulse() {
       <div className="precision-row">
         <div className="precision-label">Auction State</div>
         <div className="precision-selector">
-          {['Balance', 'Relocation (In HTF)', 'Relocation (Against HTF)', 'Transitional', 'Unknown'].map(opt => (
+          {(['Balance', 'Relocation', 'Relocation Against Bias', 'Transition'] as const).map(opt => (
             <button
               key={opt}
               onClick={() => {
                 if (isLocked) return;
-                const newMp: Record<string, string> = { ...mp, auctionState: opt };
-                if (opt !== 'Balance') newMp.balanceType = '';
-                setSelections({ ...selections, marketPulse: newMp });
+                setSelections({ ...selections, marketPulse: { ...mp, auctionState: opt, subAuctionState: '' } });
               }}
               disabled={isLocked}
               className={`precision-opt ${auctionState === opt ? 'selected' : ''} ${isLocked && auctionState !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
@@ -226,26 +202,13 @@ export default function Phase3MarketPulse() {
         </div>
       </div>
 
-      {showBalanceType && (
+      {showSubAuction && (
         <div className="precision-row">
-          <div className="precision-label">Balance Type</div>
+          <div className="precision-label">Sub-State</div>
           <div className="precision-selector">
-            {['Stable', 'Skewed', 'Contracting', 'Expanding', 'Unknown'].map(opt => (
-              <button key={opt} onClick={() => setMp('balanceType', opt)} disabled={isLocked}
-                className={`precision-opt ${balanceType === opt ? 'selected' : ''} ${isLocked && balanceType !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
-              >{opt}</button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {showBalanceType && balanceType === 'Skewed' && (
-        <div className="precision-row">
-          <div className="precision-label">Direction</div>
-          <div className="precision-selector">
-            {['Upward', 'Downward', 'Unknown'].map(opt => (
-              <button key={opt} onClick={() => setMp('skewedDirection', opt)} disabled={isLocked}
-                className={`precision-opt ${mp.skewedDirection === opt ? 'selected' : ''} ${isLocked && mp.skewedDirection !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
+            {(SUB_AUCTION_OPTIONS[auctionState] || []).map(opt => (
+              <button key={opt} onClick={() => setMp('subAuctionState', opt)} disabled={isLocked}
+                className={`precision-opt ${subAuctionState === opt ? 'selected' : ''} ${isLocked && subAuctionState !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
               >{opt}</button>
             ))}
           </div>
@@ -256,7 +219,7 @@ export default function Phase3MarketPulse() {
         <div className="precision-row">
           <div className="precision-label">Active Leg</div>
           <div className="precision-selector">
-            {activeLegOptions.map(opt => (
+            {ACTIVE_LEG_OPTIONS.map(opt => (
               <button key={opt} onClick={() => setMp('activeLeg', opt)} disabled={isLocked}
                 className={`precision-opt ${activeLeg === opt ? 'selected' : ''} ${isLocked && activeLeg !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
               >{opt}</button>
@@ -270,7 +233,7 @@ export default function Phase3MarketPulse() {
       <div className="precision-row">
         <div className="precision-label">Momentum</div>
         <div className="precision-selector">
-          {['Impulsive', 'Sustained', 'Opposed', 'Stalling', 'Unknown'].map(opt => (
+          {(['Impulsive', 'Sustained', 'Stalling', 'Exhausted', 'Unknown'] as const).map(opt => (
             <button key={opt} onClick={() => setMp('momentum', opt)} disabled={isLocked}
               className={`precision-opt ${momentum === opt ? 'selected' : ''} ${isLocked && momentum !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
             >{opt}</button>
@@ -280,7 +243,7 @@ export default function Phase3MarketPulse() {
       <div className="precision-row">
         <div className="precision-label">Resistance</div>
         <div className="precision-selector">
-          {['Weak', 'Moderate', 'Strong', 'Dominant', 'Unknown'].map(opt => (
+          {(['Weak', 'Moderate', 'Strong', 'Dominant', 'Unknown'] as const).map(opt => (
             <button key={opt} onClick={() => setMp('resistance', opt)} disabled={isLocked}
               className={`precision-opt ${resistance === opt ? 'selected' : ''} ${isLocked && resistance !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
             >{opt}</button>

@@ -1,3 +1,5 @@
+// App-wide constants — API base URL, debounce timing, and the dimension scoring weights/tables.
+
 export const API_BASE: string = import.meta.env.VITE_API_URL || '';
 
 export const DEBOUNCE_MS = 1500;

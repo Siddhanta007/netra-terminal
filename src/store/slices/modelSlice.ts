@@ -1,3 +1,5 @@
+// Redux slice — AI model selection: the available-model catalog, current pick, generation params, and system data.
+
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { loadState, saveState } from '../../utils/storage';
 import { AvailableModel, ModelConfig, SysData } from '../../types';
