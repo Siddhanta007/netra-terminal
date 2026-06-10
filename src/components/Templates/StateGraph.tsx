@@ -38,8 +38,10 @@ const MONO: React.CSSProperties = { fontFamily: 'JetBrains Mono, Consolas, monos
 
 // ─── Colour ──────────────────────────────────────────────────────────────────
 
-function postureHex(posture?: string | null): string {
-  switch ((posture || '').toUpperCase()) {
+// The tactical command (STRIKE / INTERCEPTION / SATURATION / WATCH / NO_ENGAGEMENT)
+// — lives in `command` after the states.json routing swap. Drives node/track colour.
+function tacticalHex(v?: string | null): string {
+  switch ((v || '').toUpperCase()) {
     case 'STRIKE':        return '#ffd700';
     case 'INTERCEPTION':  return '#38bdf8';
     case 'SATURATION':    return '#f97316';
@@ -48,8 +50,9 @@ function postureHex(posture?: string | null): string {
     default:              return '#64748b';
   }
 }
-function commandHex(command?: string | null): string {
-  return command === 'ENGAGE' ? '#22c55e' : command ? '#ef4444' : '#94a3b8';
+// The engagement posture (ENGAGE / STAND_DOWN / NO_ENGAGEMENT) — lives in `posture`.
+function engageHex(v?: string | null): string {
+  return v === 'ENGAGE' ? '#22c55e' : v ? '#ef4444' : '#94a3b8';
 }
 
 function Chip({ label, value, color }: { label: string; value: string; color: string }) {
@@ -65,7 +68,7 @@ function Chip({ label, value, color }: { label: string; value: string; color: st
 
 function StateHero({ state }: { state: RecognizedState }) {
   const [open, setOpen] = useState(false);
-  const accent = postureHex(state.posture);
+  const accent = tacticalHex(state.command);
 
   return (
     <div style={{
@@ -82,8 +85,8 @@ function StateHero({ state }: { state: RecognizedState }) {
         </div>
       </div>
       <div style={{ display: 'flex', gap: '8px', marginTop: '14px', flexWrap: 'wrap' }}>
-        <Chip label="COMMAND" value={state.command || '—'} color={commandHex(state.command)} />
-        <Chip label="POSTURE" value={(state.posture || '—').replace(/_/g, ' ')} color={accent} />
+        <Chip label="COMMAND" value={(state.command || '—').replace(/_/g, ' ')} color={accent} />
+        <Chip label="POSTURE" value={(state.posture || '—').replace(/_/g, ' ')} color={engageHex(state.posture)} />
         {state.status && <Chip label="STATUS" value={state.status.replace(/_/g, ' ')} color={state.status === 'OK' ? '#22c55e' : '#f59e0b'} />}
       </div>
       {state.meaning && <p style={{ ...MONO, fontSize: '11px', color: 'rgba(255,255,255,0.78)', lineHeight: 1.7, margin: '14px 0 0' }}>{state.meaning}</p>}
@@ -113,7 +116,6 @@ interface GNode {
 
 const NODE_W = 172;
 const NODE_H = 48;
-const COL_W  = 340;   // column pitch — wider so the state and its transitions sit further apart (room for the edge label)
 const ROW_H  = 92;    // leaf row pitch — taller = more breathing room
 const PAD    = 26;
 const V_GAP  = 36;    // vertical drop from the state down to its command node
@@ -142,10 +144,22 @@ function SubwayMap({ state, transitions }: { state: RecognizedState; transitions
       command: state.command, isRoot: true, children: transitions.map(toNode), x: 0, y: 0,
     };
 
+    // Flexible column pitch: the widest edge label decides the horizontal gap,
+    // so the FULL condition text always sits cleanly between a node and its
+    // children (no truncation, no overlap).
+    const CHAR_W = 6.7, PILL_PAD = 14, CLEAR = 56;
+    let maxLabelPx = 0;
+    const scanLabels = (n: GNode) => n.children.forEach(c => {
+      if (c.condition) maxLabelPx = Math.max(maxLabelPx, c.condition.length * CHAR_W + PILL_PAD);
+      scanLabels(c);
+    });
+    scanLabels(root);
+    const colW = Math.max(300, NODE_W + maxLabelPx + CLEAR);
+
     // Layered left→right layout; leaves stacked, parents centered on children.
     let leaf = 0;
     const assign = (n: GNode, depth: number) => {
-      n.x = PAD + depth * COL_W;
+      n.x = PAD + depth * colW;
       if (!n.children.length) {
         n.y = PAD + leaf * ROW_H;
         leaf += 1;
@@ -175,7 +189,7 @@ function SubwayMap({ state, transitions }: { state: RecognizedState; transitions
       cx: root.x + NODE_W / 2,
       top: root.y + NODE_H,
       value: String(cmdValue).replace(/_/g, ' '),
-      color: commandHex(state.command),
+      color: tacticalHex(state.command),
     } : null;
 
     const baseH = PAD * 2 + Math.max(leaf, 1) * ROW_H;
@@ -183,7 +197,7 @@ function SubwayMap({ state, transitions }: { state: RecognizedState; transitions
       nodes: ns,
       edges: es,
       cmd,
-      width: PAD + (maxDepth + 1) * COL_W,
+      width: PAD + (maxDepth + 1) * colW,
       height: Math.max(baseH, cmd ? cmd.y + CMD_H + PAD : 0),
     };
   }, [state, transitions]);
@@ -193,12 +207,12 @@ function SubwayMap({ state, transitions }: { state: RecognizedState; transitions
       <svg width={width} height={height} style={{ display: 'block', minWidth: '100%' }}>
         {/* ── tracks ── */}
         {edges.map((e, i) => {
-          const color = e.to.isTerminal ? '#475569' : postureHex(e.to.posture);
+          const color = e.to.isTerminal ? '#475569' : tacticalHex(e.to.command);
           const x1 = e.from.x + NODE_W, y1 = e.from.y + NODE_H / 2;
           const x2 = e.to.x,            y2 = e.to.y + NODE_H / 2;
           const mx = (x1 + x2) / 2;
           const d = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
-          const cond = (e.to.condition || '').length > 40 ? `${e.to.condition!.slice(0, 38)}…` : e.to.condition;
+          const cond = e.to.condition;   // full text — the column pitch flexes to fit it
           const ly = (y1 + y2) / 2;
           const pillW = cond ? cond.length * 6.7 + 14 : 0;
           return (
@@ -246,7 +260,7 @@ function SubwayMap({ state, transitions }: { state: RecognizedState; transitions
 
         {/* ── stations ── */}
         {nodes.map((n, i) => {
-          const color = n.isTerminal ? '#64748b' : postureHex(n.posture);
+          const color = n.isTerminal ? '#64748b' : tacticalHex(n.command);
           return (
             <g key={i}>
               <rect x={n.x} y={n.y} width={NODE_W} height={NODE_H} rx={5}
@@ -267,10 +281,10 @@ function SubwayMap({ state, transitions }: { state: RecognizedState; transitions
                   <text x={n.x + 14} y={n.y + 26} style={{ ...MONO, fontSize: '7.5px', fontWeight: 700, fill: '#e8eaed' }}>
                     {(n.name || '').length > 18 ? `${n.name.slice(0, 17)}…` : n.name}
                   </text>
-                  {n.command && (
+                  {n.posture && (
                     <text x={n.x + NODE_W - 8} y={n.y + NODE_H / 2 + 3} textAnchor="end"
-                          style={{ ...MONO, fontSize: '7px', fontWeight: 800, fill: commandHex(n.command) }}>
-                      {n.command === 'ENGAGE' ? '▲' : n.command === 'NO_ENGAGEMENT' || n.command === 'STAND_DOWN' ? '■' : '●'}
+                          style={{ ...MONO, fontSize: '7px', fontWeight: 800, fill: engageHex(n.posture) }}>
+                      {n.posture === 'ENGAGE' ? '▲' : '■'}
                     </text>
                   )}
                 </>
@@ -300,7 +314,7 @@ export default function StateGraph({ state, transitions }: {
               Forward Path Map
             </span>
             <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }} />
-            <span style={{ ...MONO, fontSize: '7px', color: 'rgba(255,255,255,0.3)' }}>▲ engage · ■ stand-down · ● watch</span>
+            <span style={{ ...MONO, fontSize: '7px', color: 'rgba(255,255,255,0.3)' }}>▲ engage · ■ stand-down · colour = command</span>
           </div>
           <div style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.25)', padding: '8px' }}>
             <SubwayMap state={state} transitions={transitions} />

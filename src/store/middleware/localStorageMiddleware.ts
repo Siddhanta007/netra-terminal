@@ -18,6 +18,9 @@ const PERSIST_MAP: Record<string, string> = {
   'analysis/setSelections': 'selections',
   'analysis/setNotes': 'notes',
   'analysis/setFinalCommand': 'finalCommand',
+  'analysis/setNetraOutput': 'netraOutput',            // recognition — expensive AI output, persist across reloads
+  'analysis/setWeaponPrediction': 'weaponPrediction',  // weapon co-pilot — expensive AI output, persist across reloads
+  'analysis/setSysRecommendation': 'sysRecommendation',
   'analysis/setCommandLocked': 'commandLocked',
   'analysis/setWeaponLocked': 'weaponLocked',
   'analysis/setInterSelections': 'interSelections',

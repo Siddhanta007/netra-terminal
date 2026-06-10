@@ -121,9 +121,9 @@ export function useAnalysisFlow() {
     dispatch(setIsEvaluating(false));
   }, [dispatch]);
 
-  const triggerWeaponPrediction = useCallback((thought?: string) => {
-    if (isPredictingWeapon) return;
-    if (!checkGuestLimit()) { showToast('Guest limit reached — sign in to continue', 'error'); return; }
+  const triggerWeaponPrediction = useCallback((thought?: string): Promise<Record<string, unknown> | null> => {
+    if (isPredictingWeapon) return Promise.resolve(null);
+    if (!checkGuestLimit()) { showToast('Guest limit reached — sign in to continue', 'error'); return Promise.resolve(null); }
     dispatch(setIsPredictingWeapon(true));
     dispatch(setWeaponPrediction(null));
 
@@ -145,7 +145,7 @@ export function useAnalysisFlow() {
       image_description: imageDescription,
     };
 
-    fetch(`${API_BASE}/api/predict-weapon`, {
+    return fetch(`${API_BASE}/api/predict-weapon`, {
       method: 'POST',
       headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(payload),
@@ -154,14 +154,16 @@ export function useAnalysisFlow() {
       .then((res) => res.json())
       .then((envelope: { data?: Record<string, unknown>; thinking?: string }) => {
         const data = { ...(envelope?.data ?? envelope), thinking: envelope?.thinking ?? '' };
-        dispatch(setWeaponPrediction(data));
+        dispatch(setWeaponPrediction(data));   // keeps the shared store in sync (e.g. session snapshot)
         dispatch(setIsPredictingWeapon(false));
         showToast('Weapon Prediction Ready');
+        return data;                            // returned so the caller can store it per-trade-card
       })
       .catch((err: Error) => {
         if (err.name === 'AbortError') showToast('Prediction Stopped', 'info');
         else showToast('Prediction Failure', 'error');
         dispatch(setIsPredictingWeapon(false));
+        return null;
       });
   }, [isPredictingWeapon, dispatch, getActiveModel, getAuthHeaders, selections, finalCommand, strikeSelections, interSelections, notes, netraOutput, modelConfig, imageDescription, showToast]);
 

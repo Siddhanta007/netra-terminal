@@ -49,8 +49,8 @@ const initialState: AnalysisState = {
   finalCommand: loadState('finalCommand', null),
   commandLocked: loadState('commandLocked', false),
   weaponLocked: loadState('weaponLocked', false),
-  netraOutput: null,
-  sysRecommendation: null,
+  netraOutput: loadState<NetraOutput | null>('netraOutput', null),       // expensive AI call — persist so a reload doesn't re-run it
+  sysRecommendation: loadState('sysRecommendation', null),
   interSelections: loadState('interSelections', { pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }),
   strikeSelections: loadState('strikeSelections', { impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' }),
   saturationSelections: loadState('saturationSelections', { expansionQuality: '', pullbackQuality: '', followThrough: '', structuralFatigue: '', liquidityConsumption: '', emotionalParticipation: '' }),
@@ -59,7 +59,7 @@ const initialState: AnalysisState = {
   selectedWeaponId: loadState('selectedWeaponId', null),
   isEvaluating: false,
   isPredictingWeapon: false,
-  weaponPrediction: null,
+  weaponPrediction: loadState<WeaponPrediction | null>('weaponPrediction', null),  // expensive AI call — persist across reloads
   imageDescription: loadState('imageDescription', null),
   isUploadingImage: false,
   analyticsData: null,

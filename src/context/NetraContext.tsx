@@ -211,7 +211,7 @@ export interface NetraContextValue {
   getNCSBreakdown: () => Array<{ dim: string; selection: string; raw: number; weight: number; contrib: number }>;
   triggerNeuralSynthesis: () => void;
   stopSynthesis: () => void;
-  triggerWeaponPrediction: (thought?: string) => void;
+  triggerWeaponPrediction: (thought?: string) => Promise<Record<string, unknown> | null>;
   stopWeaponPrediction: () => void;
   isPredictingWeapon: boolean;
   weaponPrediction: WeaponPrediction | null;

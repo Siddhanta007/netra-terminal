@@ -16,7 +16,7 @@ export function mkCard(): TradeCard {
   return {
     id: `c${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
     date: todayStr(), dbId: null,
-    side: 'BUY', weapon: '', weaponThought: '', weaponNote: '', assetSuffix: '',
+    side: 'BUY', weapon: '', weaponThought: '', weaponNote: '', weaponPrediction: null, assetSuffix: '',
     entry: '', sl: '', slManual: false,
     qty: '65', cost: '10',
     t1: '', t2: '', t3: '', t4: '',
@@ -71,7 +71,7 @@ export const bare: CSSProperties = {
 };
 export const sep  = '1px solid rgba(255,255,255,0.07)';
 export const SEP6 = '1px solid rgba(255,255,255,0.06)';
-export const BOX_H = '840px';   // match the Maya AI boxes for uniformity
+export const BOX_H = '920px';   // match the Maya AI boxes for uniformity
 
 // ─── presentational primitives ────────────────────────────────────────────────
 

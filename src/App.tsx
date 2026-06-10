@@ -1,5 +1,5 @@
 // App — top-level router + the Pinaka terminal shell. Lays out the phase cards
-// (P1–P8), the Maya chat sidebar, the trade logger, modals, and the marketing routes.
+// (P1–P9), the Maya chat sidebar, the trade logger, modals, and the marketing routes.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, Navigate } from 'react-router-dom';
@@ -19,6 +19,7 @@ import Phase0Vision from './pages/PinakaTerminal/phases/Phase0Vision';
 import { StrategicMarkingChecklist, STRATEGIC_MARKS_TOTAL, BiasDimensions, HTFDimensions, MacroMappingActions, PreSessionActions } from './pages/PinakaTerminal/PhaseMacroMap';
 import Phase3MarketPulse from './pages/PinakaTerminal/phases/Phase3MarketPulse';
 import Phase5Synthesis from './pages/PinakaTerminal/phases/Phase5Synthesis';
+import PhaseNetraState from './pages/PinakaTerminal/phases/PhaseNetraState';
 import Phase6Command from './pages/PinakaTerminal/phases/Phase6Command';
 import Phase10MissionControl from './pages/PinakaTerminal/phases/Phase10MissionControl';
 import Phase11MayaAudit from './pages/PinakaTerminal/phases/Phase11MayaAudit';
@@ -426,7 +427,8 @@ export default function NetraTerminal() {
               <div style={{ minWidth: '400px', height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
                   <div style={{ height: '3px', background: 'linear-gradient(90deg, #4169E1, #7c3aed)' }} />
-                  <div style={{ height: '36px', display: 'flex', alignItems: 'stretch' }}>
+                  {/* 3px gradient + 49px row = 52px → matches the Mission Telemetry sub-header height */}
+                  <div style={{ height: '49px', display: 'flex', alignItems: 'stretch' }}>
                     <div style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '0 14px', fontSize: '8px', fontWeight: 900, letterSpacing: '0.2em', color: '#ffffff', textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace' }}>LEDGER</div>
                     <button onClick={() => ctxSetIsLoggerOpen(false)}
                       style={{ width: '36px', height: '100%', background: 'transparent', border: 'none', borderLeft: '1px solid var(--border)', color: 'var(--text-4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'color 150ms', flexShrink: 0 }}
@@ -1374,19 +1376,33 @@ export default function NetraTerminal() {
                       <div className="phase-card-header">
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P5</span>
                         <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>SYNTHESIS</span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>RECOGNITION</span>
                         <div style={{ flex: 1 }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Neural Fusion Output</span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Maya — Market Type Recognition</span>
                       </div>
                       <div className="phase-card-body" style={{ padding: '12px' }}><Phase5Synthesis /></div>
                     </div>
                   )}
 
-                  {/* P6: COMMAND */}
+                  {/* P6: NETRA STATE — recognised state + forward-path graph */}
+                  {highestStep >= 4 && (
+                    <div className="phase-card" data-phase="5" data-active={highestStep === 4 ? 'true' : undefined}>
+                      <div className="phase-card-header">
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P6</span>
+                        <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>NETRA STATE</span>
+                        <div style={{ flex: 1 }} />
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Recognised State &amp; Transitions</span>
+                      </div>
+                      <div className="phase-card-body" style={{ padding: '12px' }}><PhaseNetraState /></div>
+                    </div>
+                  )}
+
+                  {/* P7: COMMAND */}
                   {highestStep >= 4 && (
                     <div className="phase-card cmd-card phase-theme-2" data-phase="6" data-active={highestStep === 4 ? 'true' : undefined}>
                       <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P6</span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P7</span>
                         <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>COMMAND</span>
                         <div style={{ flex: 1 }} />
@@ -1403,11 +1419,11 @@ export default function NetraTerminal() {
                     </div>
                   )}
 
-                  {/* P7: TRADING DATA — weapon + trade hybrid */}
-                  {highestStep >= 6 && (
-                    <div className="phase-card" data-phase="9" data-active={highestStep === 6 ? 'true' : undefined}>
+                  {/* P8: TRADING DATA — weapon + trade hybrid (command confirm → step 5 lands here) */}
+                  {highestStep >= 5 && (
+                    <div className="phase-card" data-phase="9" data-active={highestStep === 5 ? 'true' : undefined}>
                       <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P7</span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P8</span>
                         <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>TRADING DATA</span>
                         <div style={{ flex: 1 }} />
@@ -1416,11 +1432,11 @@ export default function NetraTerminal() {
                       <div className="phase-card-body"><Phase10MissionControl /></div>
                     </div>
                   )}
-                  {/* P8: MAYA AUDIT */}
-                  {highestStep >= 6 && (
-                    <div className="phase-card" data-phase="10" data-active={highestStep === 7 ? 'true' : undefined}>
+                  {/* P9: MAYA AUDIT */}
+                  {highestStep >= 5 && (
+                    <div className="phase-card" data-phase="10" data-active={highestStep === 6 ? 'true' : undefined}>
                       <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P8</span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P9</span>
                         <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>MAYA AUDIT</span>
                         <div style={{ flex: 1 }} />
