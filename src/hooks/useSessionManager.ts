@@ -4,7 +4,7 @@ import { useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { RootState, AppDispatch } from '../store';
-import { setSession, setActiveSessionId, setIsLoggingIn, setSessionInput, setIsGuest } from '../store/slices/sessionSlice';
+import { setSession, setActiveSessionId, setIsLoggingIn, setSessionInput } from '../store/slices/sessionSlice';
 import { setPrepStep, setActiveView, setIsLoggerOpen, setAiPaneOpen, setMobileMenuOpen } from '../store/slices/uiSlice';
 import {
   setHighestStep, setSelections, setNotes, setInterSelections, setStrikeSelections,
@@ -31,11 +31,11 @@ function resolveLogState(log: TradeLog) {
   return {
     highestStep:   (log.highestStep  ?? s?.highestStep  ?? 1) as number,
     stepTimestamps:(log.stepTimestamps ?? s?.stepTimestamps ?? {}) as Record<string, string>,
-    realBias:      p2?.selections ?? (s?.selections?.realBias ?? {}) as Record<string,string>,
+    preSessionContext: p2?.selections ?? (s?.selections?.preSessionContext ?? (s?.selections as any)?.realBias ?? {}) as Record<string,string>,
     htfStructure:  p3?.selections ?? (s?.selections?.htfStructure ?? {}) as Record<string,string>,
     marketPulse:   p4?.marketPulse ?? (s?.selections?.marketPulse ?? {}) as Record<string,string>,
     liquidityCtx:  p4?.liquidityContext ?? (s?.selections?.liquidityContext ?? {}) as Record<string,string>,
-    note2:  p2?.note ?? s?.notes?.realBias ?? '',
+    note2:  p2?.note ?? s?.notes?.preSessionContext ?? (s?.notes as any)?.realBias ?? '',
     note3:  p3?.note ?? s?.notes?.htfStructure ?? '',
     note4mp:p4?.marketPulse_note ?? s?.notes?.marketPulse ?? '',
     note4lq:p4?.liquidityContext_note ?? s?.notes?.liquidityContext ?? '',
@@ -60,7 +60,6 @@ export function useSessionManager() {
 
   const session = useSelector((s: RootState) => s.session.session);
   const sessionInput = useSelector((s: RootState) => s.session.sessionInput);
-  const isGuest = useSelector((s: RootState) => s.session.isGuest);
   const currentModel = useSelector((s: RootState) => s.model.currentModel);
   const notes = useSelector((s: RootState) => s.analysis.notes);
   const selections = useSelector((s: RootState) => s.analysis.selections);
@@ -70,8 +69,8 @@ export function useSessionManager() {
   // current values without a stale closure, regardless of dependency arrays.
   const analysisRef = useRef({
     highestStep: 1,
-    selections: { realBias: {}, htfStructure: {}, marketPulse: {}, liquidityContext: {} },
-    notes: { realBias: '', htfStructure: '', marketPulse: '', liquidityContext: '' },
+    selections: { preSessionContext: {}, htfStructure: {}, marketPulse: {}, liquidityContext: {} },
+    notes: { preSessionContext: '', htfStructure: '', marketPulse: '', liquidityContext: '' },
     interSelections: { pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' },
     strikeSelections: { impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' },
     finalCommand: null as string | null,
@@ -114,8 +113,8 @@ export function useSessionManager() {
     dispatch(setHighestStep(1));
     dispatch(setCommandLocked(false));
     dispatch(setWeaponLocked(false));
-    dispatch(setSelections({ realBias: {}, htfStructure: {}, marketPulse: {}, liquidityContext: {} }));
-    dispatch(setNotes({ realBias: '', htfStructure: '', marketPulse: '', liquidityContext: '' }));
+    dispatch(setSelections({ preSessionContext: {}, htfStructure: {}, marketPulse: {}, liquidityContext: {} }));
+    dispatch(setNotes({ preSessionContext: '', htfStructure: '', marketPulse: '', liquidityContext: '' }));
     dispatch(setInterSelections({ pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }));
     dispatch(setStrikeSelections({ impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' }));
     dispatch(setFinalCommand(null));
@@ -152,8 +151,8 @@ export function useSessionManager() {
 
       const r = resolveLogState(log);
       dispatch(setHighestStep(r.highestStep));
-      dispatch(setSelections({ realBias: r.realBias, htfStructure: r.htfStructure, marketPulse: r.marketPulse, liquidityContext: r.liquidityCtx }));
-      dispatch(setNotes({ realBias: r.note2, htfStructure: r.note3, marketPulse: r.note4mp, liquidityContext: r.note4lq }));
+      dispatch(setSelections({ preSessionContext: r.preSessionContext, htfStructure: r.htfStructure, marketPulse: r.marketPulse, liquidityContext: r.liquidityCtx }));
+      dispatch(setNotes({ preSessionContext: r.note2, htfStructure: r.note3, marketPulse: r.note4mp, liquidityContext: r.note4lq }));
       dispatch(setStrikeSelections(r.strikeSel as Parameters<typeof setStrikeSelections>[0]));
       dispatch(setInterSelections(r.interSel   as Parameters<typeof setInterSelections>[0]));
       dispatch(setFinalCommand(r.finalCmd));
@@ -190,21 +189,30 @@ export function useSessionManager() {
       body: JSON.stringify({ username: sessionInput.userName, password: sessionInput.password }),
     })
       .then((res) => { if (res.ok) return res.json(); throw new Error('Invalid credentials'); })
-      .then((data: { user: string }) => {
-        dispatch(setSession({ userName: data.user, assetName: null, tradeName: null }));
+      .then((data: {
+        user: string;
+        role: string;
+        allowed_models: string[];
+        allowed_pages: string[];
+        access_token: string;
+      }) => {
+        const sessObj = {
+          userName: data.user,
+          assetName: null,
+          tradeName: null,
+          role: data.role,
+          allowedModels: data.allowed_models,
+          allowedPages: data.allowed_pages,
+        };
+        localStorage.setItem('netra_token', data.access_token);
+        localStorage.setItem('netra_session', JSON.stringify(sessObj));
+        dispatch(setSession(sessObj));
         dispatch(setPrepStep(1));
         navigate('/home');
       })
       .catch((err: Error) => showToast(err.message, 'error'))
       .finally(() => dispatch(setIsLoggingIn(false)));
   }, [dispatch, getAuthHeaders, sessionInput, navigate, showToast]);
-
-  const handleGuestLogin = useCallback(() => {
-    dispatch(setIsGuest(true));
-    dispatch(setSession({ userName: 'Guest', assetName: null, tradeName: null }));
-    dispatch(setPrepStep(1));
-    navigate('/home');
-  }, [dispatch, navigate]);
 
   const initializeMission = useCallback(() => {
     if (!sessionInput.tradeName || !sessionInput.assetName) {
@@ -215,20 +223,22 @@ export function useSessionManager() {
     const payload = {
       model_id: currentModel,
       username: session?.userName || 'Unknown',
-      realBias: '-', htfStructure: '-', marketPulse: '-', liquidityContext: '-',
+      preSessionContext: '-', htfStructure: '-', marketPulse: '-', liquidityContext: '-',
       weapon: 'INITIALIZING',
       protocol: sessionInput.modelName === 'trishul' ? 'TRISHUL' : 'PINAKA',
       trade_name: sessionInput.tradeName,
       asset_ticker: sessionInput.assetName,
+      asset_class: sessionInput.assetClass || 'Index',
       session_state: {
         highestStep: 1,
-        selections: { realBias: {}, htfStructure: {}, marketPulse: {}, liquidityContext: {} },
-        notes: { realBias: '', htfStructure: '', marketPulse: '', liquidityContext: '' },
+        selections: { preSessionContext: {}, htfStructure: {}, marketPulse: {}, liquidityContext: {} },
+        notes: { preSessionContext: '', htfStructure: '', marketPulse: '', liquidityContext: '' },
         interSelections: { pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' },
         strikeSelections: { impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' },
         finalCommand: null, netraOutput: null, sysRecommendation: null,
         selectedWeaponId: null, stepTimestamps: {},
         tradeName: sessionInput.tradeName, assetName: sessionInput.assetName,
+        assetClass: sessionInput.assetClass || 'Index',
       },
     };
     fetch(`${API_BASE}/api/logs`, {
@@ -243,7 +253,7 @@ export function useSessionManager() {
         dispatch(setSession({ ...session!, assetName: sessionInput.assetName, tradeName: sessionInput.tradeName }));
         dispatch(setIsLoggerOpen(true));
         dispatch(setAiPaneOpen(false));
-        dispatch(setSessionInput({ ...sessionInput, assetName: '', tradeName: '' }));
+        dispatch(setSessionInput({ ...sessionInput, assetName: '', tradeName: '', assetClass: 'Index' }));
         dispatch(setPrepStep(2));
         dispatch(setActiveView(sessionInput.modelName === 'trishul' ? 'trishul' : 'terminal'));
         dispatch(registerSession(buildSessionMeta(data, null, null)));
@@ -257,8 +267,8 @@ export function useSessionManager() {
   const resumeSession = useCallback((log: TradeLog) => {
     const r = resolveLogState(log);
     dispatch(setHighestStep(r.highestStep));
-    dispatch(setSelections({ realBias: r.realBias, htfStructure: r.htfStructure, marketPulse: r.marketPulse, liquidityContext: r.liquidityCtx }));
-    dispatch(setNotes({ realBias: r.note2, htfStructure: r.note3, marketPulse: r.note4mp, liquidityContext: r.note4lq }));
+    dispatch(setSelections({ preSessionContext: r.preSessionContext, htfStructure: r.htfStructure, marketPulse: r.marketPulse, liquidityContext: r.liquidityCtx }));
+    dispatch(setNotes({ preSessionContext: r.note2, htfStructure: r.note3, marketPulse: r.note4mp, liquidityContext: r.note4lq }));
     dispatch(setStrikeSelections(r.strikeSel as Parameters<typeof setStrikeSelections>[0]));
     dispatch(setInterSelections(r.interSel   as Parameters<typeof setInterSelections>[0]));
     dispatch(setFinalCommand(r.finalCmd));
@@ -287,7 +297,6 @@ export function useSessionManager() {
   }, [dispatch, session, navigate, showToast, buildSessionMeta]);
 
   const forkSession = useCallback((log: TradeLog, newName: string) => {
-    if (isGuest) { showToast('Demo mode — fork disabled', 'error'); return; }
     const r = resolveLogState(log);
     const finalName = newName || `FORK_${log.name || 'Trade'}`;
     const payload = {
@@ -306,8 +315,8 @@ export function useSessionManager() {
       .then((res) => { if (!res.ok) throw new Error('Failed to fork session'); return res.json(); })
       .then((data: TradeLog) => {
         dispatch(setHighestStep(r.highestStep));
-        dispatch(setSelections({ realBias: r.realBias, htfStructure: r.htfStructure, marketPulse: r.marketPulse, liquidityContext: r.liquidityCtx }));
-        dispatch(setNotes({ realBias: r.note2, htfStructure: r.note3, marketPulse: r.note4mp, liquidityContext: r.note4lq }));
+        dispatch(setSelections({ preSessionContext: r.preSessionContext, htfStructure: r.htfStructure, marketPulse: r.marketPulse, liquidityContext: r.liquidityCtx }));
+        dispatch(setNotes({ preSessionContext: r.note2, htfStructure: r.note3, marketPulse: r.note4mp, liquidityContext: r.note4lq }));
         dispatch(setStrikeSelections(r.strikeSel as Parameters<typeof setStrikeSelections>[0]));
         dispatch(setInterSelections(r.interSel   as Parameters<typeof setInterSelections>[0]));
         dispatch(setFinalCommand(r.finalCmd));
@@ -335,10 +344,9 @@ export function useSessionManager() {
         navigate('/mission/pinaka');
       })
       .catch((err: Error) => showToast(`Fork Failure: ${err.message}`, 'error'));
-  }, [dispatch, session, isGuest, currentModel, navigate, showToast, getAuthHeaders, buildSessionMeta]);
+  }, [dispatch, session, currentModel, navigate, showToast, getAuthHeaders, buildSessionMeta]);
 
   const forkCurrentSession = useCallback((phaseNum: number, newName: string) => {
-    if (isGuest) { showToast('Demo mode — fork disabled', 'error'); return; }
     const snap = analysisRef.current;
     if (!snap.activeSessionId) return;
     
@@ -348,7 +356,7 @@ export function useSessionManager() {
     const payload = {
       model_id: currentModel,
       username: session?.userName || 'Unknown',
-      realBias: snap.selections.realBias ? 'FILLED' : '-',
+      preSessionContext: snap.selections.preSessionContext ? 'FILLED' : '-',
       htfStructure: snap.selections.htfStructure ? 'FILLED' : '-',
       marketPulse: snap.selections.marketPulse ? 'FILLED' : '-',
       liquidityContext: snap.selections.liquidityContext ? 'FILLED' : '-',
@@ -403,9 +411,9 @@ export function useSessionManager() {
         // Clear the data for the forked phase so the user starts it fresh
         const ts = { ...snap.stepTimestamps };
         if (phaseNum === 1) {
-          dispatch(setSelections({ ...snap.selections, realBias: {} }));
-          dispatch(setNotes({ ...snap.notes, realBias: '' }));
-          delete ts.realBias;
+          dispatch(setSelections({ ...snap.selections, preSessionContext: {} }));
+          dispatch(setNotes({ ...snap.notes, preSessionContext: '' }));
+          delete ts.preSessionContext;
         } else if (phaseNum === 2) {
           dispatch(setSelections({ ...snap.selections, htfStructure: {} }));
           dispatch(setNotes({ ...snap.notes, htfStructure: '' }));
@@ -514,8 +522,8 @@ export function useSessionManager() {
         ? { image_description: snap.imageDescription }
         : null,
 
-      phase2: snap.selections.realBias
-        ? { selections: snap.selections.realBias, note: snap.notes.realBias }
+      phase2: snap.selections.preSessionContext
+        ? { selections: snap.selections.preSessionContext, note: snap.notes.preSessionContext }
         : null,
 
       phase3: snap.selections.htfStructure
@@ -579,8 +587,8 @@ export function useSessionManager() {
   const activeSessionIdVal = useSelector((s: RootState) => s.session.activeSessionId);
 
   return {
-    session, sessionInput, isLoggingIn, isGuest, activeSessionId: activeSessionIdVal,
-    handleAuth, handleGuestLogin, initializeMission, resumeSession, forkSession, forkCurrentSession, saveSession, resetTerminalState, logout, loadSessionById,
+    session, sessionInput, isLoggingIn, activeSessionId: activeSessionIdVal,
+    handleAuth, initializeMission, resumeSession, forkSession, forkCurrentSession, saveSession, resetTerminalState, logout, loadSessionById,
     setSession: (v: RootState['session']['session']) => dispatch(setSession(v)),
     setSessionInput: (v: RootState['session']['sessionInput']) => dispatch(setSessionInput(v)),
   };

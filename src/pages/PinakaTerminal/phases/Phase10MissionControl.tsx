@@ -10,8 +10,7 @@ import { useNetra } from '../../../context/NetraContext';
 import { useNetraUtils } from '../../../hooks/useNetraUtils';
 import type { TradeCard } from './missionControl/types';
 import { CARDS_KEY, todayStr, mkCard, computeCardStats, MONO, StatCell } from './missionControl/helpers';
-import WeaponPanel from './missionControl/WeaponPanel';
-import TradeCardComponent from './missionControl/TradeCard';
+import UnifiedTradeCard from './missionControl/UnifiedTradeCard';
 
 export default function Phase10MissionControl() {
   const {
@@ -88,31 +87,22 @@ export default function Phase10MissionControl() {
         </div>
       )}
 
-      {/* ── Trade cards — each is a hybrid: weapon (left) + trade (right) ── */}
+      {/* ── Trade cards — each is a unified 3-column panel ── */}
       {visibleCards.length > 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {visibleCards.map((card, idx) => (
-            <div
+            <UnifiedTradeCard
               key={card.id}
-              style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) minmax(300px, 1fr)', gap: '14px', alignItems: 'start' }}
-            >
-              <WeaponPanel
-                card={card}
-                onChange={updates => updCard(card.id, updates)}
-                isLocked={isFullyLocked}
-              />
-              <TradeCardComponent
-                card={card}
-                tradeIndex={idx}
-                assetPrefix={assetPrefix}
-                username={session?.userName || ''}
-                onChange={updates => updCard(card.id, updates)}
-                onRemove={() => setCards(prev => prev.filter(c => c.id !== card.id))}
-                canRemove={visibleCards.length > 1}
-                isLocked={isFullyLocked}
-                getAuthHeaders={getAuthHeaders}
-              />
-            </div>
+              card={card}
+              tradeIndex={idx}
+              assetPrefix={assetPrefix}
+              username={session?.userName || ''}
+              onChange={updates => updCard(card.id, updates)}
+              onRemove={() => setCards(prev => prev.filter(c => c.id !== card.id))}
+              canRemove={visibleCards.length > 1}
+              isLocked={isFullyLocked}
+              getAuthHeaders={getAuthHeaders}
+            />
           ))}
         </div>
       ) : (

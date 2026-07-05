@@ -47,6 +47,7 @@ export default function PhaseNetraState() {
           ...inner,
           recognized_state: rec,
           possible_transitions: proj.possible_transitions || [],
+          child_states: proj.child_states || [],
           state_id: rec.state_id,
           cmd: rec.command,
           posture: rec.posture,
@@ -69,21 +70,42 @@ export default function PhaseNetraState() {
         )}
         <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }} />
 
-        {/* state picker — analyst overrides the recognised state */}
-        <select
-          value={recognizedState?.state_id || ''}
-          onChange={e => selectState(e.target.value)}
-          disabled={switching || catalog.length === 0}
-          title="Override the recognised state"
-          style={{ fontFamily: MONO, fontSize: '10px', fontWeight: 700, color: '#4169E1', background: 'rgba(65,105,225,0.08)', border: '1px solid rgba(65,105,225,0.4)', padding: '4px 8px', cursor: 'pointer', maxWidth: '210px' }}
-        >
-          <option value="" disabled>{switching ? 'loading…' : 'select state ▾'}</option>
-          {catalog.map(s => (
-            <option key={s.id} value={s.id} style={{ color: '#000' }}>
-              {s.id} · {s.name}
-            </option>
-          ))}
-        </select>
+        {/* state override widget */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', border: `1px solid ${isOverride ? '#f59e0b' : '#38bdf8'}`, background: 'rgba(0,0,0,0.4)', padding: '2px 8px', borderRadius: '3px', boxShadow: `0 0 8px ${isOverride ? 'rgba(245,158,11,0.1)' : 'rgba(56,189,248,0.15)'}` }}>
+          <span style={{ fontFamily: MONO, fontSize: '8px', fontWeight: 800, letterSpacing: '0.12em', color: isOverride ? '#f59e0b' : '#38bdf8', textTransform: 'uppercase', marginRight: '4px' }}>
+            OVERRIDE:
+          </span>
+          <select
+            value={recognizedState?.state_id || ''}
+            onChange={e => selectState(e.target.value)}
+            disabled={switching || catalog.length === 0}
+            title="Override the recognised state"
+            style={{
+              fontFamily: MONO,
+              fontSize: '10px',
+              fontWeight: 800,
+              color: '#ffffff',
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              cursor: 'pointer',
+              paddingRight: '12px',
+              appearance: 'none',
+              WebkitAppearance: 'none',
+              backgroundImage: 'url("data:image/svg+xml;utf8,<svg fill=\'white\' height=\'24\' viewBox=\'0 0 24 24\' width=\'24\' xmlns=\'http://www.w3.org/2000/svg\'><path d=\'M7 10l5 5 5-5z\'/><path d=\'M0 0h24v24H0z\' fill=\'none\'/></svg>")',
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right center',
+              backgroundSize: '12px',
+            }}
+          >
+            <option value="" disabled style={{ color: '#000' }}>{switching ? 'loading…' : 'SELECT STATE'}</option>
+            {catalog.map(s => (
+              <option key={s.id} value={s.id} style={{ color: '#000' }}>
+                {s.id} · {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>

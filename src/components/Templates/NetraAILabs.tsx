@@ -45,7 +45,7 @@ export default function NetraAILabs({
   // The suggestion box runs the multi-agent pipeline — only models that reliably
   // follow JSON belong here (tagged "Agent" in models_config.json). The chat box
   // keeps the full list. Free/preview/tiny/reasoning models are filtered out.
-  const agentModels = AVAILABLE_MODELS.filter(m => (m.tags || []).includes('Agent'));
+  const agentModels = AVAILABLE_MODELS;
 
   // Never let an agent run on a non-capable model: if the shared selection is
   // something the chat box picked (e.g. a free model), snap it to a capable one.

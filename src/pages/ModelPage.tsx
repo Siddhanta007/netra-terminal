@@ -99,11 +99,13 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
     else { setSortCol(col); setSortDir('desc'); }
   };
 
+  const [filterOperator, setFilterOperator] = useState('all');
   const allWeapons = Array.from(new Set(tradeLogs.map(l => (l.phase3?.manual_weapon || l.weapon || '').toUpperCase()).filter(Boolean))).sort();
   const allCommands = Array.from(new Set(tradeLogs.map(l => ((l.phase1?.protocol as string) || (l.session_state?.finalCommand as string) || '').toUpperCase()).filter(Boolean))).sort();
-  const hasActiveFilter = filterOutcome !== 'all' || filterWeapon !== 'all' || filterCommand !== 'all' || filterPL !== 'all' || search !== '';
+  const allOperators = Array.from(new Set(tradeLogs.map(l => l.created_by || l.username || '').filter(Boolean))).sort();
+  const hasActiveFilter = filterOutcome !== 'all' || filterWeapon !== 'all' || filterCommand !== 'all' || filterPL !== 'all' || filterOperator !== 'all' || search !== '';
 
-  const clearFilters = () => { setFilterOutcome('all'); setFilterWeapon('all'); setFilterCommand('all'); setFilterPL('all'); setSearch(''); };
+  const clearFilters = () => { setFilterOutcome('all'); setFilterWeapon('all'); setFilterCommand('all'); setFilterPL('all'); setFilterOperator('all'); setSearch(''); };
 
   const filteredLogs = tradeLogs
     .filter(l => {
@@ -112,7 +114,8 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
         const asset = (l.phase2?.asset_ticker || l.phase1?.asset_ticker || l.asset || '').toLowerCase();
         const weapon = (l.phase3?.manual_weapon || l.weapon || '').toLowerCase();
         const outcome = (l.phase4?.outcome || '').toLowerCase();
-        if (!asset.includes(s) && !weapon.includes(s) && !outcome.includes(s) && !fmtDate(l.timestamp).toLowerCase().includes(s) && !(l.name || '').toLowerCase().includes(s)) return false;
+        const creator = (l.created_by || l.username || '').toLowerCase();
+        if (!asset.includes(s) && !weapon.includes(s) && !outcome.includes(s) && !creator.includes(s) && !fmtDate(l.timestamp).toLowerCase().includes(s) && !(l.name || '').toLowerCase().includes(s)) return false;
       }
       if (filterOutcome !== 'all') {
         const o = (l.phase4?.outcome || '').toLowerCase();
@@ -133,6 +136,10 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
         if (filterPL === 'profit' && (isNaN(pl) || pl <= 0)) return false;
         if (filterPL === 'loss'   && (isNaN(pl) || pl >= 0)) return false;
       }
+      if (filterOperator !== 'all') {
+        const creator = (l.created_by || l.username || '').toLowerCase();
+        if (creator !== filterOperator.toLowerCase()) return false;
+      }
       return true;
     })
     .sort((a, b) => {
@@ -142,6 +149,8 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
       else if (sortCol === 'weapon') { va = a.phase3?.manual_weapon || a.weapon || ''; vb = b.phase3?.manual_weapon || b.weapon || ''; }
       else if (sortCol === 'pl') { va = parseFloat(String(a.phase4?.pl || '0')) || 0; vb = parseFloat(String(b.phase4?.pl || '0')) || 0; }
       else if (sortCol === 'result') { va = a.phase4?.outcome || ''; vb = b.phase4?.outcome || ''; }
+      else if (sortCol === 'created_by') { va = a.created_by || a.username || ''; vb = b.created_by || b.username || ''; }
+      else if (sortCol === 'name') { va = a.name || ''; vb = b.name || ''; }
       if (va < vb) return sortDir === 'asc' ? -1 : 1;
       if (va > vb) return sortDir === 'asc' ? 1 : -1;
       return 0;
@@ -525,6 +534,33 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
                           </div>
                         )}
 
+                        {/* Operator */}
+                        {allOperators.length > 0 && (
+                          <div style={{ marginBottom: '14px' }}>
+                            <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.18em', color: 'rgba(15,23,42,0.4)', marginBottom: '8px' }}>Operator</div>
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                              {(['all', ...allOperators]).map(v => {
+                                const active = filterOperator === v;
+                                return (
+                                  <button
+                                    key={v}
+                                    onClick={() => setFilterOperator(v)}
+                                    style={{
+                                      height: '24px', padding: '0 10px', fontSize: '8px', fontWeight: 800,
+                                      textTransform: 'uppercase', letterSpacing: '0.1em',
+                                      border: `1px solid ${active ? color : 'rgba(15,23,42,0.15)'}`,
+                                      background: active ? `${color}12` : 'transparent',
+                                      color: active ? color : 'rgba(15,23,42,0.45)', cursor: 'pointer', fontFamily: 'inherit'
+                                    }}
+                                  >
+                                    {v === 'all' ? 'All' : v}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
                         {/* Clear */}
                         {hasActiveFilter && (
                           <button onClick={() => { clearFilters(); setFilterOpen(false); }} style={{ width: '100%', height: '28px', marginTop: '4px', fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.05)', color: '#ef4444', cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -566,9 +602,10 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
             ) : (
               <>
                 {/* Column headers (sortable) */}
-                <div style={{ display: 'grid', gridTemplateColumns: '140px 110px 90px 90px 100px 100px 80px 76px 1fr', padding: '10px 28px', borderBottom: `1px solid ${color}20`, gap: '8px', background: `${color}08` }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '120px 90px 110px 90px 90px 90px 90px 75px 70px 1fr', padding: '10px 28px', borderBottom: `1px solid ${color}20`, gap: '8px', background: `${color}08` }}>
                   {([
                     { key: 'name', label: 'Name' },
+                    { key: 'created_by', label: 'Operator' },
                     { key: 'date', label: 'Date' },
                     { key: 'asset', label: 'Asset' },
                     { key: 'weapon', label: 'Weapon' },
@@ -602,11 +639,13 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
                     <div key={log.id}>
                       {/* Main row */}
                       <div
-                        style={{ display: 'grid', gridTemplateColumns: '140px 110px 90px 90px 100px 100px 80px 76px 1fr', padding: '13px 28px', borderBottom: `1px solid ${color}0e`, gap: '8px', alignItems: 'center', borderLeft: `3px solid ${accentLine}`, background: isExpanded ? `${color}12` : (rowIdx % 2 === 0 ? `${color}0d` : LEDGER_BG), transition: 'background 150ms', cursor: 'default' }}
+                        onClick={() => setExpandedId(isExpanded ? null : log.id)}
+                        style={{ display: 'grid', gridTemplateColumns: '120px 90px 110px 90px 90px 90px 90px 75px 70px 1fr', padding: '13px 28px', borderBottom: `1px solid ${color}0e`, gap: '8px', alignItems: 'center', borderLeft: `3px solid ${accentLine}`, background: isExpanded ? `${color}12` : (rowIdx % 2 === 0 ? `${color}0d` : LEDGER_BG), transition: 'background 150ms', cursor: 'pointer' }}
                         onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = `${color}16`; }}
                         onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = rowIdx % 2 === 0 ? `${color}0d` : LEDGER_BG; }}
                       >
                         <span style={{ fontSize: '10px', fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.name || '—'}>{log.name || '—'}</span>
+                        <span style={{ fontSize: '10px', fontWeight: 700, fontFamily: 'monospace', color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.created_by || log.username || '—'}>{log.created_by || log.username || '—'}</span>
                         <span style={{ fontSize: '11px', fontWeight: 600, color: '#334155', fontFamily: 'monospace' }}>{fmtDate(log.timestamp)}</span>
                         <span style={{ fontSize: '11px', fontWeight: 700, color: '#0f172a' }}>{log.phase2?.asset_ticker || log.phase1?.asset_ticker || log.asset || '—'}</span>
                         <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.06em', color }}>{log.phase3?.manual_weapon || log.weapon || '—'}</span>
@@ -620,39 +659,28 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
                         </span>
 
                         {/* Action buttons */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
-                          {/* View — opens left Operational Ledger pane */}
-                          <button
-                            onClick={() => { onView?.(log); setExpandedId(isExpanded ? null : log.id); }}
-                            style={{ height: '22px', padding: '0 8px', fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', border: `1px solid ${color}38`, background: isExpanded ? `${color}25` : `${color}10`, color, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 150ms' }}
-                          >
-                            {isExpanded ? 'Close' : 'View'}
-                          </button>
+                        <div onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                           {/* Resume */}
-                          {hasSession && (
-                            <button
-                              onClick={() => resumeSession(log)}
-                              style={{ height: '22px', padding: '0 8px', fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(16,185,129,0.5)', background: 'rgba(16,185,129,0.08)', color: '#059669', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 150ms' }}
-                              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.18)'; }}
-                              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.08)'; }}
-                            >
-                              Resume
-                            </button>
-                          )}
+                          <button
+                            onClick={() => resumeSession(log)}
+                            style={{ height: '22px', padding: '0 8px', fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', border: '1px solid rgba(16,185,129,0.5)', background: 'rgba(16,185,129,0.08)', color: '#059669', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 150ms' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.18)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.08)'; }}
+                          >
+                            Resume
+                          </button>
                           {/* Fork */}
-                          {hasSession && (
-                            <button
-                              onClick={() => {
-                                const name = window.prompt('Fork name:', `FORK_${log.name || log.id}`) ?? '';
-                                if (name !== null) forkSession(log, name);
-                              }}
-                              style={{ height: '22px', padding: '0 8px', fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', border: `1px solid ${color}38`, background: `${color}10`, color, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 150ms' }}
-                              onMouseEnter={e => { e.currentTarget.style.background = `${color}25`; }}
-                              onMouseLeave={e => { e.currentTarget.style.background = `${color}10`; }}
-                            >
-                              Fork
-                            </button>
-                          )}
+                          <button
+                            onClick={() => {
+                              const name = window.prompt('Fork name:', `FORK_${log.name || log.id}`) ?? '';
+                              if (name) forkSession(log, name);
+                            }}
+                            style={{ height: '22px', padding: '0 8px', fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', border: `1px solid ${color}38`, background: `${color}10`, color, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 150ms' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = `${color}25`; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = `${color}10`; }}
+                          >
+                            Fork
+                          </button>
                           {/* Delete */}
                           {deleteTradeLog && (
                             <button

@@ -64,10 +64,10 @@ export const MONO = 'JetBrains Mono, Consolas, monospace';
 export const bare: CSSProperties = {
   background: 'rgba(255,255,255,0.03)',
   border: '1px solid rgba(255,255,255,0.16)',
-  borderRadius: '5px',
+  borderRadius: '0px',
   outline: 'none',
   fontFamily: MONO, color: '#e8eaed', width: '100%',
-  padding: '8px 10px',
+  padding: '12px 14px',
 };
 export const sep  = '1px solid rgba(255,255,255,0.07)';
 export const SEP6 = '1px solid rgba(255,255,255,0.06)';
@@ -94,7 +94,7 @@ export function Field({ label, value, onChange, disabled, placeholder, color }: 
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
       <span style={{ fontFamily: MONO, fontSize: '8px', fontWeight: 800, color: color || 'rgba(255,255,255,0.55)', letterSpacing: '0.2em', textTransform: 'uppercase' }}>{label}</span>
       <input type="number" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} disabled={disabled}
-        style={{ ...bare, fontSize: '16px', fontWeight: 900, color: color || '#ffffff' }} />
+        style={{ ...bare, fontSize: '13px', fontWeight: 900, color: color || '#ffffff' }} />
     </div>
   );
 }

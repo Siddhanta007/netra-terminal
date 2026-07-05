@@ -17,7 +17,6 @@ export function useTradeLogsCrud() {
   const activeEditLog = useSelector((s: RootState) => s.logs.activeEditLog);
   const editFormData = useSelector((s: RootState) => s.logs.editFormData);
   const session = useSelector((s: RootState) => s.session.session);
-  const isGuest = useSelector((s: RootState) => s.session.isGuest);
   const currentModel = useSelector((s: RootState) => s.model.currentModel);
   const selections = useSelector((s: RootState) => s.analysis.selections);
   const notes = useSelector((s: RootState) => s.analysis.notes);
@@ -31,16 +30,15 @@ export function useTradeLogsCrud() {
   const auditData = useSelector((s: RootState) => s.logs.auditData);
 
   const fetchLogs = useCallback((modelId = 'pinaka') => {
-    if (isGuest) return;
     fetch(`${API_BASE}/api/logs?model_id=${modelId}`, { headers: getAuthHeaders() })
       .then((res) => res.json())
       .then((data: TradeLog[]) => dispatch(setTradeLogs(data)))
       .catch(() => { if (import.meta.env.DEV) console.error('Logger offline'); });
-  }, [dispatch, getAuthHeaders, isGuest]);
+  }, [dispatch, getAuthHeaders]);
 
   const commitTradeLog = useCallback((weapon?: string) => {
     const selNotes = [
-      Object.keys(selections.realBias || {}).length > 0 && `Real Bias: ${Object.values(selections.realBias).join(', ')}${notes.realBias ? ' — ' + notes.realBias : ''}`,
+      Object.keys(selections.preSessionContext || {}).length > 0 && `Pre-Session Context: ${Object.values(selections.preSessionContext).join(', ')}${notes.preSessionContext ? ' — ' + notes.preSessionContext : ''}`,
       Object.keys(selections.htfStructure || {}).length > 0 && `HTF Structure: ${Object.values(selections.htfStructure).join(', ')}${notes.htfStructure ? ' — ' + notes.htfStructure : ''}`,
       Object.keys(selections.marketPulse || {}).length > 0 && `Market Pulse: ${Object.values(selections.marketPulse).join(', ')}${notes.marketPulse ? ' — ' + notes.marketPulse : ''}`,
       Object.keys(selections.liquidityContext || {}).length > 0 && `Liquidity Context: ${Object.values(selections.liquidityContext).join(', ')}${notes.liquidityContext ? ' — ' + notes.liquidityContext : ''}`,
@@ -78,7 +76,7 @@ export function useTradeLogsCrud() {
     const payload = {
       model_id: currentModel, username: session?.userName || 'Unknown',
       ...selections,
-      realBias_note: notes.realBias, htfStructure_note: notes.htfStructure,
+      preSessionContext_note: notes.preSessionContext, htfStructure_note: notes.htfStructure,
       marketPulse_note: notes.marketPulse, liquidityContext_note: notes.liquidityContext,
       weapon: finalWeapon, protocol: finalCommand || 'UNKNOWN',
       asset_ticker: editFormData.trading_asset || session?.assetName || '',

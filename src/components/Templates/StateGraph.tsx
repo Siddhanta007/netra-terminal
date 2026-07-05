@@ -13,7 +13,9 @@ export interface RecognizedState {
   status?: string;
   description?: string;
   meaning?: string;
-  triggering_conditions?: string[];
+  definition?: string;
+  doctrine_purpose?: string[];
+  recognition_logic?: string[];
 }
 
 export interface EdgeStats {
@@ -35,6 +37,33 @@ export interface TransitionBranch {
 }
 
 const MONO: React.CSSProperties = { fontFamily: 'JetBrains Mono, Consolas, monospace' };
+
+const WEAPON_NAME_MAP: Record<string, string> = {
+  // STRIKE
+  'NS-03-CS01': 'Astra',
+  'NS-03-CS02': 'BrahMos',
+  'NS-03-CS03': 'Agni',
+  'NS-03-CS04': 'Nirbhay',
+  'NS-03-CS05': 'Akash',
+  'NS-03-CS06': 'Pralay',
+  // INTERCEPTION
+  'NS-04-CS01': 'Rafale',
+  'NS-04-CS02': 'Su-30 MKI',
+  'NS-04-CS03': 'Tejas',
+  'NS-04-CS04': 'Mirage-2000',
+  'NS-04-CS05': 'MiG-29',
+  // SATURATION
+  'NS-02-CS01': 'HAL Dhruv',
+  'NS-02-CS02': 'HAL Rudra',
+  'NS-02-CS03': 'HAL Prachand',
+  'NS-02-CS04': 'HAL Cheetah',
+  // NO ENGAGEMENT
+  'NS-01-CS01': 'Info Void',
+  'NS-01-CS02': 'Liq Trap',
+  'NS-01-CS03': 'Collapse',
+  'NS-01-CS04': 'Constraint',
+  'NS-01-CS05': 'Transition',
+};
 
 // ─── Colour ──────────────────────────────────────────────────────────────────
 
@@ -89,19 +118,41 @@ function StateHero({ state }: { state: RecognizedState }) {
         <Chip label="POSTURE" value={(state.posture || '—').replace(/_/g, ' ')} color={engageHex(state.posture)} />
         {state.status && <Chip label="STATUS" value={state.status.replace(/_/g, ' ')} color={state.status === 'OK' ? '#22c55e' : '#f59e0b'} />}
       </div>
-      {state.meaning && <p style={{ ...MONO, fontSize: '11px', color: 'rgba(255,255,255,0.78)', lineHeight: 1.7, margin: '14px 0 0' }}>{state.meaning}</p>}
-      {!!state.triggering_conditions?.length && (
-        <div style={{ marginTop: '12px' }}>
-          <button onClick={() => setOpen(v => !v)} style={{ ...MONO, fontSize: '8px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {open ? '▾' : '▸'} Triggering Conditions ({state.triggering_conditions.length})
-          </button>
-          {open && (
-            <ul style={{ margin: '8px 0 0', paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {state.triggering_conditions.map((c, i) => <li key={i} style={{ ...MONO, fontSize: '10px', color: 'rgba(255,255,255,0.65)', lineHeight: 1.6 }}>{c}</li>)}
-            </ul>
-          )}
-        </div>
+      {(state.definition || state.meaning) && (
+        <p style={{ ...MONO, fontSize: '11px', color: 'rgba(255,255,255,0.85)', lineHeight: 1.6, margin: '14px 0 12px 0' }}>
+          {state.definition || state.meaning}
+        </p>
       )}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '14px', marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px' }}>
+        {state.doctrine_purpose && state.doctrine_purpose.length > 0 && (
+          <div>
+            <span style={{ ...MONO, fontSize: '7.5px', fontWeight: 800, color: accent, letterSpacing: '0.15em', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+              Doctrine Purpose
+            </span>
+            <ul style={{ margin: 0, paddingLeft: '14px', listStyleType: 'square', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              {state.doctrine_purpose.map((item, idx) => (
+                <li key={idx} style={{ ...MONO, fontSize: '9.5px', color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {state.recognition_logic && state.recognition_logic.length > 0 && (
+          <div>
+            <span style={{ ...MONO, fontSize: '7.5px', fontWeight: 800, color: accent, letterSpacing: '0.15em', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+              Recognition Logic
+            </span>
+            <ul style={{ margin: 0, paddingLeft: '14px', listStyleType: 'square', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              {state.recognition_logic.map((item, idx) => (
+                <li key={idx} style={{ ...MONO, fontSize: '9.5px', color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -276,7 +327,7 @@ function SubwayMap({ state, transitions }: { state: RecognizedState; transitions
               ) : (
                 <>
                   <text x={n.x + 14} y={n.y + 14} style={{ ...MONO, fontSize: '11px', fontWeight: 900, fill: color }}>
-                    {n.id}{n.cycle ? ' ↺' : ''}
+                    {(WEAPON_NAME_MAP[n.id] || n.id)}{n.cycle ? ' ↺' : ''}
                   </text>
                   <text x={n.x + 14} y={n.y + 26} style={{ ...MONO, fontSize: '7.5px', fontWeight: 700, fill: '#e8eaed' }}>
                     {(n.name || '').length > 18 ? `${n.name.slice(0, 17)}…` : n.name}
@@ -299,28 +350,42 @@ function SubwayMap({ state, transitions }: { state: RecognizedState; transitions
 
 // ─── Public component ────────────────────────────────────────────────────────
 
-export default function StateGraph({ state, transitions }: {
+// StateGraph: P6 card — shows the recognised MASTER COMMAND hero only.
+// The forward-path subway map has moved to P7 (below the weapon box).
+export default function StateGraph({ state }: {
   state: RecognizedState;
-  transitions: TransitionBranch[];
+  transitions?: TransitionBranch[]; // kept in signature for backward-compat but not rendered here
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
       <StateHero state={state} />
-
-      {!!transitions?.length && (
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-            <span style={{ ...MONO, fontSize: '8px', fontWeight: 700, letterSpacing: '0.28em', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>
-              Forward Path Map
-            </span>
-            <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }} />
-            <span style={{ ...MONO, fontSize: '7px', color: 'rgba(255,255,255,0.3)' }}>▲ engage · ■ stand-down · colour = command</span>
-          </div>
-          <div style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.25)', padding: '8px' }}>
-            <SubwayMap state={state} transitions={transitions} />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
+
+// ─── ForwardPathMap — rendered in P7 below the weapon box ────────────────────
+// Exported so Phase6Command can embed it after child-state selection.
+export function ForwardPathMap({
+  state,
+  transitions,
+}: {
+  state: RecognizedState;
+  transitions: TransitionBranch[];
+}) {
+  if (!transitions?.length) return null;
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+        <span style={{ ...MONO, fontSize: '8px', fontWeight: 700, letterSpacing: '0.28em', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>
+          Command Transition Map
+        </span>
+        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' }} />
+        <span style={{ ...MONO, fontSize: '7px', color: 'rgba(255,255,255,0.3)' }}>▲ engage · ■ stand-down · colour = command</span>
+      </div>
+      <div style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.25)', padding: '8px' }}>
+        <SubwayMap state={state} transitions={transitions} />
+      </div>
+    </div>
+  );
+}
+

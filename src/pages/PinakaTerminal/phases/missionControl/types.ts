@@ -32,4 +32,5 @@ export interface TradeCard {
   closed: boolean;
   tradeStatus: string;
   exitType: string;
+  weaponSelections?: Record<string, string>;
 }

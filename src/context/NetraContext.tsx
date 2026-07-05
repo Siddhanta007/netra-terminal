@@ -146,9 +146,7 @@ export interface NetraContextValue {
   setCurrentModel: (v: string) => void;
   tradeName: string;
   setTradeName: (v: string) => void;
-  isGuest: boolean;
   handleAuth: () => void;
-  handleGuestLogin: () => void;
   initializeMission: () => void;
   resumeSession: (log: TradeLog) => void;
   forkSession: (log: TradeLog, newName: string) => void;
@@ -244,14 +242,14 @@ const NetraContext = createContext<NetraContextValue | null>(null);
 
 const EMPTY_SYS_DATA: SysData = {
   weapons: { strike: [], interception: [], saturation: [] },
-  realBias: { dimensions: [] },
+  preSessionContext: { dimensions: [] },
   htfStructure: { dimensions: [] },
   marketPulse: { dimensions: [] },
   liquidityContext: { dimensions: [] },
   strikeDimensions: [],
   interceptionDimensions: [],
   saturationDimensions: [],
-  marketPulseExtras: { operationalMarks: [], activeLegOptions: [], subAuctionOptions: {} },
+  marketPulseExtras: { operationalMarks: [], activeLegOptions: {}, subAuctionOptions: {} },
   executionMarks: [],
   weaponStages: [],
   tradeStatuses: [],
@@ -336,8 +334,6 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highestStep, activeSessionId]);
 
-  const isGuest = useSelector((s: RootState) => s.session.isGuest);
-
   // ─── Boot: load models (always) + system data (auth only) ──────────
 
   // Parses a models_config response (from API or static file) into a flat list.
@@ -397,7 +393,6 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
           });
       });
 
-    if (isGuest) return;
     fetch(`${API_BASE}/api/system-data`, { headers: getAuthHeaders() })
       .then((res) => res.json())
       .then((data: SysData) => dispatch(setSysDataAction(data)))
@@ -454,8 +449,8 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
       if (editFormData.trade_name && editFormData.trade_name !== tradeName) {
         dispatch(setTradeNameAction(editFormData.trade_name as string));
       }
-      if (editFormData.notes && editFormData.notes !== notes.realBias) {
-        dispatch(setNotesAction({ ...notes, realBias: editFormData.notes as string }));
+      if (editFormData.notes && editFormData.notes !== notes.preSessionContext) {
+        dispatch(setNotesAction({ ...notes, preSessionContext: editFormData.notes as string }));
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -512,7 +507,7 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
   }, [dispatch]);
 
   const doResetStep = useCallback((stepLevel: number) => {
-    const stepKeys = ['realBias', 'htfStructure', 'marketPulse', 'liquidityContext'] as const;
+    const stepKeys = ['preSessionContext', 'htfStructure', 'marketPulse', 'liquidityContext'] as const;
     const key = stepKeys[stepLevel - 1];
     if (key) {
       dispatch(setSelectionsAction({ ...selections, [key]: {} }));
@@ -605,9 +600,7 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     setCurrentModel: (v) => dispatch(setCurrentModelAction(v)),
     tradeName,
     setTradeName: (v) => dispatch(setTradeNameAction(v)),
-    isGuest,
     handleAuth: session_.handleAuth,
-    handleGuestLogin: session_.handleGuestLogin,
     initializeMission: session_.initializeMission,
     resumeSession: session_.resumeSession,
     forkSession: session_.forkSession,

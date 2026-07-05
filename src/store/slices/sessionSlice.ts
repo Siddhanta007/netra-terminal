@@ -8,7 +8,6 @@ interface SessionState {
   session: Session | null;
   activeSessionId: number | null;
   isLoggingIn: boolean;
-  isGuest: boolean;
   sessionInput: SessionInput;
 }
 
@@ -16,7 +15,6 @@ const initialState: SessionState = {
   session: loadState('session', null),
   activeSessionId: loadState('activeSessionId', null),
   isLoggingIn: false,
-  isGuest: false,
   sessionInput: {
     userName: '',
     password: '',
@@ -24,6 +22,7 @@ const initialState: SessionState = {
     tradeName: '',
     marketType: 'TRENDING',
     modelName: 'pinaka',
+    assetClass: 'Index',
   },
 };
 
@@ -43,9 +42,6 @@ export const sessionSlice = createSlice({
     setSessionInput: (state, action: PayloadAction<SessionInput>) => {
       state.sessionInput = action.payload;
     },
-    setIsGuest: (state, action: PayloadAction<boolean>) => {
-      state.isGuest = action.payload;
-    },
   },
 });
 
@@ -54,7 +50,6 @@ export const {
   setActiveSessionId,
   setIsLoggingIn,
   setSessionInput,
-  setIsGuest,
 } = sessionSlice.actions;
 
 export default sessionSlice.reducer;

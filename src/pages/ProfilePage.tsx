@@ -62,12 +62,38 @@ function PageCorners() {
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}` }}>
+    <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ height: '3px', background: BLUE }} />
-      <div style={{ padding: '14px 20px', borderBottom: `1px solid ${CARD_DIVIDER}` }}>
+      <div style={{ padding: '14px 20px', borderBottom: `1px solid ${CARD_DIVIDER}`, flexShrink: 0 }}>
         <span style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.25em', color: BLUE }}>{title}</span>
       </div>
-      {children}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ClearanceItem({ label, values }: { label: string; values: string[] }) {
+  return (
+    <div style={{ padding: '14px 20px', borderBottom: `1px solid ${CARD_DIVIDER}` }}>
+      <span style={{ fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgba(15,23,42,0.45)', display: 'block', marginBottom: '8px' }}>{label}</span>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+        {values.length === 0 ? (
+          <span style={{ fontSize: '10px', color: 'rgba(15,23,42,0.45)', fontStyle: 'italic' }}>None</span>
+        ) : (
+          values.map(val => (
+            <span key={val} style={{
+              fontSize: '9px', fontWeight: 800, fontFamily: 'JetBrains Mono, monospace',
+              color: BLUE, background: 'rgba(65, 105, 225, 0.06)',
+              border: `1px solid ${CARD_BORDER}`, padding: '4px 10px',
+              textTransform: 'uppercase', letterSpacing: '0.04em'
+            }}>
+              {val}
+            </span>
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -118,20 +144,23 @@ function SelectField({ label, value, onChange, options }: { label: string; value
 export default function ProfilePage() {
   const { session, tradeLogs } = useNetra();
 
-  const total = tradeLogs?.length ?? 0;
-  const wins = tradeLogs?.filter(l => l.phase4?.outcome?.toLowerCase() === 'win').length ?? 0;
-  const losses = tradeLogs?.filter(l => l.phase4?.outcome?.toLowerCase() === 'loss').length ?? 0;
+  // Filter logs to show only this user's personal trades on their profile
+  const myLogs = (tradeLogs || []).filter(l => l.created_by?.toLowerCase() === session?.userName?.toLowerCase());
+
+  const total = myLogs.length;
+  const wins = myLogs.filter(l => l.phase4?.outcome?.toLowerCase() === 'win').length;
+  const losses = myLogs.filter(l => l.phase4?.outcome?.toLowerCase() === 'loss').length;
   const settled = wins + losses;
   const winRate = settled > 0 ? ((wins / settled) * 100).toFixed(1) : '—';
 
-  const totalPL = tradeLogs?.reduce((sum, l) => {
+  const totalPL = myLogs.reduce((sum, l) => {
     const pl = parseFloat(String(l.phase4?.pl ?? ''));
     return isNaN(pl) ? sum : sum + pl;
-  }, 0) ?? 0;
-  const hasPL = tradeLogs?.some(l => !isNaN(parseFloat(String(l.phase4?.pl ?? '')))) ?? false;
+  }, 0);
+  const hasPL = myLogs.some(l => !isNaN(parseFloat(String(l.phase4?.pl ?? ''))));
 
   const weapMap: Record<string, number> = {};
-  tradeLogs?.forEach(l => {
+  myLogs.forEach(l => {
     const w = l.phase3?.manual_weapon || l.weapon || '';
     if (w) weapMap[w] = (weapMap[w] ?? 0) + 1;
   });
@@ -189,61 +218,57 @@ export default function ProfilePage() {
           ))}
         </div>
 
-        {/* Content grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        {/* Balanced Content Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'stretch' }}>
 
-          {/* Left column */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Row 1: Profile Settings & Clearances */}
+          <Card title="Operator Settings">
+            <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', flex: 1 }}>
+              <InputField label="Display Name" value={profile.displayName} onChange={v => setProfile(p => ({ ...p, displayName: v }))} placeholder="Your name" mono={false} />
+              <InputField label="Email Address" value={profile.email} onChange={v => setProfile(p => ({ ...p, email: v }))} placeholder="you@example.com" mono={false} />
+              <InputField label="Phone / WhatsApp" value={profile.phone} onChange={v => setProfile(p => ({ ...p, phone: v }))} placeholder="+91 XXXXX XXXXX" />
+              <InputField label="Broker / Platform" value={profile.broker} onChange={v => setProfile(p => ({ ...p, broker: v }))} placeholder="Zerodha, Dhan..." mono={false} />
+            </div>
+            <div style={{ padding: '0 20px 20px', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+              <button style={{ padding: '9px 20px', background: BLUE, color: '#ffffff', border: 'none', fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', cursor: 'pointer', fontFamily: 'inherit' }}>
+                Save Profile
+              </button>
+            </div>
+          </Card>
 
-            <Card title="Operator Settings">
-              <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <InputField label="Display Name" value={profile.displayName} onChange={v => setProfile(p => ({ ...p, displayName: v }))} placeholder="Your name" mono={false} />
-                <InputField label="Email Address" value={profile.email} onChange={v => setProfile(p => ({ ...p, email: v }))} placeholder="you@example.com" mono={false} />
-                <InputField label="Phone / WhatsApp" value={profile.phone} onChange={v => setProfile(p => ({ ...p, phone: v }))} placeholder="+91 XXXXX XXXXX" />
-                <InputField label="Broker / Platform" value={profile.broker} onChange={v => setProfile(p => ({ ...p, broker: v }))} placeholder="Zerodha, Dhan..." mono={false} />
+          <Card title="Clearances & Permissions">
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', flex: 1 }}>
+              <div style={{ flex: 1 }}>
+                <ClearanceItem label="Access Clearance Role" values={[session?.role || 'operator']} />
+                <ClearanceItem label="Allowed Model Tiers" values={session?.role === 'admin' ? ["*"] : (session?.allowedModels || [])} />
+                <ClearanceItem label="Allowed Operations Teams" values={session?.role === 'admin' ? ["*"] : (session?.allowedTeams || [])} />
+                <ClearanceItem label="Cleared Console Pages" values={session?.role === 'admin' ? ["home", "pinaka", "trishul", "about", "portfolio"] : (session?.allowedPages || [])} />
               </div>
-              <div style={{ padding: '0 20px 20px', display: 'flex', justifyContent: 'flex-end' }}>
-                <button style={{ padding: '9px 20px', background: BLUE, color: '#ffffff', border: 'none', fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', cursor: 'pointer', fontFamily: 'inherit' }}>
-                  Save Profile
-                </button>
+              <div style={{ padding: '14px 20px', background: 'rgba(16, 185, 129, 0.05)', borderTop: `1px solid ${CARD_DIVIDER}`, display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} />
+                <span style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', color: '#10b981', letterSpacing: '0.1em' }}>Permissions Verified &amp; Active</span>
               </div>
-            </Card>
+            </div>
+          </Card>
 
-            <Card title="Risk Parameters">
-              <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <InputField label="Daily P&L Target (₹)" value={risk.dailyTarget} onChange={v => setRisk(p => ({ ...p, dailyTarget: v }))} placeholder="5000" />
-                <InputField label="Max Daily Loss (₹)" value={risk.maxDailyLoss} onChange={v => setRisk(p => ({ ...p, maxDailyLoss: v }))} placeholder="3000" />
-                <InputField label="Risk Per Trade (%)" value={risk.riskPerTrade} onChange={v => setRisk(p => ({ ...p, riskPerTrade: v }))} placeholder="1.5" />
-                <InputField label="Default Lot Size" value={risk.defaultLots} onChange={v => setRisk(p => ({ ...p, defaultLots: v }))} placeholder="1" />
-              </div>
-              <div style={{ padding: '0 20px 20px', display: 'flex', justifyContent: 'flex-end' }}>
-                <button style={{ padding: '9px 20px', background: BLUE, color: '#ffffff', border: 'none', fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', cursor: 'pointer', fontFamily: 'inherit' }}>
-                  Update Risk
-                </button>
-              </div>
-            </Card>
+          {/* Row 2: Risk Parameters & Model Access */}
+          <Card title="Risk Parameters">
+            <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', flex: 1 }}>
+              <InputField label="Daily P&L Target (₹)" value={risk.dailyTarget} onChange={v => setRisk(p => ({ ...p, dailyTarget: v }))} placeholder="5000" />
+              <InputField label="Max Daily Loss (₹)" value={risk.maxDailyLoss} onChange={v => setRisk(p => ({ ...p, maxDailyLoss: v }))} placeholder="3000" />
+              <InputField label="Risk Per Trade (%)" value={risk.riskPerTrade} onChange={v => setRisk(p => ({ ...p, riskPerTrade: v }))} placeholder="1.5" />
+              <InputField label="Default Lot Size" value={risk.defaultLots} onChange={v => setRisk(p => ({ ...p, defaultLots: v }))} placeholder="1" />
+            </div>
+            <div style={{ padding: '0 20px 20px', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+              <button style={{ padding: '9px 20px', background: BLUE, color: '#ffffff', border: 'none', fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', cursor: 'pointer', fontFamily: 'inherit' }}>
+                Update Risk
+              </button>
+            </div>
+          </Card>
 
-            <Card title="Trading Preferences">
-              <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <SelectField label="Segment" value={prefs.segment} onChange={v => setPrefs(p => ({ ...p, segment: v }))} options={['NSE F&O', 'BSE F&O', 'NSE Equity', 'MCX']} />
-                <SelectField label="Expiry Preference" value={prefs.expiry} onChange={v => setPrefs(p => ({ ...p, expiry: v }))} options={['Weekly', 'Monthly', 'Both']} />
-                <InputField label="Timezone" value={prefs.timezone} onChange={v => setPrefs(p => ({ ...p, timezone: v }))} placeholder="IST (UTC+5:30)" mono={false} />
-                <InputField label="Trading Hours" value={prefs.tradingHours} onChange={v => setPrefs(p => ({ ...p, tradingHours: v }))} placeholder="09:15 — 15:30" />
-              </div>
-              <div style={{ padding: '0 20px 20px', display: 'flex', justifyContent: 'flex-end' }}>
-                <button style={{ padding: '9px 20px', background: BLUE, color: '#ffffff', border: 'none', fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', cursor: 'pointer', fontFamily: 'inherit' }}>
-                  Save Preferences
-                </button>
-              </div>
-            </Card>
-
-          </div>
-
-          {/* Right column */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-            <Card title="Model Access">
-              <div>
+          <Card title="Model Access">
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1 }}>
+              <div style={{ flex: 1 }}>
                 {[
                   { id: 'PINAKA', desc: 'AI-Assisted Retail · Strike + Interception', sub: 'Bias → HTF → Weapon → P&L → Maya', color: '#3b82f6', status: 'Live', statusColor: '#10b981' },
                   { id: 'TRISHUL', desc: 'Quant-Institutional Swing · Planning Phase', sub: 'Multi-day positional with regime detection', color: '#f59e0b', status: 'Planning', statusColor: '#d97706' },
@@ -257,59 +282,77 @@ export default function ProfilePage() {
                     <div style={{ fontSize: '10px', color: 'rgba(15,23,42,0.35)' }}>{m.sub}</div>
                   </div>
                 ))}
-                {topWeapon && (
-                  <div style={{ padding: '16px 20px', background: PAGE_BG }}>
-                    <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgba(15,23,42,0.4)', marginBottom: '6px' }}>Most Deployed Weapon</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <span style={{ fontSize: '22px', fontWeight: 950, color: BLUE, fontFamily: 'monospace', letterSpacing: '-0.02em' }}>{topWeapon[0]}</span>
-                      <span style={{ fontSize: '10px', color: 'rgba(15,23,42,0.45)' }}>{topWeapon[1]} missions</span>
-                    </div>
-                  </div>
-                )}
               </div>
-            </Card>
-
-            <Card title="System Status">
-              <div>
-                {[
-                  { label: 'MAYA AI Engine',       value: 'Online',   color: '#10b981', dot: true  },
-                  { label: 'RAG Knowledge Library', value: 'Synced',   color: '#10b981', dot: true  },
-                  { label: 'LangSmith Tracing',     value: 'Active',   color: '#10b981', dot: true  },
-                  { label: 'Doctrine Version',       value: 'NETRA v3.0', color: BLUE,   dot: false },
-                  { label: 'Session Operator',       value: session?.userName || '—', color: '#0f172a', dot: false },
-                  { label: 'Last Sync',              value: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }), color: 'rgba(15,23,42,0.5)', dot: false },
-                ].map(item => (
-                  <div key={item.label} style={{ padding: '14px 20px', borderBottom: `1px solid ${CARD_DIVIDER}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(15,23,42,0.45)' }}>{item.label}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      {item.dot && <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: item.color }} />}
-                      <span style={{ fontSize: '11px', fontWeight: 700, color: item.color, fontFamily: 'JetBrains Mono, monospace' }}>{item.value}</span>
-                    </div>
+              {topWeapon && (
+                <div style={{ padding: '16px 20px', background: PAGE_BG, flexShrink: 0 }}>
+                  <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgba(15,23,42,0.4)', marginBottom: '6px' }}>Most Deployed Weapon</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '22px', fontWeight: 950, color: BLUE, fontFamily: 'monospace', letterSpacing: '-0.02em' }}>{topWeapon[0]}</span>
+                    <span style={{ fontSize: '10px', color: 'rgba(15,23,42,0.45)' }}>{topWeapon[1]} missions</span>
                   </div>
-                ))}
-              </div>
-            </Card>
+                </div>
+              )}
+            </div>
+          </Card>
 
-            <Card title="Danger Zone">
-              <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {[
-                  { title: 'Clear Session History', desc: 'Wipe all local session state and cache' },
-                  { title: 'Reset All Preferences', desc: 'Restore risk params and settings to defaults' },
-                ].map(item => (
-                  <div key={item.title} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', border: '1px solid rgba(239,68,68,0.2)', background: PAGE_BG }}>
-                    <div>
-                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#0f172a', marginBottom: '3px' }}>{item.title}</div>
-                      <div style={{ fontSize: '10px', color: 'rgba(15,23,42,0.45)' }}>{item.desc}</div>
-                    </div>
-                    <button style={{ padding: '7px 14px', background: 'none', color: '#ef4444', border: '1px solid rgba(239,68,68,0.4)', fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
-                      {item.title.split(' ')[0]}
-                    </button>
+          {/* Row 3: Trading Preferences & System Status */}
+          <Card title="Trading Preferences">
+            <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', flex: 1 }}>
+              <SelectField label="Segment" value={prefs.segment} onChange={v => setPrefs(p => ({ ...p, segment: v }))} options={['NSE F&O', 'BSE F&O', 'NSE Equity', 'MCX']} />
+              <SelectField label="Expiry Preference" value={prefs.expiry} onChange={v => setPrefs(p => ({ ...p, expiry: v }))} options={['Weekly', 'Monthly', 'Both']} />
+              <InputField label="Timezone" value={prefs.timezone} onChange={v => setPrefs(p => ({ ...p, timezone: v }))} placeholder="IST (UTC+5:30)" mono={false} />
+              <InputField label="Trading Hours" value={prefs.tradingHours} onChange={v => setPrefs(p => ({ ...p, tradingHours: v }))} placeholder="09:15 — 15:30" />
+            </div>
+            <div style={{ padding: '0 20px 20px', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+              <button style={{ padding: '9px 20px', background: BLUE, color: '#ffffff', border: 'none', fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', cursor: 'pointer', fontFamily: 'inherit' }}>
+                Save Preferences
+              </button>
+            </div>
+          </Card>
+
+          <Card title="System Status">
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1 }}>
+              {[
+                { label: 'MAYA AI Engine',       value: 'Online',   color: '#10b981', dot: true  },
+                { label: 'RAG Knowledge Library', value: 'Synced',   color: '#10b981', dot: true  },
+                { label: 'LangSmith Tracing',     value: 'Active',   color: '#10b981', dot: true  },
+                { label: 'Doctrine Version',       value: 'NETRA v3.0', color: BLUE,   dot: false },
+                { label: 'Session Operator',       value: session?.userName || '—', color: '#0f172a', dot: false },
+                { label: 'Last Sync',              value: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }), color: 'rgba(15,23,42,0.5)', dot: false },
+              ].map(item => (
+                <div key={item.label} style={{ padding: '14px 20px', borderBottom: `1px solid ${CARD_DIVIDER}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flex: 1 }}>
+                  <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(15,23,42,0.45)' }}>{item.label}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {item.dot && <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: item.color }} />}
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: item.color, fontFamily: 'JetBrains Mono, monospace' }}>{item.value}</span>
                   </div>
-                ))}
-              </div>
-            </Card>
+                </div>
+              ))}
+            </div>
+          </Card>
 
-          </div>
+        </div>
+
+        {/* Danger Zone Spans Full Width */}
+        <div style={{ marginTop: '20px' }}>
+          <Card title="Danger Zone">
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {[
+                { title: 'Clear Session History', desc: 'Wipe all local session state and cache' },
+                { title: 'Reset All Preferences', desc: 'Restore risk params and settings to defaults' },
+              ].map(item => (
+                <div key={item.title} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', border: '1px solid rgba(239,68,68,0.2)', background: PAGE_BG }}>
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#0f172a', marginBottom: '3px' }}>{item.title}</div>
+                    <div style={{ fontSize: '10px', color: 'rgba(15,23,42,0.45)' }}>{item.desc}</div>
+                  </div>
+                  <button style={{ padding: '7px 14px', background: 'none', color: '#ef4444', border: '1px solid rgba(239,68,68,0.4)', fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+                    {item.title.split(' ')[0]}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </Card>
         </div>
 
       </div>

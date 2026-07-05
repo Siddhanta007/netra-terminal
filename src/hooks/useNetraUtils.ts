@@ -14,27 +14,30 @@ export function useNetraUtils() {
   const selectedModel = useSelector((s: RootState) => s.model.selectedModel);
   const availableModels = useSelector((s: RootState) => s.model.availableModels);
   const session = useSelector((s: RootState) => s.session.session);
-  const isGuest = useSelector((s: RootState) => s.session.isGuest);
-
   const getAuthHeaders = useCallback((extraHeaders: Record<string, string> = {}): Record<string, string> => {
-    const token = import.meta.env.VITE_HF_TOKEN as string | undefined;
     const headers: Record<string, string> = { ...extraHeaders };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    if (session) headers['x-user'] = session.userName;
+    const netraToken = localStorage.getItem('netra_token');
+    const hfToken = import.meta.env.VITE_HF_TOKEN as string | undefined;
+    
+    if (netraToken) {
+      headers['Authorization'] = `Bearer ${netraToken}`;
+    } else if (hfToken) {
+      headers['Authorization'] = `Bearer ${hfToken}`;
+    }
+    
+    if (session) {
+      headers['x-user'] = session.userName;
+    }
     return headers;
   }, [session]);
 
   const checkGuestLimit = useCallback((): boolean => {
-    if (!isGuest) return true;
-    const count = parseInt(sessionStorage.getItem(GUEST_AI_KEY) || '0', 10);
-    return count < GUEST_AI_LIMIT;
-  }, [isGuest]);
+    return true;
+  }, []);
 
   const markGuestAiUsed = useCallback(() => {
-    if (!isGuest) return;
-    const count = parseInt(sessionStorage.getItem(GUEST_AI_KEY) || '0', 10);
-    sessionStorage.setItem(GUEST_AI_KEY, String(count + 1));
-  }, [isGuest]);
+    // no-op
+  }, []);
 
   const showToast = useCallback((msg: string, type: ToastType = 'success') => {
     dispatch(setToastAction({ msg, type }));

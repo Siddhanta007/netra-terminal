@@ -44,8 +44,8 @@ interface AnalysisState {
 
 const initialState: AnalysisState = {
   highestStep: loadState('highestStep', 1),
-  selections: loadState('selections', { realBias: {}, htfStructure: {}, marketPulse: {}, liquidityContext: {} }),
-  notes: loadState('notes', { realBias: '', htfStructure: '', marketPulse: '', liquidityContext: '', weapon: '' }),
+  selections: loadState('selections', { preSessionContext: {}, htfStructure: {}, marketPulse: {}, liquidityContext: {} }),
+  notes: loadState('notes', { preSessionContext: '', htfStructure: '', marketPulse: '', liquidityContext: '', weapon: '' }),
   finalCommand: loadState('finalCommand', null),
   commandLocked: loadState('commandLocked', false),
   weaponLocked: loadState('weaponLocked', false),

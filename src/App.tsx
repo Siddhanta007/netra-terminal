@@ -16,7 +16,7 @@ import Login from './components/Auth/Login';
 import GlobalOverlay from './components/Layout/GlobalOverlay';
 import MayaChatPanel from './components/Layout/MayaChatPanel';
 import Phase0Vision from './pages/PinakaTerminal/phases/Phase0Vision';
-import { StrategicMarkingChecklist, STRATEGIC_MARKS_TOTAL, BiasDimensions, HTFDimensions, MacroMappingActions, PreSessionActions } from './pages/PinakaTerminal/PhaseMacroMap';
+import { StrategicMarkingChecklist, STRATEGIC_MARKS_TOTAL, BiasDimensions, HTFDimensions, HTFEvents, MacroMappingActions, PreSessionActions } from './pages/PinakaTerminal/PhaseMacroMap';
 import Phase3MarketPulse from './pages/PinakaTerminal/phases/Phase3MarketPulse';
 import Phase5Synthesis from './pages/PinakaTerminal/phases/Phase5Synthesis';
 import PhaseNetraState from './pages/PinakaTerminal/phases/PhaseNetraState';
@@ -27,6 +27,7 @@ import Phase11MayaAudit from './pages/PinakaTerminal/phases/Phase11MayaAudit';
 import MarketTypeSelector from './pages/PinakaTerminal/MarketTypeSelector';
 import ProfilePage from './pages/ProfilePage';
 import AboutPage from './pages/AboutPage';
+import PortfolioPage from './pages/PortfolioPage';
 import ForkButton from './components/UI/ForkButton';
 import Footer from './components/Layout/Footer';
 import ModelPage from './pages/ModelPage';
@@ -61,7 +62,6 @@ export default function NetraTerminal() {
     uploadedVisionFiles, setUploadedVisionFiles,
     logout,
     tradeName,
-    isGuest,
   } = useNetra();
 
   const dispatch = useDispatch();
@@ -194,8 +194,8 @@ export default function NetraTerminal() {
     try {
       const headers = ['MISSION_ID', 'TIMESTAMP', 'ASSET', 'MISSION_NAME', 'OPERATOR', 'PROTOCOL', 'WEAPON', 'BIAS_SELECT', 'AUCTION_SELECT', 'LIQUIDITY_SELECT', 'BEHAVIOUR_SELECT', 'ENTRY_PRICE', 'STOP_LOSS', 'EXIT_PRICE', 'OUTCOME', 'NET_PL', 'OPERATOR_THOUGHT'];
       const rows = tradeLogs.map(log => [
-        log.id, new Date(log.timestamp).toISOString(), log.phase1?.asset_ticker || '—', log.name || 'UNNAMED_MISSION', log.username || 'ANONYMOUS', log.phase1?.protocol || '—', log.weapon || '—',
-        Object.values(log.phase1?.realBias || {}).join('|'), Object.values(log.phase1?.htfStructure || {}).join('|'), Object.values(log.phase1?.marketPulse || {}).join('|'), Object.values(log.phase1?.liquidityContext || {}).join('|'),
+        log.id, new Date(log.timestamp).toISOString(), log.phase1?.asset_ticker || '—', log.name || 'UNNAMED_MISSION', log.created_by || log.username || 'ANONYMOUS', log.phase1?.protocol || '—', log.weapon || '—',
+        Object.values(log.phase1?.preSessionContext || log.phase1?.realBias || {}).join('|'), Object.values(log.phase1?.htfStructure || {}).join('|'), Object.values(log.phase1?.marketPulse || {}).join('|'), Object.values(log.phase1?.liquidityContext || {}).join('|'),
         log.phase2?.entry_price || '0', log.phase2?.stop_loss || '0', log.phase4?.exit_price || '0', log.phase4?.outcome || 'OPEN', log.phase4?.pl || '0', (String(log.phase4?.user_thought || '')).replace(/"/g, '""'),
       ]);
       const csvContent = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n');
@@ -211,7 +211,7 @@ export default function NetraTerminal() {
 
   if (!session) return <><Login /><GlobalOverlay /></>;
 
-  if (!sysData && !isGuest) {
+  if (!sysData) {
     return (
       <div style={{ minHeight: '100vh', background: 'hsl(224,30%,6%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'monospace', overflow: 'hidden', position: 'relative' }}>
         {/* Ambient grid */}
@@ -327,16 +327,43 @@ export default function NetraTerminal() {
 
           {/* Nav */}
           <div className="desktop-only" style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
-            {[
-              { label: 'Home', active: prepStep === 1 && activeView !== 'profile' && activeView !== 'about', action: () => { ctxSetPrepStep(1); ctxSetActiveView('terminal'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } },
-              { label: 'Pinaka', active: prepStep === 5 && currentModel === 'pinaka' && activeView !== 'about' && activeView !== 'profile', action: () => { setCurrentModel('pinaka'); setActiveSessionId(null); ctxSetPrepStep(5); ctxSetActiveView('terminal'); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } },
-              { label: 'Trishul', active: prepStep === 5 && currentModel === 'trishul' && activeView !== 'about' && activeView !== 'profile', action: () => { setCurrentModel('trishul'); setActiveSessionId(null); ctxSetPrepStep(5); ctxSetActiveView('trishul'); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } },
-              { label: 'About', active: activeView === 'about', action: () => { ctxSetActiveView('about'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } },
-            ].map(nav => (
-              <button key={nav.label} onClick={nav.action} style={{ padding: '0 14px', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: nav.active ? '#4169E1' : (darkMode ? 'rgba(255,255,255,0.45)' : 'rgba(15,23,42,0.45)'), border: 'none', background: 'none', cursor: 'pointer', transition: 'all 150ms', height: '56px', display: 'flex', alignItems: 'center' }}>
-                <span style={{ borderBottom: nav.active ? '2px solid #4169E1' : '2px solid transparent', paddingBottom: '4px', transition: 'border-color 150ms' }}>{nav.label}</span>
-              </button>
-            ))}
+            {(() => {
+              const allowedPages = session?.role === 'admin'
+                ? ["home", "pinaka", "trishul", "about", "portfolio"]
+                : (session?.allowedPages || []);
+              const navItems = [];
+
+              if (allowedPages.includes('home')) {
+                navItems.push({ label: 'Home', active: prepStep === 1 && activeView !== 'profile' && activeView !== 'about' && activeView !== 'admin' && activeView !== 'portfolio', action: () => { ctxSetPrepStep(1); ctxSetActiveView('terminal'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } });
+              }
+              if (allowedPages.includes('pinaka')) {
+                navItems.push({ label: 'Pinaka', active: prepStep === 5 && currentModel === 'pinaka' && activeView !== 'profile' && activeView !== 'about' && activeView !== 'admin' && activeView !== 'portfolio', action: () => { setCurrentModel('pinaka'); setActiveSessionId(null); ctxSetPrepStep(5); ctxSetActiveView('terminal'); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } });
+              }
+              if (allowedPages.includes('trishul')) {
+                navItems.push({ label: 'Trishul', active: prepStep === 5 && currentModel === 'trishul' && activeView !== 'profile' && activeView !== 'about' && activeView !== 'admin' && activeView !== 'portfolio', action: () => { setCurrentModel('trishul'); setActiveSessionId(null); ctxSetPrepStep(5); ctxSetActiveView('trishul'); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } });
+              }
+              if (allowedPages.includes('portfolio')) {
+                navItems.push({
+                  label: 'Portfolio',
+                  active: activeView === 'portfolio',
+                  action: () => { ctxSetActiveView('portfolio'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); }
+                });
+              }
+
+              navItems.push({
+                label: 'About',
+                active: activeView === 'about',
+                action: () => { ctxSetActiveView('about'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); }
+              });
+
+
+
+              return navItems.map(nav => (
+                <button key={nav.label} onClick={nav.action} style={{ padding: '0 14px', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: nav.active ? '#4169E1' : (darkMode ? 'rgba(255,255,255,0.45)' : 'rgba(15,23,42,0.45)'), border: 'none', background: 'none', cursor: 'pointer', transition: 'all 150ms', height: '56px', display: 'flex', alignItems: 'center' }}>
+                  <span style={{ borderBottom: nav.active ? '2px solid #4169E1' : '2px solid transparent', paddingBottom: '4px', transition: 'border-color 150ms' }}>{nav.label}</span>
+                </button>
+              ));
+            })()}
           </div>
         </div>
 
@@ -355,13 +382,7 @@ export default function NetraTerminal() {
             <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', borderBottom: isAiPaneOpen ? '2px solid #4169E1' : '2px solid transparent', paddingBottom: '4px', transition: 'border-color 200ms' }}>Maya</span>
           </button>
 
-          {/* Demo badge */}
-          {isGuest && (
-            <div style={{ padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#f59e0b' }} />
-              <span style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.2em', color: '#f59e0b' }}>Demo</span>
-            </div>
-          )}
+
 
           {/* Profile — text only, underline when open */}
           <div style={{ position: 'relative', height: '56px', display: 'flex', alignItems: 'stretch' }}>
@@ -507,7 +528,7 @@ export default function NetraTerminal() {
                     <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-1">
                       {/* Phases 00–03 with inline fork visualization after each */}
                       {([
-                        { phase: '00 · REAL BIAS',         color: '#4169E1', val: activeEditLog ? activeEditLog.phase1?.realBias        : selections.realBias,         step: 1 },
+                        { phase: '00 · PRE-SESSION CONTEXT', color: '#4169E1', val: activeEditLog ? (activeEditLog.phase1?.preSessionContext || activeEditLog.phase1?.realBias) : selections.preSessionContext, step: 1 },
                         { phase: '01 · HTF STRUCTURE',     color: '#6366f1', val: activeEditLog ? activeEditLog.phase1?.htfStructure    : selections.htfStructure,     step: 2 },
                         { phase: '02 · MARKET PULSE',      color: '#0ea5e9', val: activeEditLog ? activeEditLog.phase1?.marketPulse     : selections.marketPulse,      step: 3 },
                         { phase: '03 · LIQUIDITY CONTEXT', color: '#f59e0b', val: activeEditLog ? activeEditLog.phase1?.liquidityContext : selections.liquidityContext, step: 4 },
@@ -701,7 +722,18 @@ export default function NetraTerminal() {
                       )}
                       {subBtn('Cut',
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
-                        () => { setActiveSessionId(null); ctxSetPrepStep(1); ctxSetActiveView('terminal'); dispatch({ type: 'logs/setActiveEditLog', payload: null }); dispatch({ type: 'analysis/setHighestStep', payload: 0 }); dispatch({ type: 'analysis/setWeaponLocked', payload: false }); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); showToast('Protocol Aborted — State Purged'); },
+                        () => {
+                          handleGlobalSave();
+                          setActiveSessionId(null);
+                          ctxSetPrepStep(5);
+                          ctxSetActiveView(currentModel === 'trishul' ? 'trishul' : 'terminal');
+                          dispatch({ type: 'logs/setActiveEditLog', payload: null });
+                          dispatch({ type: 'analysis/setHighestStep', payload: 0 });
+                          dispatch({ type: 'analysis/setWeaponLocked', payload: false });
+                          ctxSetIsLoggerOpen(false);
+                          setIsAiPaneOpen(false);
+                          showToast('Session Saved & Returned to Model Console', 'success');
+                        },
                         '#ef4444'
                       )}
                     </div>
@@ -711,12 +743,14 @@ export default function NetraTerminal() {
               );
             })()}
 
-            <main className={prepStep === 1 || prepStep === 5 || prepStep === 3 || prepStep === 4 || activeView === 'profile' || activeView === 'about' ? '' : 'terminal-main'} style={{ flex: 1, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+            <main className={prepStep === 1 || prepStep === 5 || prepStep === 3 || prepStep === 4 || activeView === 'profile' || activeView === 'about' || activeView === 'portfolio' ? '' : 'terminal-main'} style={{ flex: 1, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
 
               {activeView === 'about' ? (
                 <AboutPage />
               ) : activeView === 'profile' ? (
                 <ProfilePage />
+              ) : activeView === 'portfolio' ? (
+                <PortfolioPage />
               ) : prepStep === 1 && !activeSessionId ? (
                 /* ── COMMAND DASHBOARD ── */
                 <div className="flex-1 overflow-y-auto" style={{ background: '#ffffff', position: 'relative' }}>
@@ -782,10 +816,37 @@ export default function NetraTerminal() {
                           <span style={{ color: '#2563eb' }}>COMMAND</span>
                         </h1>
                       </div>
-                      <div className="home-fade" style={{ textAlign: 'right', paddingBottom: '6px', animationDelay: '200ms' }}>
+                      <div className="home-fade" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '14px', paddingBottom: '6px', animationDelay: '200ms' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end' }}>
                           <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }} className="pulse-dot" />
                           <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.25em', color: '#10b981' }}>System Online</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <button
+                            onClick={() => {
+                              dispatch(setSessionInput({ ...sessionInput, assetName: '', tradeName: '', modelName: 'pinaka' }));
+                              ctxSetPrepStep(3);
+                            }}
+                            style={{ height: '36px', padding: '0 16px', background: '#2563eb', color: '#ffffff', border: 'none', fontSize: '9.5px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', cursor: 'pointer', transition: 'background 150ms', display: 'flex', alignItems: 'center', gap: '6px' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = '#1D4ED8'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = '#2563eb'; }}
+                          >
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            Initialize Trade
+                          </button>
+                          <button
+                            onClick={() => {
+                              setCurrentModel('pinaka');
+                              ctxSetPrepStep(5);
+                              ctxSetActiveView('terminal');
+                            }}
+                            style={{ height: '36px', padding: '0 16px', background: 'transparent', color: '#2563eb', border: '1.5px solid #2563eb', fontSize: '9.5px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', cursor: 'pointer', transition: 'all 150ms', display: 'flex', alignItems: 'center', gap: '6px' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(37,99,235,0.06)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                          >
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                            View Trades
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -1119,6 +1180,22 @@ export default function NetraTerminal() {
                         ))}
                       </div>
 
+                      {/* Asset Class */}
+                      <div style={{ marginBottom: '20px' }}>
+                        <label style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgba(15,23,42,0.5)', display: 'block', marginBottom: '10px' }}>Asset Class</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
+                          {(['Index', 'Crypto', 'Forex', 'Commodity', 'Equity'] as const).map(c => {
+                            const active = (sessionInput as any).assetClass === c || (!((sessionInput as any).assetClass) && c === 'Index');
+                            return (
+                              <button key={c} onClick={() => dispatch(setSessionInput({ ...sessionInput, assetClass: c }))}
+                                style={{ height: '34px', border: `1px solid ${active ? '#4169E1' : 'rgba(15,23,42,0.12)'}`, background: active ? '#e4e8f0' : '#f8fafc', color: active ? '#4169E1' : 'rgba(15,23,42,0.6)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', transition: 'all 150ms', borderLeft: active ? '3px solid #4169E1' : '3px solid transparent', padding: 0 }}>
+                                {c}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
                       {/* Market Type */}
                       <div style={{ marginBottom: '20px' }}>
                         <label style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgba(15,23,42,0.5)', display: 'block', marginBottom: '10px' }}>Market Environment</label>
@@ -1291,7 +1368,7 @@ export default function NetraTerminal() {
                   )}
 
                   {/* MACRO MAPPING — Strategic Marking + HTF Structure */}
-                  {highestStep >= 1 && (
+                  {highestStep >= 2 && (
                     <div className="phase-card mm-card phase-theme-1" data-phase="2" data-active={highestStep <= 2 ? 'true' : undefined}>
 
                       {/* Card header */}
@@ -1342,6 +1419,20 @@ export default function NetraTerminal() {
                         </div>
                         <HTFDimensions />
 
+                        {/* ── Component 3: HTF Events ── */}
+                        <div style={{
+                          margin: '28px 0 12px 0', display: 'flex', alignItems: 'center', gap: '10px',
+                          borderLeft: '3px solid var(--phase-accent)', paddingLeft: '10px',
+                        }}>
+                          <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '11px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase', flexShrink: 0 }}>Component 3 — HTF Events</span>
+                          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
+                          <ForkButton onClick={() => {
+                            setForkModalState({ isOpen: true, phaseNum: 2, defaultName: `FORK_${tradeName || 'Trade'}_HTF_EVENTS` });
+                            setForkInputName(`FORK_${tradeName || 'Trade'}_HTF_EVENTS`);
+                          }} size="sm" />
+                        </div>
+                        <HTFEvents />
+
                         <MacroMappingActions />
 
                       </div>
@@ -1365,7 +1456,12 @@ export default function NetraTerminal() {
                           : <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Auction State · Price Behaviour · Liquidity Context</span>
                         }
                       </div>
-                      <div className="phase-card-body"><Phase3MarketPulse /></div>
+                      <div className="phase-card-body">
+                        <Phase3MarketPulse onFork={(phaseNum, defaultName) => {
+                          setForkModalState({ isOpen: true, phaseNum, defaultName });
+                          setForkInputName(defaultName);
+                        }} />
+                      </div>
                     </div>
                   )}
 

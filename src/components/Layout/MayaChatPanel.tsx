@@ -32,6 +32,7 @@ export default function MayaChatPanel() {
   const dispatch = useDispatch<AppDispatch>();
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
 
   const chatHistory = useSelector((s: RootState) => s.chat.chatHistory);
   const chatInput = useSelector((s: RootState) => s.chat.chatInput);
@@ -42,7 +43,7 @@ export default function MayaChatPanel() {
   const darkMode = useSelector((s: RootState) => s.ui.darkMode);
   const AVAILABLE_MODELS = useSelector((s: RootState) => s.model.availableModels);
 
-  const { handleSendMessage, toggleSource, startNewChat, summarizeNow, uploadedVisionFiles, setUploadedVisionFiles } = useNetra();
+  const { handleSendMessage, toggleSource, startNewChat, summarizeNow, uploadedVisionFiles, setUploadedVisionFiles, session } = useNetra();
 
   const SOURCE_OPTIONS: { id: ChatSource; label: string }[] = [
     { id: 'terminal',    label: 'Terminal' },
@@ -233,32 +234,11 @@ export default function MayaChatPanel() {
           />
 
           {/* Toolbar */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderTop: `1px solid ${t.toolbarBorder}` }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-
-              {/* Config toggle */}
-              <button
-                onClick={() => setIsConfigOpen(!isConfigOpen)}
-                title="Model Configuration"
-                style={{ width: '26px', height: '26px', border: `1px solid ${isConfigOpen ? '#4169E1' : t.toolbarBtnBorder}`, background: isConfigOpen ? 'rgba(65,105,225,0.1)' : 'none', color: isConfigOpen ? '#4169E1' : t.toolbarText, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 150ms' }}
-              >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 12h6"/></svg>
-              </button>
-
-              {/* Upload image */}
-              <label
-                style={{ width: '26px', height: '26px', border: `1px solid ${t.toolbarBtnBorder}`, background: 'none', color: t.toolbarText, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 150ms' }}
-                title="Attach image"
-              >
-                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) setUploadedVisionFiles([e.target.files[0]]); }} />
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              </label>
-
-              {/* Separator */}
-              <div style={{ width: '1px', height: '16px', background: t.sepColor, margin: '0 2px' }} />
-
-              {/* Model selector */}
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderTop: `1px solid ${t.toolbarBorder}`, gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
+              
+              {/* Model selector (on the left) */}
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', flexShrink: 0 }}>
                 <span style={{ fontSize: '10px', fontWeight: 600, color: t.toolbarText }}>{AVAILABLE_MODELS.find(m => m.id === selectedModel)?.name.split(',')[0] || 'Model'}</span>
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke={t.toolbarText} strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
                 <select
@@ -266,45 +246,110 @@ export default function MayaChatPanel() {
                   onChange={e => dispatch(setSelectedModel(e.target.value))}
                   style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', fontSize: '10px' }}
                 >
-                  {AVAILABLE_MODELS.map(m => (
-                    <option key={m.id} value={m.id}>{m.name.split(',')[0]}</option>
-                  ))}
+                  {(() => {
+                    const allowedModels = session?.allowedModels || [];
+                    let filtered = AVAILABLE_MODELS.filter(m => {
+                      if (allowedModels.includes('*')) return true;
+                      return allowedModels.some((am: string) => m.id.toLowerCase().includes(am.toLowerCase()));
+                    });
+                    if (filtered.length === 0) {
+                      filtered = AVAILABLE_MODELS;
+                    }
+                    return filtered.map(m => (
+                      <option key={m.id} value={m.id}>{m.name.split(',')[0]}</option>
+                    ));
+                  })()}
                 </select>
               </div>
 
-              {/* Source multiselect — user picks which knowledge the agent may use */}
-              {SOURCE_OPTIONS.map(opt => {
-                const on = sources.includes(opt.id);
-                return (
-                  <button
-                    key={opt.id}
-                    onClick={() => toggleSource(opt.id)}
-                    title={`Toggle ${opt.label} source`}
-                    style={{
-                      height: '26px', padding: '0 8px',
-                      border: `1px solid ${on ? '#6366f1' : t.toolbarBtnBorder}`,
-                      background: on ? 'rgba(99,102,241,0.12)' : 'none',
-                      color: on ? '#6366f1' : t.toolbarText,
-                      fontSize: '9px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase',
-                      cursor: 'pointer', transition: 'all 150ms',
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
+              {/* Separator */}
+              <div style={{ width: '1px', height: '14px', background: t.sepColor, margin: '0 2px', flexShrink: 0 }} />
 
-              {/* New chat thread */}
+              {/* Config toggle */}
               <button
-                onClick={startNewChat}
-                title="Start a new chat thread"
-                style={{ width: '26px', height: '26px', border: `1px solid ${t.toolbarBtnBorder}`, background: 'none', color: t.toolbarText, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 150ms' }}
+                onClick={() => setIsConfigOpen(!isConfigOpen)}
+                title="Model Configuration"
+                style={{ width: '26px', height: '26px', border: `1px solid ${isConfigOpen ? '#4169E1' : t.toolbarBtnBorder}`, background: isConfigOpen ? 'rgba(65,105,225,0.1)' : 'none', color: isConfigOpen ? '#4169E1' : t.toolbarText, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 150ms', flexShrink: 0 }}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 12h6"/></svg>
               </button>
+
+              {/* Upload image */}
+              <label
+                style={{ width: '26px', height: '26px', border: `1px solid ${t.toolbarBtnBorder}`, background: 'none', color: t.toolbarText, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 150ms', flexShrink: 0 }}
+                title="Attach image"
+              >
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) setUploadedVisionFiles([e.target.files[0]]); }} />
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              </label>
+
+              {/* Separator */}
+              <div style={{ width: '1px', height: '14px', background: t.sepColor, margin: '0 2px', flexShrink: 0 }} />
+
+              {/* Context Source Multiselect Dropdown */}
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <button
+                  onClick={() => setSourcesOpen(o => !o)}
+                  title="Toggle Context Sources"
+                  style={{
+                    height: '26px', padding: '0 8px',
+                    border: `1px solid ${t.toolbarBtnBorder}`,
+                    background: 'none',
+                    color: t.toolbarText,
+                    fontSize: '9px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                  }}
+                >
+                  <span>Sources ({sources.length})</span>
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+                {sourcesOpen && (
+                  <>
+                    <div onClick={() => setSourcesOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 998 }} />
+                    <div style={{
+                      position: 'absolute', bottom: '30px', left: 0, zIndex: 999,
+                      background: darkMode ? '#0d0d0d' : '#ffffff',
+                      border: `1px solid ${t.toolbarBorder}`,
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+                      display: 'flex', flexDirection: 'column', padding: '4px 0', minWidth: '100px'
+                    }}>
+                      {SOURCE_OPTIONS.map(opt => {
+                        const on = sources.includes(opt.id);
+                        return (
+                          <div
+                            key={opt.id}
+                            onClick={() => toggleSource(opt.id)}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '8px',
+                              padding: '6px 12px', cursor: 'pointer',
+                              background: on ? 'rgba(99,102,241,0.08)' : 'transparent',
+                              color: on ? '#6366f1' : t.toolbarText,
+                              fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+                              transition: 'background 100ms'
+                            }}
+                            onMouseEnter={e => { if (!on) e.currentTarget.style.background = t.toolbarHoverBg; }}
+                            onMouseLeave={e => { if (!on) e.currentTarget.style.background = 'transparent'; }}
+                          >
+                            <div style={{
+                              width: '8px', height: '8px', borderRadius: '1px',
+                              border: `1.5px solid ${on ? '#6366f1' : t.toolbarBtnBorder}`,
+                              background: on ? '#6366f1' : 'transparent',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}>
+                              {on && <span style={{ fontSize: '6px', color: 'white', fontWeight: 900 }}>✓</span>}
+                            </div>
+                            <span>{opt.label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+
             </div>
 
-            {/* Send */}
+            {/* Send Button */}
             <button
               onClick={handleSendMessage}
               disabled={!chatInput.trim() || isAiLoading}
@@ -314,6 +359,7 @@ export default function MayaChatPanel() {
                 color: (!chatInput.trim() || isAiLoading) ? t.toolbarText : '#ffffff',
                 cursor: (!chatInput.trim() || isAiLoading) ? 'not-allowed' : 'pointer',
                 display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 150ms', fontFamily: 'inherit',
+                flexShrink: 0
               }}
             >
               {isAiLoading ? (

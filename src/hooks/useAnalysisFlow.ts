@@ -52,7 +52,7 @@ export function useAnalysisFlow() {
       method: 'POST',
       headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
-        realBias: selections.realBias,
+        preSessionContext: selections.preSessionContext,
         htfStructure: selections.htfStructure,
         marketPulse: selections.marketPulse,
         provider: providerVal,
@@ -80,9 +80,17 @@ export function useAnalysisFlow() {
     }
 
     const payload = {
-      realBias: selections.realBias || {},
+      preSessionContext: selections.preSessionContext || {},
       htfStructure: selections.htfStructure || {},
       marketPulse: selections.marketPulse || {},
+      // All analyst notes — every phase note the operator has written.
+      // These are the highest-signal human input and must reach the LLM.
+      notes: {
+        preSessionContext: notes.preSessionContext || '',
+        htfStructure:      notes.htfStructure      || '',
+        marketPulse:       notes.marketPulse       || '',
+        liquidityContext:  notes.liquidityContext  || '',
+      },
       provider: providerVal,
       llm_config: { ...modelConfig, model_id: modelIdVal },
       image_description: imageDescStr,
@@ -132,12 +140,20 @@ export function useAnalysisFlow() {
 
     const { provider: providerVal, model_id: modelIdVal } = getActiveModel();
     const payload = {
-      realBias: selections.realBias,
+      preSessionContext: selections.preSessionContext,
       htfStructure: selections.htfStructure,
       marketPulse: selections.marketPulse,
       command: finalCommand,
       sts_dims: finalCommand === 'STRIKE' ? strikeSelections : interSelections,
-      notes: notes.command,
+      // Full notes object so weapon agent has all analyst context
+      notes: {
+        preSessionContext: notes.preSessionContext || '',
+        htfStructure:      notes.htfStructure      || '',
+        marketPulse:       notes.marketPulse       || '',
+        liquidityContext:  notes.liquidityContext  || '',
+        command:           notes.command           || '',
+        weapon_thought:    notes.weapon_thought    || '',
+      },
       trader_thought: thought || undefined,
       strategy_reasoning: netraOutput?.analysis,
       provider: providerVal,

@@ -4,17 +4,21 @@ export interface Session {
   userName: string;
   assetName: string | null;
   tradeName: string | null;
+  role?: string;
+  allowedModels?: string[];
+  allowedPages?: string[];
+  allowedTeams?: string[];
 }
 
 export interface Selections {
-  realBias: Record<string, string>;
+  preSessionContext: Record<string, string>;
   htfStructure: Record<string, string>;
   marketPulse: Record<string, string>;
   liquidityContext: Record<string, string>;
 }
 
 export interface Notes {
-  realBias: string;
+  preSessionContext: string;
   htfStructure: string;
   marketPulse: string;
   liquidityContext: string;
@@ -24,6 +28,7 @@ export interface Notes {
 }
 
 export interface InterSelections {
+  [key: string]: string | undefined;
   pattern: string;
   friction: string;
   sweep: string;
@@ -34,6 +39,7 @@ export interface InterSelections {
 }
 
 export interface StrikeSelections {
+  [key: string]: string | undefined;
   impulseQuality: string;
   continuationZone: string;
   // Trishul (D2 = None / Shallow Pullback)
@@ -271,6 +277,7 @@ export interface SessionInput {
   tradeName: string;
   marketType: string;
   modelName: string;
+  assetClass?: string;
 }
 
 export interface EditFormData {
@@ -343,13 +350,13 @@ export interface ChecklistMark {
 
 export interface MarketPulseExtras {
   operationalMarks?: ChecklistMark[];
-  activeLegOptions?: string[];
+  activeLegOptions?: Record<string, string[]>;
   subAuctionOptions?: Record<string, string[]>;
 }
 
 export interface SysData {
   weapons?: SystemWeapons;
-  realBias?: { title?: string; dimensions: SystemDimension[] };
+  preSessionContext?: { title?: string; dimensions: SystemDimension[] };
   htfStructure?: { title?: string; dimensions: SystemDimension[] };
   marketPulse?: { title?: string; dimensions: SystemDimension[] };
   liquidityContext?: { title?: string; dimensions: SystemDimension[] };
@@ -398,7 +405,7 @@ export interface AIOutput {
 }
 
 export type FinalCommand = 'STRIKE' | 'INTERCEPTION' | 'SATURATION' | 'NO_ENGAGEMENT' | null;
-export type ActiveView = 'terminal' | 'trishul' | 'profile' | 'about';
+export type ActiveView = 'terminal' | 'trishul' | 'profile' | 'about' | 'admin' | 'portfolio';
 
 // ─── Session Registry ─────────────────────────────────────────────────────────
 

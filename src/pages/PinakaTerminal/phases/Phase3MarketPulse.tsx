@@ -1,9 +1,10 @@
-// Market Pulse phase — the operational marking checklist and live dimension capture.
-
 import React, { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../../store';
 import { useNetra } from '../../../context/NetraContext';
 import { useNetraUtils } from '../../../hooks/useNetraUtils';
 import { API_BASE } from '../../../utils/constants';
+import ForkButton from '../../../components/UI/ForkButton';
 
 // ─── Operational Marking checklist ───────────────────────────────────────────
 
@@ -43,40 +44,38 @@ function OperationalMarkingChecklist({
 
       {open && (
         <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+          display: 'flex', flexDirection: 'column',
           border: '1px solid var(--border-strong)',
           borderRadius: '0 0 5px 5px',
           marginBottom: '4px', overflow: 'hidden',
         }}>
           {marks.map((m, i) => {
             const isDone = !!checked[m.id];
-            const isLastRow = i >= 3;
-            const isRightEdge = (i + 1) % 3 === 0;
+            const isLastRow = i === marks.length - 1;
             return (
               <div
                 key={m.id}
                 onClick={e => { e.stopPropagation(); toggle(m.id); }}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: '8px',
-                  padding: '8px 10px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '12px 16px', cursor: 'pointer',
                   background: isDone ? 'var(--accent-bg)' : 'transparent',
                   borderBottom: isLastRow ? 'none' : '1px solid var(--border)',
-                  borderRight: isRightEdge ? 'none' : '1px solid var(--border)',
                   transition: 'background 120ms',
                 }}
               >
                 <div style={{
-                  width: '11px', height: '11px', flexShrink: 0,
+                  width: '12px', height: '12px', flexShrink: 0,
                   border: `1.5px solid ${isDone ? 'var(--phase-accent)' : 'var(--border-strong)'}`,
                   background: isDone ? 'var(--phase-accent)' : 'transparent',
                   borderRadius: '2px',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   transition: 'border-color 100ms, background 100ms',
                 }}>
-                  {isDone && <span style={{ fontSize: '7px', color: 'white', fontWeight: 900, lineHeight: 1 }}>✓</span>}
+                  {isDone && <span style={{ fontSize: '8px', color: 'white', fontWeight: 900, lineHeight: 1 }}>✓</span>}
                 </div>
                 <span style={{
-                  ...MONO_MP, fontSize: '9px', fontWeight: 500, flex: 1, lineHeight: 1.4,
+                  ...MONO_MP, fontSize: '10px', fontWeight: 600, flex: 1, lineHeight: 1.4,
                   color: isDone ? 'var(--text-3)' : 'var(--text-1)',
                   textDecoration: isDone ? 'line-through' : 'none',
                   textDecorationColor: 'var(--text-4)',
@@ -92,7 +91,7 @@ function OperationalMarkingChecklist({
   );
 }
 
-export default function Phase3MarketPulse() {
+export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: number, defaultName: string) => void }) {
   const {
     SYSTEM_DATA, selections, setSelections,
     notes, setNotes,
@@ -100,6 +99,7 @@ export default function Phase3MarketPulse() {
     confirmMarketPulse,
   } = useNetra();
 
+  const tradeName = useSelector((s: RootState) => s.logs.tradeName);
   const [editing, setEditing] = useState(false);
 
   const isLocked = highestStep > 3 && !editing;
@@ -118,11 +118,11 @@ export default function Phase3MarketPulse() {
   };
 
   const mpExtras = SYSTEM_DATA.marketPulseExtras || {};
-  const SUB_AUCTION_OPTIONS = mpExtras.subAuctionOptions || {};
-  const ACTIVE_LEG_OPTIONS  = mpExtras.activeLegOptions  || [];
+  const SUB_AUCTION_OPTIONS = (mpExtras.subAuctionOptions || {}) as Record<string, string[]>;
+  const ACTIVE_LEG_OPTIONS  = (mpExtras.activeLegOptions?.[auctionState] || []) as string[];
   const OPERATIONAL_MARKS   = mpExtras.operationalMarks   || [];
 
-  const showSubAuction = !!auctionState;
+  const showSubAuction = auctionState === 'Balance';
   const showActiveLeg  = !!auctionState;
 
   const isCompressionTrap = subAuctionState === 'Contracting Balance';
@@ -162,9 +162,9 @@ export default function Phase3MarketPulse() {
   // ── Gate ──────────────────────────────────────────────────────────────────
   const mpOk = !!auctionState && !!activeLeg && !!momentum && !!resistance;
 
-  const canConfirm = !isLocked && !isNoEngagement && mpOk && allLiqSelected;
+  const canConfirm = !isLocked;
 
-  const subLabel = (text: string, first = false) => (
+  const subLabel = (text: string, first = false, onForkClick?: () => void) => (
     <div style={{
       margin: first ? '14px 0 12px 0' : '28px 0 12px 0',
       display: 'flex', alignItems: 'center', gap: '10px',
@@ -173,6 +173,7 @@ export default function Phase3MarketPulse() {
     }}>
       <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '11px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase', flexShrink: 0 }}>{text}</span>
       <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
+      {onForkClick && <ForkButton onClick={onForkClick} size="sm" />}
     </div>
   );
 
@@ -188,12 +189,12 @@ export default function Phase3MarketPulse() {
       <div className="precision-row">
         <div className="precision-label">Auction State</div>
         <div className="precision-selector">
-          {(['Balance', 'Relocation', 'Relocation Against Bias', 'Transition'] as const).map(opt => (
+          {(['Balance', 'Relocation In HTF Direction', 'Relocation Against HTF Direction', 'Transitional'] as const).map(opt => (
             <button
               key={opt}
               onClick={() => {
                 if (isLocked) return;
-                setSelections({ ...selections, marketPulse: { ...mp, auctionState: opt, subAuctionState: '' } });
+                setSelections({ ...selections, marketPulse: { ...mp, auctionState: opt, subAuctionState: '', activeLeg: '' } });
               }}
               disabled={isLocked}
               className={`precision-opt ${auctionState === opt ? 'selected' : ''} ${isLocked && auctionState !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
@@ -233,7 +234,7 @@ export default function Phase3MarketPulse() {
       <div className="precision-row">
         <div className="precision-label">Momentum</div>
         <div className="precision-selector">
-          {(['Impulsive', 'Sustained', 'Stalling', 'Exhausted', 'Unknown'] as const).map(opt => (
+          {(['Impulsive', 'Sustained', 'Opposed', 'Stalling'] as const).map(opt => (
             <button key={opt} onClick={() => setMp('momentum', opt)} disabled={isLocked}
               className={`precision-opt ${momentum === opt ? 'selected' : ''} ${isLocked && momentum !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
             >{opt}</button>
@@ -243,7 +244,7 @@ export default function Phase3MarketPulse() {
       <div className="precision-row">
         <div className="precision-label">Resistance</div>
         <div className="precision-selector">
-          {(['Weak', 'Moderate', 'Strong', 'Dominant', 'Unknown'] as const).map(opt => (
+          {(['Weak', 'Moderate', 'Strong', 'Dominant'] as const).map(opt => (
             <button key={opt} onClick={() => setMp('resistance', opt)} disabled={isLocked}
               className={`precision-opt ${resistance === opt ? 'selected' : ''} ${isLocked && resistance !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
             >{opt}</button>
@@ -257,12 +258,30 @@ export default function Phase3MarketPulse() {
         </div>
       )}
 
-      {/* ── COMPONENT 3: LIQUIDITY CONTEXT ── */}
+      {/* ── COMPONENT 4: LIQUIDITY CONTEXT & COMPONENT 5: AUCTION EVENT ── */}
       {liqDims.length > 0 && (
         <>
-          {subLabel('Component 4 — Liquidity Context')}
+          {subLabel('Component 4 — Liquidity Context', false, onFork ? () => onFork(3, `FORK_${tradeName || 'Trade'}_P3_LIQ`) : undefined)}
 
-          {liqDims.map((dim) => (
+          {liqDims.filter(dim => dim.id !== 'auctionEvent').map((dim) => (
+            <div key={dim.id} className="precision-row">
+              <div className="precision-label">{dim.name}</div>
+              <div className="precision-selector">
+                {(dim.options || []).map(opt => {
+                  const isSelected = liq[dim.id] === opt;
+                  return (
+                    <button key={opt} onClick={() => setLiq(dim.id, opt)} disabled={isLocked}
+                      className={`precision-opt ${isSelected ? 'selected' : ''} ${isLocked && !isSelected ? 'opacity-30 cursor-not-allowed' : ''}`}
+                    >{opt}</button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {subLabel('Component 5 — Auction Event', false, onFork ? () => onFork(3, `FORK_${tradeName || 'Trade'}_P3_EVENT`) : undefined)}
+
+          {liqDims.filter(dim => dim.id === 'auctionEvent').map((dim) => (
             <div key={dim.id} className="precision-row">
               <div className="precision-label">{dim.name}</div>
               <div className="precision-selector">

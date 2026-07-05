@@ -7,15 +7,10 @@ import { useHTFGate } from '../../hooks/useReduceFlag';
 // ─── Strategic Marking ───────────────────────────────────────────────────────
 
 const STRATEGIC_MARKS = [
-  { id: 'whl',    label: 'Weekly High & Low',       tier: 'T1' },
-  { id: 'pdhl',   label: 'Previous Day High & Low', tier: 'T1' },
-  { id: 'yclose', label: "Yesterday's Close",        tier: 'T1' },
-  { id: 'gap',    label: 'Gap Zone',                tier: 'T1' },
-  { id: 'shl1h',  label: '1H Swing High & Low',     tier: 'T2' },
-  { id: 'eqhl',   label: '1H Equal Highs / Lows',   tier: 'T2' },
-  { id: 'htfdst', label: '1H HTF Destination',       tier: 'T2' },
-  { id: 'imb',    label: '1H Unfilled Imbalance',   tier: 'T2' },
-  { id: 'disp',   label: '1H Displacement Origin',  tier: 'T2' },
+  { id: 'structuralBoundaries', label: 'Category 1 — Structural Boundaries (Weekly High/Low, Significant Swings)', tier: 'T1' },
+  { id: 'structuralLiquidity',  label: 'Category 2 — Structural Liquidity (Equal High/Low Clusters, Nearest Swings)', tier: 'T2' },
+  { id: 'structuralImbalance',  label: 'Category 3 — Structural Imbalance (Fresh HTF Fair Value Gaps)', tier: 'T2' },
+  { id: 'structuralEvents',     label: 'Category 4 — Structural Events (BOS, CHoCH)', tier: 'T2' },
 ] as const;
 
 const MONO: React.CSSProperties = { fontFamily: 'Space Grotesk, Inter, sans-serif' };
@@ -34,45 +29,43 @@ export function StrategicMarkingChecklist({
   if (!open) return null;
   return (
     <div style={{
-      display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+      display: 'flex', flexDirection: 'column',
       border: '1px solid var(--border-strong)',
       marginBottom: '4px',
     }}>
       {STRATEGIC_MARKS.map((m, i) => {
         const isDone = !!checked[m.id];
-        const isLastRow = i >= 6;
-        const isRightEdge = (i + 1) % 3 === 0;
+        const isLastRow = i === STRATEGIC_MARKS.length - 1;
         return (
           <div
             key={m.id}
             onClick={e => { e.stopPropagation(); onToggle(m.id); }}
             style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '10px 12px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '10px',
+              padding: '12px 16px', cursor: 'pointer',
               background: isDone ? 'var(--phase-accent-bg)' : 'transparent',
               borderBottom: isLastRow ? 'none' : '1px solid var(--border)',
-              borderRight: isRightEdge ? 'none' : '1px solid var(--border)',
               transition: 'background 120ms',
             }}
           >
             <div style={{
-              width: '11px', height: '11px', flexShrink: 0,
+              width: '12px', height: '12px', flexShrink: 0,
               border: `1.5px solid ${isDone ? 'var(--phase-accent)' : 'var(--border-strong)'}`,
               background: isDone ? 'var(--phase-accent)' : 'transparent',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'border-color 100ms, background 100ms',
             }}>
-              {isDone && <span style={{ fontSize: '7px', color: 'white', fontWeight: 900, lineHeight: 1 }}>✓</span>}
+              {isDone && <span style={{ fontSize: '8px', color: 'white', fontWeight: 900, lineHeight: 1 }}>✓</span>}
             </div>
             <span style={{
-              ...MONO, fontSize: '9px', fontWeight: 500, flex: 1, lineHeight: 1.4,
+              ...MONO, fontSize: '10px', fontWeight: 600, flex: 1, lineHeight: 1.4,
               color: isDone ? 'var(--text-3)' : 'var(--text-1)',
               textDecoration: isDone ? 'line-through' : 'none',
               textDecorationColor: 'var(--text-4)',
             }}>
               {m.label}
             </span>
-            <span style={{ ...MONO, fontSize: '7px', fontWeight: 700, letterSpacing: '0.1em', color: isDone ? 'var(--phase-accent)' : 'var(--text-4)', flexShrink: 0 }}>
+            <span style={{ ...MONO, fontSize: '8px', fontWeight: 800, letterSpacing: '0.1em', color: isDone ? 'var(--phase-accent)' : 'var(--text-4)', flexShrink: 0 }}>
               {m.tier}
             </span>
           </div>
@@ -87,13 +80,13 @@ export function StrategicMarkingChecklist({
 export function BiasDimensions() {
   const { SYSTEM_DATA, selections, setSelections, highestStep } = useNetra();
 
-  const dims     = SYSTEM_DATA.realBias?.dimensions || [];
-  const rb       = (selections.realBias || {}) as Record<string, string>;
+  const dims     = SYSTEM_DATA.preSessionContext?.dimensions || [];
+  const rb       = (selections.preSessionContext || {}) as Record<string, string>;
   const isLocked = highestStep > 1;
 
   const setRb = (key: string, val: string) => {
     if (isLocked) return;
-    setSelections({ ...selections, realBias: { ...rb, [key]: val } });
+    setSelections({ ...selections, preSessionContext: { ...rb, [key]: val } });
   };
 
   return (
@@ -132,60 +125,61 @@ export function HTFDimensions() {
   const isLocked = highestStep > 2;
 
   const htf  = (selections.htfStructure || {}) as Record<string, string>;
-  const dims = SYSTEM_DATA.htfStructure?.dimensions || [];
+  const dims = (SYSTEM_DATA.htfStructure?.dimensions || []).filter(dim => !dim.multiselect);
 
-  const setHtf = (key: string, val: string) => {
+  const toggleHtf = (key: string, val: string) => {
     if (isLocked) return;
     setSelections({ ...selections, htfStructure: { ...htf, [key]: val } });
   };
 
-  const stopReason = htf.continuity === 'Broken'
+  const stopReason = htf.structuralContinuity === 'Broken Continuity'
     ? 'Structural continuity is broken. Price has violated HTF structure — no valid trade environment exists.'
+    : htf.anchorCondition === 'Anchor Failure'
+    ? 'Anchor has failed. Foundational structural origin has failed — no valid trade environment exists.'
+    : htf.protectionCondition === 'Protection Failure'
+    ? 'Protection has failed. Defended structural boundary has failed — no valid trade environment exists.'
     : 'Late maturity + deep rotation + near destination forms a terminal squeeze. Continuation probability is too low.';
 
   return (
     <div className="flex flex-col phase-theme-1">
-      {dims.map((dim) => (
-        <div key={dim.id} className="precision-row flex items-center">
-          <div className="precision-label">{dim.name}</div>
-          <div className="precision-selector flex-1">
-            {(dim.options || []).map(opt => {
-              const isSelected = htf[dim.id] === opt;
-              return (
-                <button
-                  key={opt}
-                  onClick={() => setHtf(dim.id, opt)}
-                  disabled={isLocked}
-                  className={`precision-opt ${isSelected ? 'selected' : ''} ${isLocked && !isSelected ? 'opacity-30 cursor-not-allowed' : ''}`}
-                >{opt}</button>
-              );
-            })}
+      {dims.map((dim) => {
+        return (
+          <div key={dim.id} className="precision-row flex items-center">
+            <div className="precision-label">{dim.name}</div>
+            <div className="precision-selector flex-1">
+              {(dim.options || []).map(opt => {
+                const isSelected = htf[dim.id] === opt;
+                return (
+                  <button
+                    key={opt}
+                    onClick={() => toggleHtf(dim.id, opt)}
+                    disabled={isLocked}
+                    className={`precision-opt ${isSelected ? 'selected' : ''} ${isLocked && !isSelected ? 'opacity-30 cursor-not-allowed' : ''}`}
+                  >{opt}</button>
+                );
+              })}
+            </div>
+            {dim.id === 'legMaturity' && (
+              <div className="flex gap-2 ml-4">
+                <input type="text" placeholder="Avg No Of Legs" value={htf['avgNoOfLegs'] || ''} onChange={e => toggleHtf('avgNoOfLegs', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text-1)] w-24 outline-none focus:border-[var(--accent)]" />
+                <input type="text" placeholder="Current Leg No" value={htf['currentLegNo'] || ''} onChange={e => toggleHtf('currentLegNo', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text-1)] w-24 outline-none focus:border-[var(--accent)]" />
+              </div>
+            )}
+            {dim.id === 'rotationDepth' && (
+              <div className="flex gap-2 ml-4">
+                <input type="text" placeholder="Avg" value={htf['avgRotation'] || ''} onChange={e => toggleHtf('avgRotation', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text-1)] w-16 outline-none focus:border-[var(--accent)]" />
+                <input type="text" placeholder="curr" value={htf['currRotation'] || ''} onChange={e => toggleHtf('currRotation', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text-1)] w-16 outline-none focus:border-[var(--accent)]" />
+              </div>
+            )}
+            {dim.id === 'structuralCompression' && (
+              <div className="flex gap-2 ml-4">
+                <input type="text" placeholder="Avg Height" value={htf['avgHeight'] || ''} onChange={e => toggleHtf('avgHeight', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text-1)] w-20 outline-none focus:border-[var(--accent)]" />
+                <input type="text" placeholder="Current Height" value={htf['currentHeight'] || ''} onChange={e => toggleHtf('currentHeight', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text-1)] w-24 outline-none focus:border-[var(--accent)]" />
+              </div>
+            )}
           </div>
-          {dim.id === 'maturity' && (
-            <div className="flex gap-2 ml-4">
-              <input type="text" placeholder="Avg No Of Legs" value={htf['avgNoOfLegs'] || ''} onChange={e => setHtf('avgNoOfLegs', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text-1)] w-24 outline-none focus:border-[var(--accent)]" />
-              <input type="text" placeholder="Current Leg No" value={htf['currentLegNo'] || ''} onChange={e => setHtf('currentLegNo', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text-1)] w-24 outline-none focus:border-[var(--accent)]" />
-            </div>
-          )}
-          {dim.id === 'rotation' && (
-            <div className="flex gap-2 ml-4">
-              <input type="text" placeholder="Avg" value={htf['avgRotation'] || ''} onChange={e => setHtf('avgRotation', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text-1)] w-16 outline-none focus:border-[var(--accent)]" />
-              <input type="text" placeholder="curr" value={htf['currRotation'] || ''} onChange={e => setHtf('currRotation', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text-1)] w-16 outline-none focus:border-[var(--accent)]" />
-            </div>
-          )}
-          {dim.id === 'compression' && (
-            <div className="flex gap-2 ml-4">
-              <input type="text" placeholder="Avg Height" value={htf['avgHeight'] || ''} onChange={e => setHtf('avgHeight', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text-1)] w-20 outline-none focus:border-[var(--accent)]" />
-              <input type="text" placeholder="Current Height" value={htf['currentHeight'] || ''} onChange={e => setHtf('currentHeight', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text-1)] w-24 outline-none focus:border-[var(--accent)]" />
-            </div>
-          )}
-          {dim.name === 'HTF Imbalance' && (
-            <div className="flex gap-2 ml-4">
-              <input type="text" placeholder="Filling %" value={htf['fillingPercentage'] || ''} onChange={e => setHtf('fillingPercentage', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text-1)] w-28 outline-none focus:border-[var(--accent)]" />
-            </div>
-          )}
-        </div>
-      ))}
+        );
+      })}
 
       {isStop && !isLocked && (
         <div className="flex flex-col gap-1.5 px-4 py-3 mt-3" style={{ background: 'var(--red-bg)', border: '1px solid var(--red)' }}>
@@ -194,6 +188,60 @@ export function HTFDimensions() {
           <span style={{ fontSize: '9px', color: 'var(--red)', opacity: 0.6, marginTop: '4px' }}>Chart closes. No further analysis permitted for this session.</span>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Component 4: HTF Events ───────────────────────────────────────────────
+
+export function HTFEvents() {
+  const { SYSTEM_DATA, selections, setSelections, highestStep } = useNetra();
+
+  const isLocked = highestStep > 2;
+  const htf  = (selections.htfStructure || {}) as Record<string, string>;
+  const dims = (SYSTEM_DATA.htfStructure?.dimensions || []).filter(dim => dim.multiselect);
+
+  const toggleHtf = (key: string, val: string) => {
+    if (isLocked) return;
+    const currentVal = htf[key] || '';
+    let selectedVals = currentVal ? currentVal.split(', ') : [];
+    if (val === 'No Significant Event') {
+      selectedVals = ['No Significant Event'];
+    } else {
+      selectedVals = selectedVals.filter(v => v !== 'No Significant Event');
+      if (selectedVals.includes(val)) {
+        selectedVals = selectedVals.filter(v => v !== val);
+      } else {
+        selectedVals.push(val);
+      }
+    }
+    const newVal = selectedVals.join(', ');
+    setSelections({ ...selections, htfStructure: { ...htf, [key]: newVal } });
+  };
+
+  return (
+    <div className="flex flex-col phase-theme-1">
+      {dims.map((dim) => {
+        const selectedVals = htf[dim.id] ? String(htf[dim.id]).split(', ') : [];
+        return (
+          <div key={dim.id} className="precision-row flex items-center">
+            <div className="precision-label">{dim.name}</div>
+            <div className="precision-selector flex-1">
+              {(dim.options || []).map(opt => {
+                const isSelected = selectedVals.includes(opt);
+                return (
+                  <button
+                    key={opt}
+                    onClick={() => toggleHtf(dim.id, opt)}
+                    disabled={isLocked}
+                    className={`precision-opt ${isSelected ? 'selected' : ''} ${isLocked && !isSelected ? 'opacity-30 cursor-not-allowed' : ''}`}
+                  >{opt}</button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -211,17 +259,17 @@ export function PreSessionActions() {
   const [editing, setEditing] = useState(false);
   const isLocked = highestStep > 1 && !editing;
 
-  const biasDims = SYSTEM_DATA.realBias?.dimensions || [];
-  const rb       = (selections.realBias || {}) as Record<string, string>;
+  const biasDims = SYSTEM_DATA.preSessionContext?.dimensions || [];
+  const rb       = (selections.preSessionContext || {}) as Record<string, string>;
   const allBias  = biasDims.length > 0 && biasDims.every(d => !!rb[d.id]);
   const hasData  = Object.keys(rb).length > 0;
-  const canConfirm = !isLocked && allBias;
+  const canConfirm = !isLocked;
 
   const handleEdit  = () => { setEditing(false); editStep(1); };
   const handleReset = () => {
     if (isLocked) return;
-    setSelections({ ...selections, realBias: {} });
-    setNotes({ ...notes, realBias: '' });
+    setSelections({ ...selections, preSessionContext: {} });
+    setNotes({ ...notes, preSessionContext: '' });
   };
 
   return (
@@ -229,8 +277,8 @@ export function PreSessionActions() {
       <div style={{ borderTop: '1px solid var(--border-strong)', margin: '16px 0 0 0' }} />
       <div className="flex gap-4 items-start pt-4">
         <textarea
-          value={notes.realBias || ''}
-          onChange={e => setNotes({ ...notes, realBias: e.target.value })}
+          value={notes.preSessionContext || ''}
+          onChange={e => setNotes({ ...notes, preSessionContext: e.target.value })}
           placeholder="Pre-session notes — directional bias, correlated market, displacement context..."
           disabled={isLocked}
           className="flex-1 bg-transparent outline-none resize-none text-[12px] text-[var(--text-2)] placeholder:text-[var(--text-4)] leading-relaxed min-h-[44px]"
@@ -247,9 +295,9 @@ export function PreSessionActions() {
           </button>
         </div>
       </div>
-      {stepTimestamps.realBias && (
+      {stepTimestamps.preSessionContext && (
         <div className="text-right text-[9px] font-mono text-[var(--text-4)] mt-1">
-          Locked: {stepTimestamps.realBias}
+          Locked: {stepTimestamps.preSessionContext}
         </div>
       )}
     </>
@@ -276,7 +324,7 @@ export function MacroMappingActions() {
   const htf        = (selections.htfStructure || {}) as Record<string, string>;
   const allHTF     = htfDims.length === 0 || htfDims.every(d => !!htf[d.id]);
   const hasAnyData = Object.keys(htf).length > 0;
-  const canConfirm = !isLocked && !isStop && allHTF;
+  const canConfirm = !isLocked;
   const lockedAt   = stepTimestamps.htfStructure;
 
   const handleEdit  = () => { setEditing(false); editStep(2); };
