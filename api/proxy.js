@@ -19,7 +19,7 @@ export default async function handler(req, res) {
     }
   }
 
-  const target = `${hfSpaceUrl}/api/${path}${query.size ? `?${query}` : ''}`;
+  const target = `${hfSpaceUrl}/${path}${query.size ? `?${query}` : ''}`;
   const headers = new Headers();
   for (const [key, value] of Object.entries(req.headers)) {
     if (value == null) continue;
@@ -28,8 +28,6 @@ export default async function handler(req, res) {
     headers.set(key, Array.isArray(value) ? value.join(', ') : value);
   }
 
-  // Hugging Face owns the Authorization header for a Private Space.
-  // Preserve the application's JWT separately for backend verification.
   if (req.headers.authorization) {
     headers.set('x-netra-authorization', req.headers.authorization);
   }
@@ -62,3 +60,4 @@ export default async function handler(req, res) {
     });
   }
 }
+

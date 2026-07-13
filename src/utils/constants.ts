@@ -4,7 +4,7 @@
 // server-side /api proxy. Only local Vite development calls FastAPI directly.
 export const API_BASE: string = import.meta.env.DEV
   ? import.meta.env.VITE_API_URL || 'http://localhost:7860'
-  : '';
+  : '/backend';
 
 export const DEBOUNCE_MS = 1500;
 
