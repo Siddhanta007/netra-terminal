@@ -1,6 +1,10 @@
 // App-wide constants — API base URL, debounce timing, and the dimension scoring weights/tables.
 
-export const API_BASE: string = import.meta.env.VITE_API_URL || '';
+// Production requests stay on the Vercel origin and are forwarded by the
+// server-side /api proxy. Only local Vite development calls FastAPI directly.
+export const API_BASE: string = import.meta.env.DEV
+  ? import.meta.env.VITE_API_URL || 'http://localhost:7860'
+  : '';
 
 export const DEBOUNCE_MS = 1500;
 

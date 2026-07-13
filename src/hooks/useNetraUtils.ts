@@ -17,14 +17,11 @@ export function useNetraUtils() {
   const getAuthHeaders = useCallback((extraHeaders: Record<string, string> = {}): Record<string, string> => {
     const headers: Record<string, string> = { ...extraHeaders };
     const netraToken = localStorage.getItem('netra_token');
-    const hfToken = import.meta.env.VITE_HF_TOKEN as string | undefined;
-    
+
     if (netraToken) {
       headers['Authorization'] = `Bearer ${netraToken}`;
-    } else if (hfToken) {
-      headers['Authorization'] = `Bearer ${hfToken}`;
     }
-    
+
     if (session) {
       headers['x-user'] = session.userName;
     }

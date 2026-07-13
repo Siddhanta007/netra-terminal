@@ -12,6 +12,7 @@ import { setTradeName, setLogSearchTerm, setLogFilterOutcome, setLogSortOrder } 
 import { setSessionInput, setSession } from './store/slices/sessionSlice';
 import { setPrepStep, setActiveView, setIsLoggerOpen } from './store/slices/uiSlice';
 import { setRulesAcknowledged } from './store/slices/analysisSlice';
+import { API_BASE } from './utils/constants';
 import Login from './components/Auth/Login';
 import GlobalOverlay from './components/Layout/GlobalOverlay';
 import MayaChatPanel from './components/Layout/MayaChatPanel';
@@ -243,7 +244,6 @@ export default function NetraTerminal() {
       return computeTerminalSessionStats([]);
     }
   });
-  const API_BASE_APP = (import.meta as any).env?.VITE_API_URL || '';
   useEffect(() => {
     if (!session?.userName) return;
     const today = new Date().toISOString().slice(0, 10);
@@ -252,7 +252,7 @@ export default function NetraTerminal() {
     const token = localStorage.getItem('netra_token');
     if (token) headers['Authorization'] = `Bearer ${token}`;
     headers['x-user'] = session.userName;
-    fetch(`${API_BASE_APP}/api/stats/daily?model_id=${model}&username=${encodeURIComponent(session.userName)}&date=${today}`, { headers })
+    fetch(`${API_BASE}/api/stats/daily?model_id=${model}&username=${encodeURIComponent(session.userName)}&date=${today}`, { headers })
       .then(r => r.ok ? r.json() : null)
       .then(data => setTodayStats(data))
       .catch(() => {});
