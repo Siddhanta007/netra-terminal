@@ -8,7 +8,7 @@ import { setSession, setActiveSessionId, setIsLoggingIn, setSessionInput } from 
 import { setPrepStep, setActiveView, setIsLoggerOpen, setAiPaneOpen, setMobileMenuOpen } from '../store/slices/uiSlice';
 import {
   setHighestStep, setSelections, setNotes, setInterSelections, setStrikeSelections,
-  setFinalCommand, setNetraOutput, setSysRecommendation, setSelectedWeaponId,
+  setFinalCommand, setNetraOutput, setSelectedNetraState, setSysRecommendation, setSelectedWeaponId,
   setCommandLocked, setWeaponLocked, setStepTimestamps, setImageDescription,
   setWeaponPrediction, setStateTimeline,
 } from '../store/slices/analysisSlice';
@@ -18,15 +18,39 @@ import { saveState } from '../utils/storage';
 import { API_BASE } from '../utils/constants';
 import { useNetraUtils } from './useNetraUtils';
 import { TradeLog, SessionMeta, TradePhase2, TradePhase3, TradePhase4, TradePhase8, TradePhase9Card, TradePhase1 } from '../types';
+import { buildPhase9TradeBlock, buildTradeMetadata } from '../types/tradeStorageSchema';
+import { tradeCardsStorageKey } from '../features/terminal/phases/phase-10-mission-control/missionControl/helpers';
+
+function firstTradeCard(log: TradeLog): Record<string, any> | null {
+  if (log.phase_9?.trade_1) {
+    const block = log.phase_9.trade_1 as Record<string, any>;
+    const trade = (block.trade || {}) as Record<string, any>;
+    const entry = (trade.entry || {}) as Record<string, any>;
+    const exit = (trade.exit || {}) as Record<string, any>;
+    const stats = (block.stats || {}) as Record<string, any>;
+    return {
+      asset: trade.execution_instrument,
+      entry_price: entry.price,
+      stop_loss: entry.stop_loss,
+      exit_price: exit.price,
+      outcome: stats.outcome,
+    };
+  }
+  return (log.phase9?.[0] as Record<string, any> | undefined) || null;
+}
 
 // Resolve session fields from new phase structure (primary) or old session_state blob (fallback)
 function resolveLogState(log: TradeLog) {
   const s = log.session_state;
+  const firstTrade = firstTradeCard(log);
   const p2 = log.phase2 as TradePhase2 | undefined;
   const p3 = log.phase3 as TradePhase3 | undefined;
   const p4 = log.phase4 as TradePhase4 | undefined;
   const p8 = log.phase8 as TradePhase8 | undefined;
   const finalCmd = ((log.phase6 as Record<string,unknown> | undefined)?.command as string ?? s?.finalCommand ?? null);
+  const selectedNetraState = ((log.phase6 as Record<string, unknown> | undefined)?.selected_state as Record<string, unknown> | undefined)
+    ?? ((s as Record<string, unknown> | undefined)?.selectedNetraState as Record<string, unknown> | undefined)
+    ?? null;
   const dims = p8?.dimensions ?? {};
   return {
     highestStep:   (log.highestStep  ?? s?.highestStep  ?? 1) as number,
@@ -41,6 +65,7 @@ function resolveLogState(log: TradeLog) {
     note4lq:p4?.liquidityContext_note ?? s?.notes?.liquidityContext ?? '',
     netraOut:  (log.phase5 ?? s?.netraOutput ?? null),
     sysRec:    ((log.phase6 as Record<string,unknown> | undefined)?.recommendation ?? s?.sysRecommendation ?? null),
+    selectedNetraState,
     finalCmd,
     wpPred:    (log.phase7 ?? s?.weaponPrediction ?? null),
     weaponId:  (p8?.weapon_id ?? s?.selectedWeaponId ?? null) as string | null,
@@ -48,7 +73,7 @@ function resolveLogState(log: TradeLog) {
     interSel:  finalCmd === 'INTERCEPTION' ? dims : (s?.interSelections  ?? {}),
     imgDesc:   ((log.phase1 as TradePhase1 | undefined)?.image_description ?? (s as Record<string,unknown> | undefined)?.imageDescription ?? null) as string | null,
     audit:     (log.phase10 ?? (s as Record<string,unknown> | undefined)?.auditData ?? null),
-    assetName: (log.assetName ?? s?.assetName ?? (log.phase9?.[0] as TradePhase9Card | undefined)?.asset ?? '') as string,
+    assetName: (log.assetName ?? s?.assetName ?? (firstTrade as TradePhase9Card | undefined)?.asset ?? '') as string,
     stateTimeline: ((log as Record<string, unknown>).state_timeline ?? []) as Array<{ state_id: string; ts: string }>,
   };
 }
@@ -75,6 +100,7 @@ export function useSessionManager() {
     strikeSelections: { impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' },
     finalCommand: null as string | null,
     netraOutput: null as RootState['analysis']['netraOutput'],
+    selectedNetraState: null as RootState['analysis']['selectedNetraState'],
     sysRecommendation: null as unknown,
     weaponPrediction: null as RootState['analysis']['weaponPrediction'],
     selectedWeaponId: null as string | null,
@@ -93,6 +119,7 @@ export function useSessionManager() {
   const strikeSelections = useSelector((s: RootState) => s.analysis.strikeSelections);
   const finalCommand = useSelector((s: RootState) => s.analysis.finalCommand);
   const netraOutput = useSelector((s: RootState) => s.analysis.netraOutput);
+  const selectedNetraState = useSelector((s: RootState) => s.analysis.selectedNetraState);
   const sysRecommendation = useSelector((s: RootState) => s.analysis.sysRecommendation);
   const weaponPrediction = useSelector((s: RootState) => s.analysis.weaponPrediction);
   const selectedWeaponId = useSelector((s: RootState) => s.analysis.selectedWeaponId);
@@ -104,7 +131,7 @@ export function useSessionManager() {
 
   analysisRef.current = {
     highestStep, selections, notes, interSelections, strikeSelections,
-    finalCommand, netraOutput, sysRecommendation, weaponPrediction,
+    finalCommand, netraOutput, selectedNetraState, sysRecommendation, weaponPrediction,
     selectedWeaponId, stepTimestamps, tradeName, activeSessionId,
     assetName: session?.assetName || '', imageDescription, auditData, stateTimeline,
   };
@@ -119,6 +146,7 @@ export function useSessionManager() {
     dispatch(setStrikeSelections({ impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' }));
     dispatch(setFinalCommand(null));
     dispatch(setNetraOutput(null));
+    dispatch(setSelectedNetraState(null));
     dispatch(setSysRecommendation(null));
     dispatch(setSelectedWeaponId(null));
     dispatch(setStepTimestamps({}));
@@ -157,6 +185,7 @@ export function useSessionManager() {
       dispatch(setInterSelections(r.interSel   as Parameters<typeof setInterSelections>[0]));
       dispatch(setFinalCommand(r.finalCmd));
       dispatch(setNetraOutput(r.netraOut as Parameters<typeof setNetraOutput>[0] | null));
+      dispatch(setSelectedNetraState(r.selectedNetraState));
       dispatch(setSysRecommendation(r.sysRec));
       dispatch(setWeaponPrediction(r.wpPred as Parameters<typeof setWeaponPrediction>[0] | null));
       dispatch(setSelectedWeaponId(r.weaponId));
@@ -165,12 +194,13 @@ export function useSessionManager() {
       if (r.imgDesc) dispatch(setImageDescription(r.imgDesc));
       if (r.audit)   dispatch(setAuditData(r.audit as Parameters<typeof setAuditData>[0]));
       dispatch(setStateTimeline(r.stateTimeline));
-      dispatch(setSession({ userName: session?.userName || 'User', assetName: r.assetName, tradeName: log.name || '' }));
+      dispatch(setSession({ ...(session || {}), userName: session?.userName || 'User', assetName: r.assetName, tradeName: log.name || '' }));
       dispatch(setActiveSessionId(log.id));
       saveState('activeSessionId', log.id);
       dispatch(setActiveView('terminal'));
       dispatch(setActiveEditLog(log));
-      dispatch(setEditFormData({ entry_price: log.phase9?.[0]?.entry_price, stop_loss: log.phase9?.[0]?.stop_loss, exit_price: log.phase9?.[0]?.exit_price, outcome: log.phase9?.[0]?.outcome, trade_name: log.name }));
+      const firstTrade = firstTradeCard(log);
+      dispatch(setEditFormData({ entry_price: firstTrade?.entry_price, stop_loss: firstTrade?.stop_loss, exit_price: firstTrade?.exit_price, outcome: firstTrade?.outcome, trade_name: log.name }));
       dispatch(setIsLoggerOpen(true));
       dispatch(setPrepStep(2));
       dispatch(setActiveRegistryId(id));
@@ -191,18 +221,30 @@ export function useSessionManager() {
       .then((res) => { if (res.ok) return res.json(); throw new Error('Invalid credentials'); })
       .then((data: {
         user: string;
+        display_name?: string;
+        email?: string;
+        phone?: string;
+        broker?: string;
         role: string;
+        groups?: Array<{ group_key: string; group_name: string; role: string; permissions?: Record<string, unknown> }>;
         allowed_models: string[];
         allowed_pages: string[];
+        allowed_teams?: string[];
         access_token: string;
       }) => {
         const sessObj = {
           userName: data.user,
           assetName: null,
           tradeName: null,
+          displayName: data.display_name || data.user,
+          email: data.email || '',
+          phone: data.phone || '',
+          broker: data.broker || '',
           role: data.role,
+          groups: data.groups || [],
           allowedModels: data.allowed_models,
           allowedPages: data.allowed_pages,
+          allowedTeams: data.allowed_teams || [],
         };
         localStorage.setItem('netra_token', data.access_token);
         localStorage.setItem('netra_session', JSON.stringify(sessObj));
@@ -236,6 +278,7 @@ export function useSessionManager() {
         interSelections: { pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' },
         strikeSelections: { impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' },
         finalCommand: null, netraOutput: null, sysRecommendation: null,
+        selectedNetraState: null,
         selectedWeaponId: null, stepTimestamps: {},
         tradeName: sessionInput.tradeName, assetName: sessionInput.assetName,
         assetClass: sessionInput.assetClass || 'Index',
@@ -273,6 +316,7 @@ export function useSessionManager() {
     dispatch(setInterSelections(r.interSel   as Parameters<typeof setInterSelections>[0]));
     dispatch(setFinalCommand(r.finalCmd));
     dispatch(setNetraOutput(r.netraOut as Parameters<typeof setNetraOutput>[0] | null));
+    dispatch(setSelectedNetraState(r.selectedNetraState));
     dispatch(setSysRecommendation(r.sysRec));
     dispatch(setWeaponPrediction(r.wpPred as Parameters<typeof setWeaponPrediction>[0] | null));
     dispatch(setSelectedWeaponId(r.weaponId));
@@ -282,12 +326,13 @@ export function useSessionManager() {
     if (r.audit)   dispatch(setAuditData(r.audit as Parameters<typeof setAuditData>[0]));
     dispatch(setStateTimeline(r.stateTimeline));
     if (window.innerWidth < 1024) dispatch(setIsLoggerOpen(false));
-    dispatch(setSession({ userName: session?.userName || 'User', assetName: r.assetName, tradeName: log.name || '' }));
+    dispatch(setSession({ ...(session || {}), userName: session?.userName || 'User', assetName: r.assetName, tradeName: log.name || '' }));
     dispatch(setActiveSessionId(log.id));
     saveState('activeSessionId', log.id);
     dispatch(setActiveView('terminal'));
     dispatch(setActiveEditLog(log));
-    dispatch(setEditFormData({ entry_price: log.phase9?.[0]?.entry_price, stop_loss: log.phase9?.[0]?.stop_loss, exit_price: log.phase9?.[0]?.exit_price, outcome: log.phase9?.[0]?.outcome, trade_name: log.name }));
+    const firstTrade = firstTradeCard(log);
+    dispatch(setEditFormData({ entry_price: firstTrade?.entry_price, stop_loss: firstTrade?.stop_loss, exit_price: firstTrade?.exit_price, outcome: firstTrade?.outcome, trade_name: log.name }));
     dispatch(setIsLoggerOpen(true));
     dispatch(setPrepStep(2));
     dispatch(registerSession(buildSessionMeta(log, null, null)));
@@ -321,6 +366,7 @@ export function useSessionManager() {
         dispatch(setInterSelections(r.interSel   as Parameters<typeof setInterSelections>[0]));
         dispatch(setFinalCommand(r.finalCmd));
         dispatch(setNetraOutput(r.netraOut as Parameters<typeof setNetraOutput>[0] | null));
+        dispatch(setSelectedNetraState(r.selectedNetraState));
         dispatch(setSysRecommendation(r.sysRec));
         dispatch(setWeaponPrediction(r.wpPred as Parameters<typeof setWeaponPrediction>[0] | null));
         dispatch(setSelectedWeaponId(r.weaponId));
@@ -331,10 +377,11 @@ export function useSessionManager() {
         dispatch(setTradeName(data.name));
         dispatch(setActiveSessionId(data.id));
         saveState('activeSessionId', data.id);
-        dispatch(setSession({ userName: session?.userName || 'User', assetName: r.assetName, tradeName: data.name }));
+        dispatch(setSession({ ...(session || {}), userName: session?.userName || 'User', assetName: r.assetName, tradeName: data.name }));
         dispatch(setActiveView('terminal'));
         dispatch(setActiveEditLog(data));
-        dispatch(setEditFormData({ entry_price: log.phase9?.[0]?.entry_price, stop_loss: log.phase9?.[0]?.stop_loss, trade_name: data.name }));
+        const firstTrade = firstTradeCard(log);
+        dispatch(setEditFormData({ entry_price: firstTrade?.entry_price, stop_loss: firstTrade?.stop_loss, trade_name: data.name }));
         dispatch(setIsLoggerOpen(true));
         dispatch(setPrepStep(2));
         dispatch(registerSession(buildSessionMeta(log, null, null)));
@@ -373,6 +420,7 @@ export function useSessionManager() {
         finalCommand: snap.finalCommand,
         netraOutput: snap.netraOutput,
         sysRecommendation: snap.sysRecommendation,
+        selectedNetraState: snap.selectedNetraState,
         selectedWeaponId: snap.selectedWeaponId,
         stepTimestamps: snap.stepTimestamps,
         tradeName: `${snap.tradeName || 'FORKED'}_P${phaseNum}_FORK`,
@@ -394,6 +442,7 @@ export function useSessionManager() {
         dispatch(setStrikeSelections(snap.strikeSelections));
         dispatch(setFinalCommand(snap.finalCommand));
         dispatch(setNetraOutput(snap.netraOutput));
+        dispatch(setSelectedNetraState(snap.selectedNetraState));
         dispatch(setSysRecommendation(snap.sysRecommendation));
         dispatch(setWeaponPrediction(snap.weaponPrediction));
         dispatch(setSelectedWeaponId(snap.selectedWeaponId));
@@ -403,7 +452,7 @@ export function useSessionManager() {
         dispatch(setTradeName(data.name));
         dispatch(setActiveSessionId(data.id));
         saveState('activeSessionId', data.id);
-        dispatch(setSession({ userName: session?.userName || 'User', assetName: payload.asset_ticker, tradeName: data.name }));
+        dispatch(setSession({ ...(session || {}), userName: session?.userName || 'User', assetName: payload.asset_ticker, tradeName: data.name }));
         dispatch(setActiveView('terminal'));
         dispatch(setActiveEditLog(data));
         dispatch(setEditFormData({ ...data.phase2, ...data.phase3, ...data.phase4, trade_name: data.name }));
@@ -423,6 +472,7 @@ export function useSessionManager() {
           dispatch(setNotes({ ...snap.notes, marketPulse: '', liquidityContext: '' }));
           dispatch(setFinalCommand(null));
           dispatch(setNetraOutput(null));
+          dispatch(setSelectedNetraState(null));
           dispatch(setSysRecommendation(null));
           dispatch(setCommandLocked(false));
           dispatch(setInterSelections({ pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }));
@@ -432,6 +482,7 @@ export function useSessionManager() {
         } else if (phaseNum === 4) {
           dispatch(setFinalCommand(null));
           dispatch(setNetraOutput(null));
+          dispatch(setSelectedNetraState(null));
           dispatch(setSysRecommendation(null));
           dispatch(setCommandLocked(false));
           dispatch(setInterSelections({ pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }));
@@ -476,33 +527,44 @@ export function useSessionManager() {
     // Read live trade cards from localStorage for phase9
     const phase9 = (() => {
       try {
-        const raw = localStorage.getItem('netra_trade_cards_v1');
+        const raw = localStorage.getItem(tradeCardsStorageKey(snap.activeSessionId));
         if (!raw) return null;
         const cards = JSON.parse(raw) as Array<Record<string, unknown>>;
         const active = cards.filter(c => c.entry);
         if (!active.length) return null;
         return active.map((c, i) => ({
           trade_index:           i + 1,
-          asset:                 [snap.assetName, c.assetSuffix].filter(Boolean).join(' ') || null,
-          direction:             c.side,
-          entry_price:           c.entry   || null,
+	          asset:                 [snap.assetName, c.assetSuffix].filter(Boolean).join(' ') || null,
+	          direction:             c.side,
+	          execution_mode:         c.executionMode || 'LIVE',
+	          instrument_kind:        c.instrumentKind || 'CONTRACT',
+	          underlying_asset:       c.underlyingAsset || snap.assetName || null,
+	          underlying_entry_price: (c.instrumentKind || 'CONTRACT') === 'UNDERLYING' ? c.entry || null : c.underlyingEntry || null,
+	          underlying_exit_price:  (c.instrumentKind || 'CONTRACT') === 'UNDERLYING' ? c.exitPrice || null : c.underlyingExit || null,
+	          entry_price:           c.entry   || null,
           stop_loss:             c.sl      || null,
           quantity:              c.qty     || null,
           additional_cost:       c.cost    || null,
           t1: c.t1 || null, t2: c.t2 || null, t3: c.t3 || null, t4: c.t4 || null,
-          entry_time:            c.entryTime  || null,
+	          date:                  c.date       || null,
+	          entry_time:            c.entryTime  || null,
+          exit_date:             c.exitDate   || null,
           exit_time:             c.exitTime   || null,
+          be_triggered:          c.beTriggered || false,
           add_entries:           c.addEntries   || [],
           partial_exits:         c.partialExits || [],
           exit_price:            c.exitPrice   || null,
           exit_type:             c.exitType    || null,
           trade_status:          c.tradeStatus || null,
           holding_time_minutes:  (() => {
-            const et = c.entryTime as string; const xt = c.exitTime as string;
-            if (!et || !xt) return null;
-            const [eh = 0, em = 0] = et.split(':').map(Number);
-            const [xh = 0, xm = 0] = xt.split(':').map(Number);
-            const m = (xh * 60 + xm) - (eh * 60 + em);
+	            const entryDate = (c.date as string) || new Date().toISOString().slice(0, 10);
+	            const exitDate = (c.exitDate as string) || entryDate;
+	            const et = c.entryTime as string; const xt = c.exitTime as string;
+	            if (!et || !xt) return null;
+	            const start = new Date(`${entryDate}T${et}`);
+	            const end = new Date(`${exitDate}T${xt}`);
+	            if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+	            const m = Math.floor((end.getTime() - start.getTime()) / 60000);
             return m > 0 ? m : null;
           })(),
           note:   c.notes  || null,
@@ -510,8 +572,51 @@ export function useSessionManager() {
         }));
       } catch { return null; }
     })();
+    const phase_9 = phase9
+      ? Object.fromEntries(phase9.map((trade, index) => [
+          `trade_${trade.trade_index || index + 1}`,
+          buildPhase9TradeBlock({
+            weaponId: snap.selectedWeaponId || undefined,
+            selectedDimensions: snap.finalCommand === 'STRIKE' ? snap.strikeSelections : snap.interSelections,
+            mode: String(trade.execution_mode || 'LIVE'),
+            assetClass: String(trade.asset_class || 'Index'),
+            instrumentType: String(trade.instrument_kind || 'CONTRACT'),
+            thesisAsset: String(trade.underlying_asset || snap.assetName || ''),
+            executionInstrument: String(trade.asset || ''),
+            side: String(trade.direction || ''),
+            entry: {
+              date: trade.date,
+              time: trade.entry_time,
+              price: trade.entry_price,
+              stop_loss: trade.stop_loss,
+              quantity: trade.quantity,
+              additional_cost: trade.additional_cost,
+            },
+            targets: { t1: trade.t1, t2: trade.t2, t3: trade.t3, t4: trade.t4 },
+            managementActions: {
+              breakeven_triggered: trade.be_triggered,
+              add_entries: trade.add_entries,
+              partial_exits: trade.partial_exits,
+            },
+            exit: {
+              date: trade.exit_date,
+              time: trade.exit_time,
+              price: trade.exit_price,
+              type: trade.exit_type,
+              status: trade.trade_status,
+              closed: trade.closed,
+            },
+            stats: {
+              status: trade.closed ? 'committed' : 'pending_until_commit',
+              holding_duration_minutes: trade.holding_time_minutes,
+            },
+            notes: { user: trade.note },
+          }),
+        ]))
+      : null;
 
     const payload = {
+      metadata: buildTradeMetadata(session?.userName || 'Unknown', currentModel || 'pinaka', session?.allowedTeams?.[0] || 'default'),
       highestStep:    snap.highestStep,
       tradeName:      snap.tradeName,
       assetName:      snap.assetName,
@@ -545,6 +650,7 @@ export function useSessionManager() {
         ? {
             command:        snap.finalCommand,
             confirmed_at:   snap.stepTimestamps?.command ?? null,
+            selected_state: snap.selectedNetraState ?? null,
             recommendation: snap.sysRecommendation ?? null,
           }
         : null,
@@ -561,6 +667,7 @@ export function useSessionManager() {
         : null,
 
       phase9,
+      phase_9,
 
       // phase10 is written separately by useAudit after audit completes
     };

@@ -12,6 +12,7 @@ import {
   setCommandLocked as setCommandLockedAction,
   setWeaponLocked as setWeaponLockedAction,
   setNetraOutput as setNetraOutputAction,
+  setSelectedNetraState as setSelectedNetraStateAction,
   setSysRecommendation as setSysRecommendationAction,
   setInterSelections as setInterSelectionsAction,
   setStrikeSelections as setStrikeSelectionsAction,
@@ -19,6 +20,7 @@ import {
   setSelectedWeaponId as setSelectedWeaponIdAction,
   setStepTimestamps as setStepTimestampsAction,
   setAnalyticsData as setAnalyticsDataAction,
+  setWeaponPrediction as setWeaponPredictionAction,
   setRAmount as setRAmountAction,
   setDailyLossLimit as setDailyLossLimitAction,
   setDailyLossHit as setDailyLossHitAction,
@@ -128,6 +130,8 @@ export interface NetraContextValue {
   setSelectedWeaponId: (v: string | null) => void;
   netraOutput: NetraOutput | null;
   setNetraOutput: (v: NetraOutput | null) => void;
+  selectedNetraState: Record<string, unknown> | null;
+  setSelectedNetraState: (v: Record<string, unknown> | null) => void;
   sysRecommendation: unknown;
   setSysRecommendation: (v: unknown) => void;
   isEvaluating: boolean;
@@ -181,7 +185,9 @@ export interface NetraContextValue {
   setIsAiLoading: (v: boolean) => void;
   sources: ChatSource[];
   toggleSource: (s: ChatSource) => void;
-  startNewChat: () => void;
+  chatTitle: string;
+  startNewChat: (title?: string) => Promise<void>;
+  renameChat: (title: string) => Promise<void>;
   summarizeNow: () => void;
   handleSendMessage: () => void;
   // UI state
@@ -253,7 +259,19 @@ const EMPTY_SYS_DATA: SysData = {
   executionMarks: [],
   weaponStages: [],
   tradeStatuses: [],
-  exitTypes: [],
+  exitTypes: [
+    'Target 1 Hit',
+    'Target 2 Hit',
+    'Target 3 Hit',
+    'Target 4 Hit',
+    'Stop Loss Hit',
+    'Breakeven Exit',
+    'Manual Exit',
+    'Time-Based Exit',
+    'Partial Profit Exit',
+    'Trailing Stop Exit',
+    'Setup Invalidated',
+  ],
 };
 
 export function NetraProvider({ children }: { children: React.ReactNode }) {
@@ -284,6 +302,7 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
   const strikeSelections = useSelector((s: RootState) => s.analysis.strikeSelections);
   const saturationSelections = useSelector((s: RootState) => s.analysis.saturationSelections);
   const selectedWeaponId = useSelector((s: RootState) => s.analysis.selectedWeaponId);
+  const selectedNetraState = useSelector((s: RootState) => s.analysis.selectedNetraState);
   const weaponStageLog = useSelector((s: RootState) => s.analysis.weaponStageLog);
   const stepTimestamps = useSelector((s: RootState) => s.analysis.stepTimestamps);
   const analyticsData = useSelector((s: RootState) => s.analysis.analyticsData);
@@ -357,9 +376,16 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
 
   const applyModels = (flatModels: AvailableModel[], _tactical_provider?: string) => {
     dispatch(setAvailableModelsAction(flatModels));
+    const isGoogleSelection = selectedModel.toLowerCase().startsWith('google|');
     const isValid = flatModels.some((m) => m.id === selectedModel);
-    if (!isValid && flatModels.length > 0) {
-      dispatch(setSelectedModelAction(flatModels[0].id));
+    if ((!isValid || isGoogleSelection) && flatModels.length > 0) {
+      const preferred =
+        flatModels.find((m) => m.id === 'tiers|free') ||
+        flatModels.find((m) => m.id === 'tiers|openrouter-free') ||
+        flatModels.find((m) => m.id === 'openrouter|openrouter/free') ||
+        flatModels.find((m) => m.id.startsWith('openrouter|')) ||
+        flatModels[0];
+      dispatch(setSelectedModelAction(preferred.id));
     }
     // Note: tactical_provider ("google", "groq") is the AI provider, NOT the trading model
     // ("pinaka", "trishul"). Do not dispatch setCurrentModelAction here.
@@ -488,23 +514,35 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
   const confirmStep = useCallback((stepLevel: number) => {
     if (highestStepRef.current === stepLevel) {
       dispatch(setHighestStepAction(stepLevel + 1));
-      dispatch(setStepTimestampsAction({ ...stepTimestamps, [STEP_NAMES[stepLevel]]: new Date().toLocaleTimeString('en-IN') }));
+      const timestampKey = stepLevel === 4 ? 'command' : STEP_NAMES[stepLevel];
+      dispatch(setStepTimestampsAction({ ...stepTimestamps, [timestampKey]: new Date().toLocaleTimeString('en-IN') }));
       showToast(`Step ${stepLevel} confirmed`);
     }
   }, [dispatch, stepTimestamps, showToast]);
 
   const editStep = useCallback((stepLevel: number) => {
     dispatch(setHighestStepAction(stepLevel));
-    if (stepLevel <= 4) {
+    if (stepLevel < 4) {
       dispatch(setFinalCommandAction(null));
       dispatch(setNetraOutputAction(null));
+      dispatch(setSelectedNetraStateAction(null));
       dispatch(setSysRecommendationAction(null));
       dispatch(setSelectedWeaponIdAction(null));
       dispatch(setCommandLockedAction(false));
+    } else if (stepLevel === 4) {
+      // P7 command edit should preserve expensive P5/P6 recognition output.
+      // Only invalidate downstream weapon/trade guidance that depends on the command matrix.
+      const { command: _commandTimestamp, ...restTimestamps } = stepTimestamps;
+      dispatch(setStepTimestampsAction(restTimestamps));
+      dispatch(setSysRecommendationAction(null));
+      dispatch(setSelectedWeaponIdAction(null));
+      dispatch(setWeaponPredictionAction(null));
+      dispatch(setCommandLockedAction(false));
+      dispatch(setWeaponStageLogAction([]));
     }
     // Always unlock weapon; only clear selectedWeaponId when going back past the weapon step
     dispatch(setWeaponLockedAction(false));
-  }, [dispatch]);
+  }, [dispatch, stepTimestamps]);
 
   const doResetStep = useCallback((stepLevel: number) => {
     const stepKeys = ['preSessionContext', 'htfStructure', 'marketPulse', 'liquidityContext'] as const;
@@ -514,9 +552,10 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
       dispatch(setNotesAction({ ...notes, [key]: '' }));
     }
     dispatch(setHighestStepAction(stepLevel));
-    if (stepLevel <= 4) {
+    if (stepLevel < 4) {
       dispatch(setFinalCommandAction(null));
       dispatch(setNetraOutputAction(null));
+      dispatch(setSelectedNetraStateAction(null));
       dispatch(setSysRecommendationAction(null));
       dispatch(setSelectedWeaponIdAction(null));
     }
@@ -542,6 +581,7 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     dispatch(setNotesAction({ ...notes, marketPulse: '', liquidityContext: '' }));
     dispatch(setFinalCommandAction(null));
     dispatch(setNetraOutputAction(null));
+    dispatch(setSelectedNetraStateAction(null));
     dispatch(setSysRecommendationAction(null));
     dispatch(setSelectedWeaponIdAction(null));
     dispatch(setCommandLockedAction(false));
@@ -582,6 +622,8 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     setSelectedWeaponId: (v) => dispatch(setSelectedWeaponIdAction(v)),
     netraOutput: analysis_.netraOutput,
     setNetraOutput: (v) => dispatch(setNetraOutputAction(v)),
+    selectedNetraState,
+    setSelectedNetraState: (v) => dispatch(setSelectedNetraStateAction(v)),
     sysRecommendation,
     setSysRecommendation: (v) => dispatch(setSysRecommendationAction(v)),
     isEvaluating: analysis_.isEvaluating,
@@ -635,7 +677,9 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     setIsAiLoading: (v) => dispatch(setIsAiLoadingAction(v)),
     sources: chat_.sources,
     toggleSource: chat_.toggleSource,
+    chatTitle: chat_.chatTitle,
     startNewChat: chat_.startNewChat,
+    renameChat: chat_.renameChat,
     summarizeNow: chat_.summarizeNow,
     handleSendMessage: chat_.handleSendMessage,
     // UI

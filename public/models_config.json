@@ -10,7 +10,7 @@
     "concurrency": 6,
     "enrich": false
   },
-  "tactical_provider": "google",
+  "tactical_provider": "openrouter",
   "vectorizer_provider": "local",
   "embedding_model": "BAAI/bge-base-en-v1.5",
   "vectorizers": {
@@ -19,8 +19,8 @@
       "model": "BAAI/bge-base-en-v1.5"
     },
     "free_online_vectorizer": {
-      "provider": "google",
-      "model": "gemini-embedding-2"
+      "provider": "voyageai",
+      "model": "voyage-4-lite"
     },
     "paid_vectorizer": {
       "provider": "openai",
@@ -37,31 +37,6 @@
     }
   },
   "providers": [
-    {
-      "provider": "Google",
-      "displayName": "Google",
-      "envKeyName": "GEMINI_API_KEY",
-      "models": [
-        {
-          "id": "gemini-3.1-flash-lite",
-          "name": "Gemini 3.1 Flash Lite",
-          "cost": "Low",
-          "tags": [
-            "Vision",
-            "Agent"
-          ]
-        },
-        {
-          "id": "gemini-2.5-flash",
-          "name": "Gemini 2.5 Flash",
-          "cost": "Low",
-          "tags": [
-            "Vision",
-            "Agent"
-          ]
-        }
-      ]
-    },
     {
       "provider": "Groq",
       "displayName": "Groq",

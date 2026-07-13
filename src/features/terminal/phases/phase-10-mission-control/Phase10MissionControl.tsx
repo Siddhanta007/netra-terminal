@@ -1,67 +1,56 @@
 // Phase 7 · TRADING DATA (a.k.a. Mission Control) — the day's trade journal.
-// Each trade is a hybrid card: WeaponPanel (entry-model co-pilot) on the left,
-// TradeCardComponent (execution record) on the right. Cards persist to
-// localStorage and mirror to the backend quick-trade record.
+// Each trade uses UnifiedTradeCard for entry-model guidance plus execution
+// capture. Cards persist to localStorage and mirror to the backend terminal-trade
+// record.
 //
 // This file is the thin orchestrator; the pieces live in ./missionControl/.
 
-import { useState, useEffect } from 'react';
-import { useNetra } from '../../../context/NetraContext';
-import { useNetraUtils } from '../../../hooks/useNetraUtils';
+import { useState, useEffect, useMemo } from 'react';
+import { useNetra } from '@/context/NetraContext';
+import { useNetraUtils } from '@/hooks/useNetraUtils';
 import type { TradeCard } from './missionControl/types';
-import { CARDS_KEY, todayStr, mkCard, computeCardStats, MONO, StatCell } from './missionControl/helpers';
+import { TERMINAL_STATS_EVENT, localDateStr, mkCard, MONO, computeTerminalSessionStats, tradeCardsStorageKey } from './missionControl/helpers';
 import UnifiedTradeCard from './missionControl/UnifiedTradeCard';
 
 export default function Phase10MissionControl() {
   const {
-    highestStep,
-    rAmount, dailyLossHit, dailyTargetHit,
+    dailyLossHit, dailyTargetHit,
     session,
+    activeSessionId,
   } = useNetra();
 
-  const isFullyLocked = highestStep > 6;
   const assetPrefix   = (session?.assetName || '').trim();
   const { getAuthHeaders } = useNetraUtils();
+  const cardsStorageKey = useMemo(() => tradeCardsStorageKey(activeSessionId), [activeSessionId]);
 
-  const [cards, setCards] = useState<TradeCard[]>(() => {
+  const loadCards = (key: string): TradeCard[] => {
     try {
-      const raw = localStorage.getItem(CARDS_KEY);
-      if (raw) return JSON.parse(raw) as TradeCard[];
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw) as TradeCard[];
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
     } catch { /* ignore */ }
     return [mkCard()];
-  });
+  };
+
+  const [cards, setCards] = useState<TradeCard[]>(() => loadCards(cardsStorageKey));
 
   useEffect(() => {
-    localStorage.setItem(CARDS_KEY, JSON.stringify(cards));
-  }, [cards]);
+    setCards(loadCards(cardsStorageKey));
+  }, [cardsStorageKey]);
+
+  useEffect(() => {
+    localStorage.setItem(cardsStorageKey, JSON.stringify(cards));
+    window.dispatchEvent(new CustomEvent(TERMINAL_STATS_EVENT, {
+      detail: computeTerminalSessionStats(cards),
+    }));
+  }, [cards, cardsStorageKey]);
 
   const updCard = (id: string, updates: Partial<TradeCard>) =>
     setCards(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
 
-  const visibleCards = cards.filter(c => c.date === todayStr());
-
-  // Aggregate stats across visible cards that have entry data.
-  const aggStats = visibleCards.reduce((acc, card) => {
-    const s = computeCardStats(card);
-    if (s.wPrice <= 0) return acc;
-    return {
-      totalQty:   acc.totalQty   + s.entryQty,
-      totalCost:  acc.totalCost  + s.totalCost,
-      totalValue: acc.totalValue + s.wPrice * s.entryQty,
-      hasShort:   acc.hasShort   || s.isShort,
-    };
-  }, { totalQty: 0, totalCost: 0, totalValue: 0, hasShort: false });
-
-  const aggWPrice = aggStats.totalQty > 0 ? aggStats.totalValue / aggStats.totalQty : 0;
-  const aggBe     = aggWPrice > 0
-    ? (aggStats.hasShort ? aggWPrice - aggStats.totalCost / aggStats.totalQty : aggWPrice + aggStats.totalCost / aggStats.totalQty)
-    : 0;
-
-  // Risk-derived position size (R ÷ stop distance) off the primary card.
-  const primary = visibleCards[0] ?? cards[0] ?? mkCard();
-  const pStats  = computeCardStats(primary);
-  const r       = parseFloat(rAmount) || 0;
-  const positionSz = r > 0 && pStats.stopDist > 0 ? Math.floor(r / pStats.stopDist) : 0;
+  const visibleCards = cards.filter(c => c.date === localDateStr());
 
   const s400Active = dailyLossHit || dailyTargetHit;
 
@@ -78,15 +67,6 @@ export default function Phase10MissionControl() {
         </div>
       )}
 
-      {/* ── Aggregate stats ── */}
-      {aggWPrice > 0 && (
-        <div className="grid grid-cols-3 gap-3 px-4 py-3 border border-[var(--border)]" style={{ background: 'var(--surface-2)' }}>
-          <StatCell label="Breakeven"        value={aggBe > 0 ? aggBe.toFixed(2) : '—'} />
-          <StatCell label="Entry Cost"       value={aggWPrice * aggStats.totalQty > 0 ? `₹${(aggWPrice * aggStats.totalQty).toFixed(0)}` : '—'} />
-          <StatCell label="Position Size (R)" value={positionSz > 0 ? `${positionSz} units` : '—'} color="#60a5fa" />
-        </div>
-      )}
-
       {/* ── Trade cards — each is a unified 3-column panel ── */}
       {visibleCards.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -97,10 +77,11 @@ export default function Phase10MissionControl() {
               tradeIndex={idx}
               assetPrefix={assetPrefix}
               username={session?.userName || ''}
+              terminalSessionId={activeSessionId ? String(activeSessionId) : null}
               onChange={updates => updCard(card.id, updates)}
               onRemove={() => setCards(prev => prev.filter(c => c.id !== card.id))}
               canRemove={visibleCards.length > 1}
-              isLocked={isFullyLocked}
+              isLocked={false}
               getAuthHeaders={getAuthHeaders}
             />
           ))}
@@ -112,7 +93,7 @@ export default function Phase10MissionControl() {
       )}
 
       {/* ── Add trade ── */}
-      {!isFullyLocked && (
+      {!s400Active && (
         <button
           onClick={() => setCards(prev => [...prev, mkCard()])}
           style={{

@@ -9,12 +9,12 @@ export default function Footer({ accentColor = '#4169E1' }: { accentColor?: stri
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ width: '4px', height: '4px', background: accentColor }} />
           <span style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.25em', color: accentColor, fontFamily: 'JetBrains Mono, monospace' }}>NETRA</span>
-          <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(15,23,42,0.45)', fontFamily: 'JetBrains Mono, monospace' }}>v3.0</span>
+          <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(15,23,42,0.45)', fontFamily: 'JetBrains Mono, monospace' }}>First User Release</span>
           <div style={{ width: '1px', height: '12px', background: 'rgba(15,23,42,0.15)' }} />
-          <span style={{ fontSize: '10px', fontWeight: 600, color: 'rgba(15,23,42,0.55)', letterSpacing: '0.04em', fontFamily: 'JetBrains Mono, monospace' }}>Neural Execution & Tactical Reasoning Architecture</span>
+          <span style={{ fontSize: '10px', fontWeight: 600, color: 'rgba(15,23,42,0.55)', letterSpacing: '0.04em', fontFamily: 'JetBrains Mono, monospace' }}>Tactical Trading Workspace</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <a
             href="https://www.tradingview.com"
             target="_blank"

@@ -43,7 +43,7 @@ export default function MayaChatPanel() {
   const darkMode = useSelector((s: RootState) => s.ui.darkMode);
   const AVAILABLE_MODELS = useSelector((s: RootState) => s.model.availableModels);
 
-  const { handleSendMessage, toggleSource, startNewChat, summarizeNow, uploadedVisionFiles, setUploadedVisionFiles, session } = useNetra();
+  const { handleSendMessage, toggleSource, chatTitle, startNewChat, renameChat, summarizeNow, uploadedVisionFiles, setUploadedVisionFiles, session } = useNetra();
 
   const SOURCE_OPTIONS: { id: ChatSource; label: string }[] = [
     { id: 'terminal',    label: 'Terminal' },
@@ -116,6 +116,48 @@ export default function MayaChatPanel() {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', background: t.panelBg, position: 'relative', transition: 'background 300ms' }}>
 
+      {/* Thread Header */}
+      <div style={{ height: '46px', borderBottom: `1px solid ${t.headerBorder}`, background: t.headerBg, padding: '0 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexShrink: 0 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: '8px', fontWeight: 900, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#4169E1', marginBottom: '2px' }}>Maya Chat</div>
+          <div title={chatTitle} style={{ fontSize: '12px', fontWeight: 800, color: darkMode ? '#f8fafc' : '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '220px' }}>
+            {chatTitle || 'Maya Chat'}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          <button
+            type="button"
+            title="New chat"
+            onClick={() => {
+              const title = window.prompt('New Maya chat name', 'New chat');
+              if (title !== null) startNewChat(title);
+            }}
+            style={{ width: '28px', height: '28px', border: `1px solid ${t.toolbarBtnBorder}`, background: darkMode ? 'rgba(255,255,255,0.03)' : '#ffffff', color: '#4169E1', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <button
+            type="button"
+            title="Rename chat"
+            onClick={() => {
+              const title = window.prompt('Rename Maya chat', chatTitle || 'Maya Chat');
+              if (title !== null) renameChat(title);
+            }}
+            style={{ width: '28px', height: '28px', border: `1px solid ${t.toolbarBtnBorder}`, background: darkMode ? 'rgba(255,255,255,0.03)' : '#ffffff', color: t.toolbarText, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          </button>
+          <button
+            type="button"
+            title="Summarize chat memory"
+            onClick={summarizeNow}
+            disabled={isAiLoading}
+            style={{ width: '28px', height: '28px', border: `1px solid ${t.toolbarBtnBorder}`, background: darkMode ? 'rgba(255,255,255,0.03)' : '#ffffff', color: t.toolbarText, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isAiLoading ? 'not-allowed' : 'pointer', opacity: isAiLoading ? 0.5 : 1 }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3"><path d="M4 7h16M4 12h10M4 17h7"/></svg>
+          </button>
+        </div>
+      </div>
 
       {/* Chat History */}
       <div

@@ -4,7 +4,12 @@ export interface Session {
   userName: string;
   assetName: string | null;
   tradeName: string | null;
+  displayName?: string;
+  email?: string;
+  phone?: string;
+  broker?: string;
   role?: string;
+  groups?: Array<{ group_key: string; group_name: string; role: string; permissions?: Record<string, unknown> }>;
   allowedModels?: string[];
   allowedPages?: string[];
   allowedTeams?: string[];
@@ -170,6 +175,7 @@ export interface SessionState {
   strikeSelections: StrikeSelections;
   finalCommand: string | null;
   netraOutput: NetraOutput | null;
+  selectedNetraState: Record<string, unknown> | null;
   sysRecommendation: unknown;
   weaponPrediction: WeaponPrediction | null;
   selectedWeaponId: string | null;
@@ -190,11 +196,14 @@ export interface TradePhase2 { selections?: Record<string, string>; note?: strin
 export interface TradePhase3 { selections?: Record<string, string>; note?: string }
 export interface TradePhase4 { marketPulse?: Record<string, string>; liquidityContext?: Record<string, string>; marketPulse_note?: string; liquidityContext_note?: string }
 export interface TradePhase5 extends NetraOutput {}
-export interface TradePhase6 { command?: string; confirmed_at?: string; recommendation?: Record<string, unknown> }
+export interface TradePhase6 { command?: string; confirmed_at?: string; selected_state?: Record<string, unknown> | null; recommendation?: Record<string, unknown> }
 export interface TradePhase7 extends WeaponPrediction {}
 export interface TradePhase8 { weapon_id?: string; dimensions?: Record<string, string> }
 export interface TradePhase9Card {
   trade_index?: number; asset?: string; direction?: string;
+  execution_mode?: string; instrument_kind?: string;
+  underlying_asset?: string; underlying_entry_price?: string; underlying_exit_price?: string;
+  underlying_move?: number; underlying_move_percent?: number;
   entry_price?: string; stop_loss?: string; quantity?: string; additional_cost?: string;
   t1?: string; t2?: string; t3?: string; t4?: string;
   entry_time?: string; exit_time?: string;
@@ -238,10 +247,16 @@ export interface TradeLog {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   phase9?: Array<Record<string, any>>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  phase_9?: Record<string, Record<string, any>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  metadata?: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  auditor?: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   phase10?: Record<string, any>;
   // Backward-compat: old documents carry session_state blob
   session_state?: SessionState;
-  // Quick trade fields
+  // Terminal trade fields
   source?: string;
   closed?: boolean;
   [key: string]: unknown;
@@ -356,10 +371,10 @@ export interface MarketPulseExtras {
 
 export interface SysData {
   weapons?: SystemWeapons;
-  preSessionContext?: { title?: string; dimensions: SystemDimension[] };
-  htfStructure?: { title?: string; dimensions: SystemDimension[] };
-  marketPulse?: { title?: string; dimensions: SystemDimension[] };
-  liquidityContext?: { title?: string; dimensions: SystemDimension[] };
+  preSessionContext?: { title?: string; drawings?: string[]; dimensions: SystemDimension[] };
+  htfStructure?: { title?: string; drawings?: string[]; dimensions: SystemDimension[] };
+  marketPulse?: { title?: string; drawings?: string[]; dimensions: SystemDimension[] };
+  liquidityContext?: { title?: string; drawings?: string[]; dimensions: SystemDimension[] };
   strikeDimensions?: SystemDimension[];
   interceptionDimensions?: SystemDimension[];
   saturationDimensions?: SystemDimension[];

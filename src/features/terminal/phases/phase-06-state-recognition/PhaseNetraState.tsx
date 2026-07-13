@@ -1,25 +1,29 @@
-// NETRA State phase — the recognised state + forward-transition graph, with a
-// manual state-override picker. Reads the recognition output produced by the
-// Synthesis phase (shared via the store), so it updates as soon as analyse runs.
+// NETRA State phase — user-owned state selection + forward-transition graph.
+// This phase is deliberately independent from P5 AI text. P5 suggests; this
+// phase stores the user's chosen state/command.
 
 import { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
-import { useNetra } from '../../../context/NetraContext';
-import StateGraph, { RecognizedState, TransitionBranch } from '../../../components/Templates/StateGraph';
-import { setNetraOutput } from '../../../store/slices/analysisSlice';
-import { API_BASE } from '../../../utils/constants';
+import { useNetra } from '@/context/NetraContext';
+import StateGraph, { RecognizedState, TransitionBranch } from '@/components/Templates/StateGraph';
+import { appendStateRecognition } from '@/store/slices/analysisSlice';
+import { API_BASE } from '@/utils/constants';
 
 const MONO = 'JetBrains Mono, Consolas, monospace';
 
 interface StateOption { id: string; name: string; mode: string }
 
+function normalizeCommand(value: unknown) {
+  if (!value) return null;
+  const normalized = String(value).trim().toUpperCase().replace(/_/g, ' ');
+  return normalized || null;
+}
+
 export default function PhaseNetraState() {
   const dispatch = useDispatch();
-  const { netraOutput, isEvaluating } = useNetra();
+  const { selectedNetraState, setSelectedNetraState, setFinalCommand, setCommandLocked } = useNetra();
 
-  // netraOutput may arrive flat ({recognized_state,...}) or enveloped ({data:{...}}).
-  const out = (netraOutput || {}) as Record<string, unknown>;
-  const inner = (out.data && typeof out.data === 'object' ? out.data : out) as Record<string, unknown>;
+  const inner = (selectedNetraState || {}) as Record<string, unknown>;
   const recognizedState = inner.recognized_state as RecognizedState | undefined;
   const transitions = (inner.possible_transitions || []) as TransitionBranch[];
   const isOverride = !!inner.state_override;
@@ -43,8 +47,7 @@ export default function PhaseNetraState() {
       .then(proj => {
         if (!proj?.recognized_state) return;
         const rec = proj.recognized_state;
-        dispatch(setNetraOutput({
-          ...inner,
+        setSelectedNetraState({
           recognized_state: rec,
           possible_transitions: proj.possible_transitions || [],
           child_states: proj.child_states || [],
@@ -52,7 +55,10 @@ export default function PhaseNetraState() {
           cmd: rec.command,
           posture: rec.posture,
           state_override: true,
-        } as unknown as Parameters<typeof setNetraOutput>[0]));
+        });
+        setFinalCommand(normalizeCommand(rec.command));
+        setCommandLocked(false);
+        if (rec.state_id) dispatch(appendStateRecognition(rec.state_id));
       })
       .finally(() => setSwitching(false));
   };
@@ -119,7 +125,7 @@ export default function PhaseNetraState() {
               <div style={{ position: 'absolute', inset: '8px', border: '1px solid rgba(255,255,255,0.5)', borderRadius: '50%' }} />
             </div>
             <span style={{ fontFamily: MONO, fontSize: '8px', fontWeight: 700, letterSpacing: '0.3em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)' }}>
-              {isEvaluating ? 'Recognizing State…' : 'Run Analyse — or pick a state above'}
+              Read P5 suggestion — then pick a state above
             </span>
           </div>
         )}

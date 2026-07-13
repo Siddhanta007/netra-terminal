@@ -1,8 +1,8 @@
 // Macro Mapping phase — strategic chart marks plus the HTF risk gate (CONTINUE/REDUCE/STOP).
 
 import { useState } from 'react';
-import { useNetra } from '../../context/NetraContext';
-import { useHTFGate } from '../../hooks/useReduceFlag';
+import { useNetra } from '@/context/NetraContext';
+import { useHTFGate } from '@/hooks/useReduceFlag';
 
 // ─── Strategic Marking ───────────────────────────────────────────────────────
 
@@ -132,11 +132,13 @@ export function HTFDimensions() {
     setSelections({ ...selections, htfStructure: { ...htf, [key]: val } });
   };
 
+  const htfAnchor = htf.htfAnchorCondition || htf.anchorCondition;
+  const htfProtection = htf.htfProtectionCondition || htf.protectionCondition;
   const stopReason = htf.structuralContinuity === 'Broken Continuity'
     ? 'Structural continuity is broken. Price has violated HTF structure — no valid trade environment exists.'
-    : htf.anchorCondition === 'Anchor Failure'
+    : htfAnchor === 'Anchor Failure'
     ? 'Anchor has failed. Foundational structural origin has failed — no valid trade environment exists.'
-    : htf.protectionCondition === 'Protection Failure'
+    : htfProtection === 'Protection Failure'
     ? 'Protection has failed. Defended structural boundary has failed — no valid trade environment exists.'
     : 'Late maturity + deep rotation + near destination forms a terminal squeeze. Continuation probability is too low.';
 

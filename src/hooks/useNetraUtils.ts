@@ -48,7 +48,7 @@ export function useNetraUtils() {
     const parts = selectedModel.split('|');
     const model_id = parts[1];
     if (!model_id) {
-      const fallback = availableModels[0]?.id || 'google|gemini-3.1-flash';
+      const fallback = availableModels[0]?.id || 'openrouter|openrouter/free';
       const [fProvider, fModelId] = fallback.split('|');
       return { provider: fProvider, model_id: fModelId };
     }
@@ -60,7 +60,7 @@ export function useNetraUtils() {
     const parts = selectedModel.split('|');
     const model_id = parts[1];
     if (!isValid || !model_id) {
-      const fallback = availableModels[0]?.id || 'google|gemini-3.1-flash-lite';
+      const fallback = availableModels[0]?.id || 'openrouter|openrouter/free';
       const [fProvider, fModelId] = fallback.split('|');
       return { provider: fProvider, model_id: fModelId };
     }

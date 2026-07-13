@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
-import { RootState } from '../../../store';
-import { useNetra } from '../../../context/NetraContext';
-import { useNetraUtils } from '../../../hooks/useNetraUtils';
-import { API_BASE } from '../../../utils/constants';
-import ForkButton from '../../../components/UI/ForkButton';
+import { RootState } from '@/store';
+import { useNetra } from '@/context/NetraContext';
+import { useNetraUtils } from '@/hooks/useNetraUtils';
+import { API_BASE } from '@/utils/constants';
+import ForkButton from '@/components/UI/ForkButton';
 
 // ─── Operational Marking checklist ───────────────────────────────────────────
 
@@ -108,9 +108,13 @@ export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: numb
   const mp = (selections.marketPulse || {}) as Record<string, string>;
   const auctionState = mp.auctionState || '';
   const subAuctionState = mp.subAuctionState || '';
-  const activeLeg = mp.activeLeg || '';
-  const momentum = mp.momentum || '';
-  const resistance = mp.resistance || '';
+  const activeLeg = mp.auctionActiveLeg || mp.activeLeg || '';
+  const momentum = mp.activeLegMomentum || mp.momentum || '';
+  const resistance = mp.activeLegResistance || mp.resistance || '';
+  const selectedOperationalMarkIds = String(mp.operationalMarkingIds || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
 
   const setMp = (key: string, val: string) => {
     if (isLocked) return;
@@ -118,9 +122,26 @@ export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: numb
   };
 
   const mpExtras = SYSTEM_DATA.marketPulseExtras || {};
-  const SUB_AUCTION_OPTIONS = (mpExtras.subAuctionOptions || {}) as Record<string, string[]>;
-  const ACTIVE_LEG_OPTIONS  = (mpExtras.activeLegOptions?.[auctionState] || []) as string[];
-  const OPERATIONAL_MARKS   = mpExtras.operationalMarks   || [];
+  const marketPulseDims = SYSTEM_DATA.marketPulse?.dimensions || [];
+  const dimensionOptions = (id: string) => (
+    marketPulseDims.find(d => d.id === id)?.options || []
+  ) as string[];
+  const subAuctionOptionsByState = (mpExtras.subAuctionOptions || {}) as Record<string, string[]>;
+  const SUB_AUCTION_OPTIONS = subAuctionOptionsByState[auctionState] || (
+    auctionState === 'Balance' ? dimensionOptions('subAuctionState') : []
+  );
+  const ACTIVE_LEG_OPTIONS = (
+    mpExtras.activeLegOptions?.[auctionState]
+    || dimensionOptions('auctionActiveLeg')
+    || dimensionOptions('activeLeg')
+  ) as string[];
+  const drawingMarks = (SYSTEM_DATA.marketPulse?.drawings || []).map((label, idx) => ({
+    id: `drawing_${idx + 1}`,
+    label,
+  }));
+  const OPERATIONAL_MARKS = (mpExtras.operationalMarks && mpExtras.operationalMarks.length > 0)
+    ? mpExtras.operationalMarks
+    : drawingMarks;
 
   const showSubAuction = auctionState === 'Balance';
   const showActiveLeg  = !!auctionState;
@@ -136,13 +157,31 @@ export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: numb
   };
   const allLiqSelected = liqDims.every(d => !!liq[d.id]);
 
-  const objectiveCondition  = liq.objectiveCondition || '';
-  const objectiveFreshness  = liq.objectiveFreshness || '';
+  const objectiveCondition  = liq.auctionObjectiveCondition || liq.objectiveCondition || '';
+  const objectiveFreshness  = liq.auctionObjectiveFreshness || liq.objectiveFreshness || '';
   const { getAuthHeaders } = useNetraUtils();
   const [liqGate, setLiqGate] = useState<{ gate: string; reason: string }>({ gate: 'PROCEED', reason: '' });
 
   const [opChecked, setOpChecked] = useState<Record<string, boolean>>({});
-  const toggleOp = (id: string) => setOpChecked(c => ({ ...c, [id]: !c[id] }));
+  useEffect(() => {
+    setOpChecked(Object.fromEntries(selectedOperationalMarkIds.map(id => [id, true])));
+  }, [mp.operationalMarkingIds]);
+  const toggleOp = (id: string) => {
+    if (isLocked) return;
+    setOpChecked(current => {
+      const next = { ...current, [id]: !current[id] };
+      const selectedMarks = OPERATIONAL_MARKS.filter(mark => next[mark.id]);
+      setSelections({
+        ...selections,
+        marketPulse: {
+          ...mp,
+          operationalMarkingIds: selectedMarks.map(mark => mark.id).join(', '),
+          operationalMarkings: selectedMarks.map(mark => mark.label).join(' | '),
+        },
+      });
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!objectiveCondition) return;
@@ -194,7 +233,7 @@ export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: numb
               key={opt}
               onClick={() => {
                 if (isLocked) return;
-                setSelections({ ...selections, marketPulse: { ...mp, auctionState: opt, subAuctionState: '', activeLeg: '' } });
+                setSelections({ ...selections, marketPulse: { ...mp, auctionState: opt, subAuctionState: '', auctionActiveLeg: '', activeLeg: '' } });
               }}
               disabled={isLocked}
               className={`precision-opt ${auctionState === opt ? 'selected' : ''} ${isLocked && auctionState !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
@@ -207,7 +246,7 @@ export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: numb
         <div className="precision-row">
           <div className="precision-label">Sub-State</div>
           <div className="precision-selector">
-            {(SUB_AUCTION_OPTIONS[auctionState] || []).map(opt => (
+            {SUB_AUCTION_OPTIONS.map(opt => (
               <button key={opt} onClick={() => setMp('subAuctionState', opt)} disabled={isLocked}
                 className={`precision-opt ${subAuctionState === opt ? 'selected' : ''} ${isLocked && subAuctionState !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
               >{opt}</button>
@@ -221,7 +260,10 @@ export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: numb
           <div className="precision-label">Active Leg</div>
           <div className="precision-selector">
             {ACTIVE_LEG_OPTIONS.map(opt => (
-              <button key={opt} onClick={() => setMp('activeLeg', opt)} disabled={isLocked}
+              <button key={opt} onClick={() => {
+                if (isLocked) return;
+                setSelections({ ...selections, marketPulse: { ...mp, auctionActiveLeg: opt, activeLeg: opt } });
+              }} disabled={isLocked}
                 className={`precision-opt ${activeLeg === opt ? 'selected' : ''} ${isLocked && activeLeg !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
               >{opt}</button>
             ))}
@@ -235,7 +277,7 @@ export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: numb
         <div className="precision-label">Momentum</div>
         <div className="precision-selector">
           {(['Impulsive', 'Sustained', 'Opposed', 'Stalling'] as const).map(opt => (
-            <button key={opt} onClick={() => setMp('momentum', opt)} disabled={isLocked}
+            <button key={opt} onClick={() => setMp('activeLegMomentum', opt)} disabled={isLocked}
               className={`precision-opt ${momentum === opt ? 'selected' : ''} ${isLocked && momentum !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
             >{opt}</button>
           ))}
@@ -245,7 +287,7 @@ export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: numb
         <div className="precision-label">Resistance</div>
         <div className="precision-selector">
           {(['Weak', 'Moderate', 'Strong', 'Dominant'] as const).map(opt => (
-            <button key={opt} onClick={() => setMp('resistance', opt)} disabled={isLocked}
+            <button key={opt} onClick={() => setMp('activeLegResistance', opt)} disabled={isLocked}
               className={`precision-opt ${resistance === opt ? 'selected' : ''} ${isLocked && resistance !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
             >{opt}</button>
           ))}
@@ -317,7 +359,7 @@ export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: numb
         />
         <div className="flex gap-2 shrink-0">
           <button onClick={() => setEditing(true)} className="btn-edit w-20" disabled={!isLocked}>Edit</button>
-          <button onClick={() => { if (!isLocked) setSelections({ ...selections, marketPulse: {} }); }} className="btn-reset w-20" disabled={isLocked || Object.keys(mp).length === 0}>Reset</button>
+          <button onClick={() => { if (!isLocked) { setOpChecked({}); setSelections({ ...selections, marketPulse: {} }); } }} className="btn-reset w-20" disabled={isLocked || Object.keys(mp).length === 0}>Reset</button>
           <button
             onClick={() => { if (editing) { setEditing(false); } else { confirmMarketPulse(); } }}
             className={`${isLocked ? 'btn-confirmed' : 'btn-confirm'} w-40`}

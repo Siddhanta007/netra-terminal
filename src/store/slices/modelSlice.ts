@@ -15,8 +15,8 @@ interface ModelState {
 
 const initialState: ModelState = {
   availableModels: [],
-  selectedModel: loadState('selectedModel', 'google|gemini-3.1-flash-lite'),
-  visionModel: loadState('visionModel', 'google|gemini-3.1-flash-lite'),
+  selectedModel: loadState('selectedModel', 'openrouter|openrouter/free'),
+  visionModel: loadState('visionModel', 'openrouter|openrouter/free'),
   modelConfig: loadState('modelConfig', {
     temperature: 0.2,
     top_p: 1.0,

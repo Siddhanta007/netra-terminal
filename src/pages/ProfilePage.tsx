@@ -1,64 +1,17 @@
 // User profile page — account details and saved-session overview.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNetra } from '../context/NetraContext';
+import { useNetraUtils } from '../hooks/useNetraUtils';
 import Footer from '../components/Layout/Footer';
+import { API_BASE } from '../utils/constants';
+import { PageGraphics } from '../components/UI/PageGraphics';
 
 const PAGE_BG = '#edf0f6';
 const CARD_BG = '#ffffff';
 const CARD_BORDER = 'rgba(65,105,225,0.12)';
 const CARD_DIVIDER = 'rgba(15,23,42,0.07)';
 const BLUE = '#4169E1';
-
-const DIAMOND_SHAPES = [
-  { cx: 608, cy: 28,  r: 50, c: '#4169E1' }, { cx: 544, cy: 8,   r: 33, c: '#f59e0b' },
-  { cx: 488, cy: 52,  r: 44, c: '#8b5cf6' }, { cx: 618, cy: 108, r: 38, c: '#10b981' },
-  { cx: 412, cy: 18,  r: 26, c: '#6366f1' }, { cx: 558, cy: 125, r: 46, c: '#4169E1' },
-  { cx: 338, cy: 42,  r: 22, c: '#ef4444' }, { cx: 470, cy: 142, r: 30, c: '#0ea5e9' },
-  { cx: 615, cy: 188, r: 35, c: '#f59e0b' }, { cx: 280, cy: 75,  r: 20, c: '#8b5cf6' },
-  { cx: 390, cy: 112, r: 38, c: '#4169E1' }, { cx: 515, cy: 205, r: 24, c: '#10b981' },
-  { cx: 225, cy: 50,  r: 18, c: '#6366f1' }, { cx: 450, cy: 228, r: 42, c: '#f59e0b' },
-  { cx: 612, cy: 262, r: 28, c: '#0ea5e9' }, { cx: 335, cy: 182, r: 18, c: '#4169E1' },
-  { cx: 565, cy: 302, r: 22, c: '#ef4444' }, { cx: 265, cy: 162, r: 32, c: '#8b5cf6' },
-  { cx: 485, cy: 298, r: 20, c: '#10b981' }, { cx: 395, cy: 272, r: 36, c: '#6366f1' },
-];
-const DIAMOND_BL = [
-  { cx: 22,  cy: 545, r: 50, c: '#4169E1' }, { cx: 95,  cy: 560, r: 33, c: '#10b981' },
-  { cx: 162, cy: 528, r: 44, c: '#f59e0b' }, { cx: 15,  cy: 478, r: 38, c: '#8b5cf6' },
-  { cx: 248, cy: 552, r: 26, c: '#4169E1' }, { cx: 108, cy: 472, r: 46, c: '#0ea5e9' },
-  { cx: 325, cy: 530, r: 22, c: '#ef4444' }, { cx: 195, cy: 462, r: 30, c: '#f59e0b' },
-  { cx: 20,  cy: 402, r: 35, c: '#4169E1' }, { cx: 388, cy: 518, r: 20, c: '#8b5cf6' },
-  { cx: 132, cy: 388, r: 38, c: '#6366f1' }, { cx: 280, cy: 445, r: 24, c: '#10b981' },
-  { cx: 62,  cy: 322, r: 18, c: '#0ea5e9' }, { cx: 218, cy: 355, r: 42, c: '#4169E1' },
-  { cx: 25,  cy: 248, r: 28, c: '#ef4444' }, { cx: 358, cy: 422, r: 18, c: '#f59e0b' },
-  { cx: 155, cy: 282, r: 22, c: '#8b5cf6' }, { cx: 328, cy: 335, r: 32, c: '#6366f1' },
-  { cx: 92,  cy: 222, r: 20, c: '#4169E1' }, { cx: 252, cy: 272, r: 36, c: '#0ea5e9' },
-];
-
-function PageCorners() {
-  return (
-    <>
-      <div style={{ position: 'fixed', top: 0, right: 0, width: 620, height: 620, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-        <svg width="620" height="620" viewBox="0 0 620 620" fill="none">
-          {DIAMOND_SHAPES.map((s, i) => (
-            <polygon key={i}
-              points={`${s.cx},${s.cy - s.r} ${s.cx + s.r},${s.cy} ${s.cx},${s.cy + s.r} ${s.cx - s.r},${s.cy}`}
-              fill="none" stroke={s.c} strokeWidth="5.5" strokeOpacity="0.45" />
-          ))}
-        </svg>
-      </div>
-      <div style={{ position: 'fixed', bottom: 0, left: 0, width: 560, height: 560, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-        <svg width="560" height="560" viewBox="0 0 560 560" fill="none">
-          {DIAMOND_BL.map((s, i) => (
-            <polygon key={i}
-              points={`${s.cx},${s.cy - s.r} ${s.cx + s.r},${s.cy} ${s.cx},${s.cy + s.r} ${s.cx - s.r},${s.cy}`}
-              fill="none" stroke={s.c} strokeWidth="5.5" strokeOpacity="0.45" />
-          ))}
-        </svg>
-      </div>
-    </>
-  );
-}
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -142,32 +95,152 @@ function SelectField({ label, value, onChange, options }: { label: string; value
 }
 
 export default function ProfilePage() {
-  const { session, tradeLogs } = useNetra();
-
-  // Filter logs to show only this user's personal trades on their profile
-  const myLogs = (tradeLogs || []).filter(l => l.created_by?.toLowerCase() === session?.userName?.toLowerCase());
-
-  const total = myLogs.length;
-  const wins = myLogs.filter(l => l.phase4?.outcome?.toLowerCase() === 'win').length;
-  const losses = myLogs.filter(l => l.phase4?.outcome?.toLowerCase() === 'loss').length;
-  const settled = wins + losses;
-  const winRate = settled > 0 ? ((wins / settled) * 100).toFixed(1) : '—';
-
-  const totalPL = myLogs.reduce((sum, l) => {
-    const pl = parseFloat(String(l.phase4?.pl ?? ''));
-    return isNaN(pl) ? sum : sum + pl;
-  }, 0);
-  const hasPL = myLogs.some(l => !isNaN(parseFloat(String(l.phase4?.pl ?? ''))));
-
-  const weapMap: Record<string, number> = {};
-  myLogs.forEach(l => {
-    const w = l.phase3?.manual_weapon || l.weapon || '';
-    if (w) weapMap[w] = (weapMap[w] ?? 0) + 1;
+  const { session, setSession, showToast } = useNetra();
+  const { getAuthHeaders } = useNetraUtils();
+  const [profile, setProfile] = useState({
+    displayName: session?.displayName || session?.userName || '',
+    email: session?.email || '',
+    phone: session?.phone || '',
+    broker: session?.broker || '',
   });
-  const topWeapon = Object.entries(weapMap).sort((a, b) => b[1] - a[1])[0] ?? null;
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [aiUsage, setAiUsage] = useState({
+    model_calls: 0,
+    retrieval_tokens: 0,
+    input_tokens: 0,
+    output_tokens: 0,
+    total_tokens: 0,
+    estimated_cost_usd: null as number | null,
+    priced_calls: 0,
+    estimated_token_calls: 0,
+  });
+  const [appStats, setAppStats] = useState({
+    trades: 0,
+    wins: 0,
+    losses: 0,
+    breakeven: 0,
+    win_rate: null as number | null,
+    net_pnl: 0,
+    avg_r: null as number | null,
+    by_weapon: {} as Record<string, { trades: number; wins: number; losses: number; net_pnl: number; win_rate?: number | null }>,
+  });
+
+  useEffect(() => {
+    if (!session?.userName) return;
+    fetch(`${API_BASE}/api/users/${encodeURIComponent(session.userName)}/profile`, { headers: getAuthHeaders() })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (!data) return;
+        setProfile({
+          displayName: data.display_name || data.displayName || data.username || session.userName,
+          email: data.email || '',
+          phone: data.phone || '',
+          broker: data.broker || '',
+        });
+        setSession({
+          ...session,
+          displayName: data.display_name || data.displayName || session.displayName,
+          email: data.email || '',
+          phone: data.phone || '',
+          broker: data.broker || '',
+          groups: data.groups || session.groups || [],
+          role: data.role || session.role,
+          allowedModels: data.allowed_models || session.allowedModels || [],
+          allowedPages: data.allowed_pages || session.allowedPages || [],
+          allowedTeams: data.allowed_teams || session.allowedTeams || [],
+        });
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.userName]);
+
+  useEffect(() => {
+    if (!session?.userName) return;
+    fetch(`${API_BASE}/api/users/${encodeURIComponent(session.userName)}/ai-usage`, { headers: getAuthHeaders() })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (data) setAiUsage({
+          model_calls: Number(data.model_calls || 0),
+          retrieval_tokens: Number(data.retrieval_tokens || 0),
+          input_tokens: Number(data.llm_input_tokens || data.input_tokens || 0),
+          output_tokens: Number(data.llm_output_tokens || data.output_tokens || 0),
+          total_tokens: Number(data.total_tokens || 0),
+          estimated_cost_usd: typeof data.estimated_cost_usd === 'number' ? data.estimated_cost_usd : null,
+          priced_calls: Number(data.priced_calls || 0),
+          estimated_token_calls: Number(data.estimated_token_calls || 0),
+        });
+      })
+      .catch(() => {});
+  }, [getAuthHeaders, session?.userName]);
+
+  useEffect(() => {
+    if (!session?.userName) return;
+    fetch(`${API_BASE}/api/users/${encodeURIComponent(session.userName)}/stats?model_id=all&range=all`, {
+      headers: getAuthHeaders(),
+    })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        const metrics = data?.metrics;
+        if (!metrics) return;
+        setAppStats({
+          trades: Number(metrics.trades || 0),
+          wins: Number(metrics.wins || 0),
+          losses: Number(metrics.losses || 0),
+          breakeven: Number(metrics.breakeven || 0),
+          win_rate: typeof metrics.win_rate === 'number' ? metrics.win_rate : null,
+          net_pnl: Number(metrics.net_pnl || 0),
+          avg_r: typeof metrics.avg_r === 'number' ? metrics.avg_r : null,
+          by_weapon: metrics.by_weapon || {},
+        });
+      })
+      .catch(() => {});
+  }, [getAuthHeaders, session?.userName]);
+
+  const saveProfile = async () => {
+    if (!session?.userName || isSavingProfile) return;
+    setIsSavingProfile(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/users/${encodeURIComponent(session.userName)}/profile`, {
+        method: 'PATCH',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          display_name: profile.displayName,
+          email: profile.email,
+          phone: profile.phone,
+          broker: profile.broker,
+        }),
+      });
+      if (!res.ok) throw new Error('Profile save failed');
+      const data = await res.json();
+      setSession({
+        ...session,
+        displayName: data.display_name || profile.displayName,
+        email: data.email || '',
+        phone: data.phone || '',
+        broker: data.broker || '',
+        groups: data.groups || session.groups || [],
+        role: data.role || session.role,
+        allowedModels: data.allowed_models || session.allowedModels || [],
+        allowedPages: data.allowed_pages || session.allowedPages || [],
+        allowedTeams: data.allowed_teams || session.allowedTeams || [],
+      });
+      showToast('Profile saved');
+    } catch {
+      showToast('Profile save failed', 'error');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const total = appStats.trades;
+  const wins = appStats.wins;
+  const losses = appStats.losses;
+  const winRate = appStats.win_rate !== null ? appStats.win_rate.toFixed(1) : '—';
+  const totalPL = appStats.net_pnl;
+  const hasPL = total > 0;
+  const topWeapon = Object.entries(appStats.by_weapon).sort((a, b) => Number(b[1]?.trades || 0) - Number(a[1]?.trades || 0))[0] ?? null;
   const initial = (session?.userName || 'O')[0].toUpperCase();
 
-  const [profile, setProfile] = useState({ displayName: session?.userName || '', email: '', phone: '', broker: '' });
   const [risk, setRisk] = useState({ dailyTarget: '5000', maxDailyLoss: '3000', riskPerTrade: '1.5', defaultLots: '1' });
   const [prefs, setPrefs] = useState({ segment: 'NSE F&O', expiry: 'Weekly', timezone: 'IST (UTC+5:30)', tradingHours: '09:15 — 15:30' });
 
@@ -177,11 +250,16 @@ export default function ProfilePage() {
     { label: 'Confirmed Losses', value: losses > 0 ? String(losses) : '—', color: '#ef4444' },
     { label: 'Win Rate', value: winRate !== '—' ? `${winRate}%` : '—', color: BLUE },
     { label: 'Total P&L', value: hasPL ? (totalPL >= 0 ? `+₹${totalPL.toFixed(0)}` : `-₹${Math.abs(totalPL).toFixed(0)}`) : '—', color: hasPL ? (totalPL >= 0 ? '#10b981' : '#ef4444') : '#0f172a' },
+    { label: 'Average R', value: appStats.avg_r !== null ? appStats.avg_r.toFixed(2) : '—', color: '#0f172a' },
+    { label: 'Model Calls', value: aiUsage.model_calls > 0 ? String(aiUsage.model_calls) : '—', color: '#8b5cf6' },
+    { label: 'AI Tokens', value: aiUsage.total_tokens > 0 ? aiUsage.total_tokens.toLocaleString('en-IN') : '—', color: '#f59e0b' },
+    { label: 'RAG Tokens', value: aiUsage.retrieval_tokens > 0 ? aiUsage.retrieval_tokens.toLocaleString('en-IN') : '—', color: '#6366f1' },
+    { label: 'AI Cost', value: aiUsage.estimated_cost_usd !== null ? `$${aiUsage.estimated_cost_usd.toFixed(4)}` : '—', color: '#0ea5e9' },
   ];
 
   return (
     <div style={{ background: PAGE_BG, flex: 1, minHeight: '100%', position: 'relative', overflow: 'auto' }}>
-      <PageCorners />
+      <PageGraphics variant="profile" opacity={0.96} />
 
       <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '64px 48px 0', position: 'relative', zIndex: 1 }}>
 
@@ -209,7 +287,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Stats bar */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', marginBottom: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
           {stats.map(s => (
             <div key={s.label} style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, padding: '20px 24px' }}>
               <div style={{ fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.2em', color: 'rgba(15,23,42,0.4)', marginBottom: '10px' }}>{s.label}</div>
@@ -230,8 +308,8 @@ export default function ProfilePage() {
               <InputField label="Broker / Platform" value={profile.broker} onChange={v => setProfile(p => ({ ...p, broker: v }))} placeholder="Zerodha, Dhan..." mono={false} />
             </div>
             <div style={{ padding: '0 20px 20px', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
-              <button style={{ padding: '9px 20px', background: BLUE, color: '#ffffff', border: 'none', fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', cursor: 'pointer', fontFamily: 'inherit' }}>
-                Save Profile
+              <button onClick={saveProfile} disabled={isSavingProfile} style={{ padding: '9px 20px', background: isSavingProfile ? 'rgba(65,105,225,0.5)' : BLUE, color: '#ffffff', border: 'none', fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', cursor: isSavingProfile ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+                {isSavingProfile ? 'Saving' : 'Save Profile'}
               </button>
             </div>
           </Card>
@@ -288,7 +366,7 @@ export default function ProfilePage() {
                   <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgba(15,23,42,0.4)', marginBottom: '6px' }}>Most Deployed Weapon</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <span style={{ fontSize: '22px', fontWeight: 950, color: BLUE, fontFamily: 'monospace', letterSpacing: '-0.02em' }}>{topWeapon[0]}</span>
-                    <span style={{ fontSize: '10px', color: 'rgba(15,23,42,0.45)' }}>{topWeapon[1]} missions</span>
+                    <span style={{ fontSize: '10px', color: 'rgba(15,23,42,0.45)' }}>{topWeapon[1].trades} missions</span>
                   </div>
                 </div>
               )}

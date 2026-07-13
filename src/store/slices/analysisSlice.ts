@@ -15,6 +15,7 @@ interface AnalysisState {
   commandLocked: boolean;
   weaponLocked: boolean;
   netraOutput: NetraOutput | null;
+  selectedNetraState: Record<string, unknown> | null;
   sysRecommendation: unknown;
   interSelections: InterSelections;
   strikeSelections: StrikeSelections;
@@ -42,6 +43,12 @@ interface AnalysisState {
   rulesAcknowledged: boolean[];
 }
 
+const persistedNetraOutput = loadState<NetraOutput | null>('netraOutput', null);
+const cleanPersistedNetraOutput =
+  persistedNetraOutput && (persistedNetraOutput as Record<string, unknown>).state_override
+    ? null
+    : persistedNetraOutput;
+
 const initialState: AnalysisState = {
   highestStep: loadState('highestStep', 1),
   selections: loadState('selections', { preSessionContext: {}, htfStructure: {}, marketPulse: {}, liquidityContext: {} }),
@@ -49,7 +56,8 @@ const initialState: AnalysisState = {
   finalCommand: loadState('finalCommand', null),
   commandLocked: loadState('commandLocked', false),
   weaponLocked: loadState('weaponLocked', false),
-  netraOutput: loadState<NetraOutput | null>('netraOutput', null),       // expensive AI call — persist so a reload doesn't re-run it
+  netraOutput: cleanPersistedNetraOutput,       // expensive AI call — persist so a reload doesn't re-run it
+  selectedNetraState: loadState<Record<string, unknown> | null>('selectedNetraState', null),
   sysRecommendation: loadState('sysRecommendation', null),
   interSelections: loadState('interSelections', { pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }),
   strikeSelections: loadState('strikeSelections', { impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' }),
@@ -101,6 +109,9 @@ export const analysisSlice = createSlice({
     },
     setNetraOutput: (state, action: PayloadAction<NetraOutput | null>) => {
       state.netraOutput = action.payload;
+    },
+    setSelectedNetraState: (state, action: PayloadAction<Record<string, unknown> | null>) => {
+      state.selectedNetraState = action.payload;
     },
     setSysRecommendation: (state, action: PayloadAction<unknown>) => {
       state.sysRecommendation = action.payload;
@@ -169,6 +180,7 @@ export const {
   setCommandLocked,
   setWeaponLocked,
   setNetraOutput,
+  setSelectedNetraState,
   setSysRecommendation,
   setInterSelections,
   setStrikeSelections,

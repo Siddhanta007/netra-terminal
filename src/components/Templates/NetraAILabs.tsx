@@ -9,7 +9,7 @@ import { useNetra } from '../../context/NetraContext';
 import { setSelectedModel, setModelConfig } from '../../store/slices/modelSlice';
 import { RootState, AppDispatch } from '../../store';
 import { MONO, tempColor, freqColor } from './aiLabs/helpers';
-import { OutputDisplay, TraceDisplay } from './aiLabs/OutputDisplay';
+import { OutputDisplay } from './aiLabs/OutputDisplay';
 import { TerminalScroller } from './aiLabs/Loading';
 import { SliderRow } from './aiLabs/SliderRow';
 
@@ -24,6 +24,8 @@ interface NetraAILabsProps {
   phaseId?: string;
   phaseNum?: number;
   customStatus?: ReactNode;
+  analyseDisabled?: boolean;
+  analyseDisabledReason?: string;
 }
 
 export default function NetraAILabs({
@@ -33,6 +35,8 @@ export default function NetraAILabs({
   onAnalyse,
   onStop,
   customStatus,
+  analyseDisabled = false,
+  analyseDisabledReason,
 }: NetraAILabsProps) {
   const dispatch = useDispatch<AppDispatch>();
   const [previews, setPreviews] = useState<string[]>([]);
@@ -57,6 +61,7 @@ export default function NetraAILabs({
 
   const currentModelData  = AVAILABLE_MODELS.find(m => m.id === selectedModel);
   const isVisionSupported = currentModelData?.tags?.includes('Vision');
+  const executeDisabled = isEvaluating || analyseDisabled;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -81,7 +86,6 @@ export default function NetraAILabs({
     if (customStatus) return (
       <div style={{ flex: 1, overflowY: 'auto', padding: '10px 8px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {customStatus}
-        <TraceDisplay trace={((output as Record<string, unknown> | null)?.agent_trace as Array<{ agent: string; content: string }>) || []} />
       </div>
     );
     if (output != null)  return <div style={{ flex: 1, overflowY: 'auto', padding: '10px 8px' }}><OutputDisplay output={output} /></div>;
@@ -221,7 +225,7 @@ export default function NetraAILabs({
                 onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; }}
               >
-                <input type="file" multiple style={{ display: 'none' }} onChange={handleFileChange} disabled={isEvaluating} />
+                <input type="file" multiple style={{ display: 'none' }} onChange={handleFileChange} disabled={isEvaluating || analyseDisabled} />
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
                 </svg>
@@ -272,20 +276,21 @@ export default function NetraAILabs({
           </button>
           <button
             onClick={onAnalyse}
-            disabled={isEvaluating}
+            disabled={executeDisabled}
+            title={analyseDisabledReason}
             style={{
               flex: 1, height: '36px',
-              background: isEvaluating ? 'rgba(255,255,255,0.04)' : '#4169E1',
+              background: executeDisabled ? 'rgba(255,255,255,0.04)' : '#4169E1',
               border: 'none',
               ...MONO, fontSize: '9px', fontWeight: 900, letterSpacing: '0.22em', textTransform: 'uppercase',
-              color: isEvaluating ? 'rgba(255,255,255,0.2)' : '#fff',
-              cursor: isEvaluating ? 'not-allowed' : 'pointer',
+              color: executeDisabled ? 'rgba(255,255,255,0.2)' : '#fff',
+              cursor: executeDisabled ? 'not-allowed' : 'pointer',
               transition: 'all 150ms',
             }}
-            onMouseEnter={e => { if (!isEvaluating) e.currentTarget.style.background = '#3558c8'; }}
-            onMouseLeave={e => { if (!isEvaluating) e.currentTarget.style.background = '#4169E1'; }}
+            onMouseEnter={e => { if (!executeDisabled) e.currentTarget.style.background = '#3558c8'; }}
+            onMouseLeave={e => { if (!executeDisabled) e.currentTarget.style.background = '#4169E1'; }}
           >
-            EXECUTE
+            {analyseDisabled ? 'DISABLED' : 'EXECUTE'}
           </button>
         </div>
       </div>

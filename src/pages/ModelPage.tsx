@@ -8,7 +8,9 @@ import { ModelPageData } from '../utils/modelData';
 import { TradeLog } from '../types';
 import { useNetra } from '../context/NetraContext';
 import { API_BASE } from '../utils/constants';
-import { RectangleCorner, TriangleCorner, computeStats, fmtDate, fmtPrice, SortIcon } from './modelPage/helpers';
+import { useNetraUtils } from '../hooks/useNetraUtils';
+import { computeStats, fmtDate, fmtPrice, SortIcon } from './modelPage/helpers';
+import { PageGraphics } from '../components/UI/PageGraphics';
 
 interface Props {
   model: ModelPageData;
@@ -36,11 +38,12 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
   const [filterPL, setFilterPL] = useState('all');
   const tradeLogs = useSelector((s: RootState) => s.logs.tradeLogs);
   const { session } = useNetra();
+  const { getAuthHeaders } = useNetraUtils();
   const username = session?.userName || '';
 
   const [dailyStats, setDailyStats]     = useState<Record<string, any> | null>(null);
   const [rangeStats, setRangeStats]     = useState<Record<string, any> | null>(null);
-  const [statsTab, setStatsTab]         = useState<'today' | 'week' | 'month' | '3month'>('today');
+  const [statsTab, setStatsTab]         = useState<'today' | 'week' | 'month' | '3month' | 'all'>('all');
   const [statsDate, setStatsDate]       = useState(new Date().toISOString().slice(0, 10));
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsUser, setStatsUser]       = useState('');
@@ -60,7 +63,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
 
   // Fetch all operators across all models
   useEffect(() => {
-    fetch(`${API_BASE}/api/users`)
+    fetch(`${API_BASE}/api/users`, { headers: getAuthHeaders() })
       .then(r => r.json())
       .then((users: string[]) => {
         const merged = Array.from(new Set([...(username ? [username] : []), ...users]));
@@ -69,21 +72,22 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
       .catch(() => {
         if (username) setAvailableUsers([username]);
       });
-  }, [username]);
+  }, [username, getAuthHeaders]);
 
   useEffect(() => {
     const target = statsUser || username;
     if (!target) return;
     setStatsLoading(true);
     const rangeKey = statsTab === 'today' ? 'week' : statsTab;
+    const headers = getAuthHeaders();
     Promise.all([
-      fetch(`${API_BASE}/api/stats/daily?model_id=${model.id}&username=${encodeURIComponent(target)}&date=${statsDate}`).then(r => r.json()),
-      fetch(`${API_BASE}/api/stats/range?model_id=${model.id}&username=${encodeURIComponent(target)}&range=${rangeKey}`).then(r => r.json()),
+      fetch(`${API_BASE}/api/stats/daily?model_id=${model.id}&username=${encodeURIComponent(target)}&date=${statsDate}`, { headers }).then(r => r.json()),
+      fetch(`${API_BASE}/api/stats/range?model_id=${model.id}&username=${encodeURIComponent(target)}&range=${rangeKey}`, { headers }).then(r => r.json()),
     ]).then(([daily, range]) => {
       setDailyStats(daily);
       setRangeStats(range);
     }).catch(console.error).finally(() => setStatsLoading(false));
-  }, [model.id, statsUser, username, statsDate, statsTab]);
+  }, [model.id, statsUser, username, statsDate, statsTab, getAuthHeaders]);
 
   const slide = model.slides[slideIdx];
   const stats = computeStats(tradeLogs);
@@ -99,13 +103,30 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
     else { setSortCol(col); setSortDir('desc'); }
   };
 
-  const [filterOperator, setFilterOperator] = useState('all');
+  const getLogOperator = (log: TradeLog) =>
+    log.created_by || log.username || (log.phase1?.username as string | undefined) || '';
+
   const allWeapons = Array.from(new Set(tradeLogs.map(l => (l.phase3?.manual_weapon || l.weapon || '').toUpperCase()).filter(Boolean))).sort();
   const allCommands = Array.from(new Set(tradeLogs.map(l => ((l.phase1?.protocol as string) || (l.session_state?.finalCommand as string) || '').toUpperCase()).filter(Boolean))).sort();
-  const allOperators = Array.from(new Set(tradeLogs.map(l => l.created_by || l.username || '').filter(Boolean))).sort();
-  const hasActiveFilter = filterOutcome !== 'all' || filterWeapon !== 'all' || filterCommand !== 'all' || filterPL !== 'all' || filterOperator !== 'all' || search !== '';
+  const hasActiveFilter = filterOutcome !== 'all' || filterWeapon !== 'all' || filterCommand !== 'all' || filterPL !== 'all' || search !== '';
 
-  const clearFilters = () => { setFilterOutcome('all'); setFilterWeapon('all'); setFilterCommand('all'); setFilterPL('all'); setFilterOperator('all'); setSearch(''); };
+  const clearFilters = () => { setFilterOutcome('all'); setFilterWeapon('all'); setFilterCommand('all'); setFilterPL('all'); setSearch(''); };
+
+  const isWithinSelectedRange = (timestamp?: string) => {
+    if (statsTab === 'all') return true;
+    if (!timestamp) return false;
+
+    const tradeDate = timestamp.slice(0, 10);
+    if (statsTab === 'today') return tradeDate === statsDate;
+
+    const daysByRange = { week: 7, month: 30, '3month': 90 } as const;
+    const days = daysByRange[statsTab];
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    const from = new Date(today);
+    from.setDate(today.getDate() - days);
+    return new Date(timestamp) >= from && new Date(timestamp) <= today;
+  };
 
   const filteredLogs = tradeLogs
     .filter(l => {
@@ -114,9 +135,15 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
         const asset = (l.phase2?.asset_ticker || l.phase1?.asset_ticker || l.asset || '').toLowerCase();
         const weapon = (l.phase3?.manual_weapon || l.weapon || '').toLowerCase();
         const outcome = (l.phase4?.outcome || '').toLowerCase();
-        const creator = (l.created_by || l.username || '').toLowerCase();
+        const creator = getLogOperator(l).toLowerCase();
         if (!asset.includes(s) && !weapon.includes(s) && !outcome.includes(s) && !creator.includes(s) && !fmtDate(l.timestamp).toLowerCase().includes(s) && !(l.name || '').toLowerCase().includes(s)) return false;
       }
+      const selectedUser = statsUser || username;
+      if (selectedUser && selectedUser !== 'all') {
+        const creator = getLogOperator(l).toLowerCase();
+        if (creator !== selectedUser.toLowerCase()) return false;
+      }
+      if (!isWithinSelectedRange(l.timestamp)) return false;
       if (filterOutcome !== 'all') {
         const o = (l.phase4?.outcome || '').toLowerCase();
         if (filterOutcome === 'open' && o !== '' && o !== 'open') return false;
@@ -136,10 +163,6 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
         if (filterPL === 'profit' && (isNaN(pl) || pl <= 0)) return false;
         if (filterPL === 'loss'   && (isNaN(pl) || pl >= 0)) return false;
       }
-      if (filterOperator !== 'all') {
-        const creator = (l.created_by || l.username || '').toLowerCase();
-        if (creator !== filterOperator.toLowerCase()) return false;
-      }
       return true;
     })
     .sort((a, b) => {
@@ -149,7 +172,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
       else if (sortCol === 'weapon') { va = a.phase3?.manual_weapon || a.weapon || ''; vb = b.phase3?.manual_weapon || b.weapon || ''; }
       else if (sortCol === 'pl') { va = parseFloat(String(a.phase4?.pl || '0')) || 0; vb = parseFloat(String(b.phase4?.pl || '0')) || 0; }
       else if (sortCol === 'result') { va = a.phase4?.outcome || ''; vb = b.phase4?.outcome || ''; }
-      else if (sortCol === 'created_by') { va = a.created_by || a.username || ''; vb = b.created_by || b.username || ''; }
+      else if (sortCol === 'created_by') { va = getLogOperator(a); vb = getLogOperator(b); }
       else if (sortCol === 'name') { va = a.name || ''; vb = b.name || ''; }
       if (va < vb) return sortDir === 'asc' ? -1 : 1;
       if (va > vb) return sortDir === 'asc' ? 1 : -1;
@@ -161,7 +184,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
 
   return (
     <div style={{ background: '#eef0f5', flex: 1, position: 'relative', overflowX: 'hidden' }}>
-      {model.id === 'pinaka' ? <><RectangleCorner corner="tr" /><RectangleCorner corner="bl" /></> : <><TriangleCorner corner="tr" /><TriangleCorner corner="bl" /></>}
+      <PageGraphics variant={model.id === 'pinaka' ? 'model-pinaka' : 'model-trishul'} accent={color} opacity={1} />
 
       <div style={{ maxWidth: '1280px', width: '100%', margin: '0 auto', padding: '40px 48px 0', position: 'relative', zIndex: 1 }}>
 
@@ -262,6 +285,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
                   { key: 'week',  label: '1 Week' },
                   { key: 'month', label: '1 Month' },
                   { key: '3month', label: '3 Months' },
+                  { key: 'all', label: 'All' },
                 ] as const).map(tab => (
                   <button
                     key={tab.key}
@@ -281,6 +305,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
                     onChange={e => setStatsUser(e.target.value)}
                     style={{ fontSize: '9px', fontWeight: 700, border: 'none', background: 'transparent', color: '#0f172a', fontFamily: 'JetBrains Mono, monospace', outline: 'none', cursor: 'pointer', appearance: 'none', paddingRight: '16px', minWidth: '80px' }}
                   >
+                    <option value="all">All</option>
                     {(availableUsers.length > 0 ? availableUsers : (username ? [username] : [])).map(u => (
                       <option key={u} value={u}>{u}{u === username ? ' (you)' : ''}</option>
                     ))}
@@ -534,34 +559,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
                           </div>
                         )}
 
-                        {/* Operator */}
-                        {allOperators.length > 0 && (
-                          <div style={{ marginBottom: '14px' }}>
-                            <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.18em', color: 'rgba(15,23,42,0.4)', marginBottom: '8px' }}>Operator</div>
-                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                              {(['all', ...allOperators]).map(v => {
-                                const active = filterOperator === v;
-                                return (
-                                  <button
-                                    key={v}
-                                    onClick={() => setFilterOperator(v)}
-                                    style={{
-                                      height: '24px', padding: '0 10px', fontSize: '8px', fontWeight: 800,
-                                      textTransform: 'uppercase', letterSpacing: '0.1em',
-                                      border: `1px solid ${active ? color : 'rgba(15,23,42,0.15)'}`,
-                                      background: active ? `${color}12` : 'transparent',
-                                      color: active ? color : 'rgba(15,23,42,0.45)', cursor: 'pointer', fontFamily: 'inherit'
-                                    }}
-                                  >
-                                    {v === 'all' ? 'All' : v}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Clear */}
+	                        {/* Clear */}
                         {hasActiveFilter && (
                           <button onClick={() => { clearFilters(); setFilterOpen(false); }} style={{ width: '100%', height: '28px', marginTop: '4px', fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.05)', color: '#ef4444', cursor: 'pointer', fontFamily: 'inherit' }}>
                             ✕ Clear All Filters
@@ -586,7 +584,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
                   </button>
                 )}
 
-                <span style={{ fontSize: '9px', fontWeight: 700, fontFamily: 'monospace', color: 'rgba(15,23,42,0.35)', flexShrink: 0 }}>{filteredLogs.length} / {tradeLogs.length}</span>
+                <span style={{ fontSize: '9px', fontWeight: 700, fontFamily: 'monospace', color: 'rgba(15,23,42,0.35)', flexShrink: 0 }}>{filteredLogs.length} scoped / {tradeLogs.length} total</span>
               </div>
             </div>
 
@@ -597,7 +595,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
               </div>
             ) : filteredLogs.length === 0 ? (
               <div style={{ padding: '60px 36px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', opacity: 0.4 }}>
-                <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em' }}>No records match "{search}"</span>
+                <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em' }}>No records match the selected scope</span>
               </div>
             ) : (
               <>
@@ -645,7 +643,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
                         onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = rowIdx % 2 === 0 ? `${color}0d` : LEDGER_BG; }}
                       >
                         <span style={{ fontSize: '10px', fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.name || '—'}>{log.name || '—'}</span>
-                        <span style={{ fontSize: '10px', fontWeight: 700, fontFamily: 'monospace', color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.created_by || log.username || '—'}>{log.created_by || log.username || '—'}</span>
+                        <span style={{ fontSize: '10px', fontWeight: 700, fontFamily: 'monospace', color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={getLogOperator(log) || '—'}>{getLogOperator(log) || '—'}</span>
                         <span style={{ fontSize: '11px', fontWeight: 600, color: '#334155', fontFamily: 'monospace' }}>{fmtDate(log.timestamp)}</span>
                         <span style={{ fontSize: '11px', fontWeight: 700, color: '#0f172a' }}>{log.phase2?.asset_ticker || log.phase1?.asset_ticker || log.asset || '—'}</span>
                         <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.06em', color }}>{log.phase3?.manual_weapon || log.weapon || '—'}</span>
@@ -704,7 +702,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
                             { label: 'Protocol / Command', value: cmd || '—' },
                             { label: 'Mission ID', value: String(log.id) },
                             { label: 'Stop Loss', value: fmtPrice(log.phase2?.stop_loss) },
-                            { label: 'Operator', value: log.username || '—' },
+                            { label: 'Operator', value: getLogOperator(log) || '—' },
                             { label: 'Execution Rating', value: log.phase4?.execution_rating ? `${log.phase4.execution_rating}/10` : '—' },
                             { label: 'Weapon', value: log.phase3?.manual_weapon || log.weapon || '—' },
                             { label: 'Target', value: fmtPrice(log.phase2?.take_profit) },

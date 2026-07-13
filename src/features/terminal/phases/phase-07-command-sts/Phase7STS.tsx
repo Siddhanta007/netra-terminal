@@ -1,10 +1,10 @@
 // STS phase — Strike/Interception system-dimension scoring → EXECUTE / WAIT / NO_ENGAGEMENT verdict.
 
-import { useNetra } from '../../../context/NetraContext';
+import { useNetra } from '@/context/NetraContext';
 import { useEffect, useState } from 'react';
-import { useNetraUtils } from '../../../hooks/useNetraUtils';
-import { StrikeSelections, InterSelections, SystemDimension } from '../../../types';
-import { API_BASE } from '../../../utils/constants';
+import { useNetraUtils } from '@/hooks/useNetraUtils';
+import { StrikeSelections, InterSelections, SystemDimension } from '@/types';
+import { API_BASE } from '@/utils/constants';
 
 export type STSVerdict = 'EXECUTE' | 'WAIT' | 'NO_ENGAGEMENT' | null;
 

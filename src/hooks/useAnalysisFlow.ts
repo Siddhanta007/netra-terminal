@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '../store';
 import {
   setIsEvaluating, setNetraOutput, setIsPredictingWeapon, setWeaponPrediction,
-  setSysRecommendation, appendStateRecognition,
+  setSysRecommendation,
 } from '../store/slices/analysisSlice';
 import { API_BASE } from '../utils/constants';
 import { useNetraUtils } from './useNetraUtils';
@@ -26,6 +26,7 @@ export function useAnalysisFlow() {
   const finalCommand = useSelector((s: RootState) => s.analysis.finalCommand);
   const strikeSelections = useSelector((s: RootState) => s.analysis.strikeSelections);
   const interSelections = useSelector((s: RootState) => s.analysis.interSelections);
+  const saturationSelections = useSelector((s: RootState) => s.analysis.saturationSelections);
   const imageDescription = useSelector((s: RootState) => s.analysis.imageDescription);
   const modelConfig = useSelector((s: RootState) => s.model.modelConfig);
   const highestStep = useSelector((s: RootState) => s.analysis.highestStep);
@@ -38,9 +39,15 @@ export function useAnalysisFlow() {
     };
   }, []);
 
+  const buildMarketPulseDimensions = useCallback(() => ({
+    ...(selections.marketPulse || {}),
+    activeLeg: selections.marketPulse?.activeLeg || selections.marketPulse?.auctionActiveLeg || '',
+    ...(selections.liquidityContext || {}),
+  }), [selections.marketPulse, selections.liquidityContext]);
+
   // STS recommendation — converted to manual callback to save tokens
   const triggerSTSEvaluation = useCallback(() => {
-    const cmd = finalCommand || (netraOutput ? netraOutput.cmd : null);
+    const cmd = finalCommand;
     if (!cmd || (cmd !== 'STRIKE' && cmd !== 'INTERCEPTION')) return;
 
     const { provider: providerVal, model_id: modelIdVal } = getActiveModel();
@@ -52,9 +59,25 @@ export function useAnalysisFlow() {
       method: 'POST',
       headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
-        preSessionContext: selections.preSessionContext,
-        htfStructure: selections.htfStructure,
-        marketPulse: selections.marketPulse,
+        phase_0: {
+          name: 'Maya Chart Analysis',
+          image_description: typeof imageDescription === 'string' ? imageDescription : '',
+        },
+        phase_1: {
+          name: 'Pre-Session Context',
+          dimensions: selections.preSessionContext || {},
+          notes: notes.preSessionContext || '',
+        },
+        phase_2: {
+          name: 'HTF Structure',
+          dimensions: selections.htfStructure || {},
+          notes: notes.htfStructure || '',
+        },
+        phase_3: {
+          name: 'Market Pulse',
+          dimensions: buildMarketPulseDimensions(),
+          notes: notes.marketPulse || '',
+        },
         provider: providerVal,
         llm_config: { ...modelConfig, model_id: modelIdVal },
       }),
@@ -62,7 +85,7 @@ export function useAnalysisFlow() {
       .then((res) => res.json())
       .then((data) => dispatch(setSysRecommendation(data)))
       .catch(console.error);
-  }, [finalCommand, netraOutput, getActiveModel, getAuthHeaders, selections, modelConfig, dispatch]);
+  }, [finalCommand, getActiveModel, getAuthHeaders, selections, notes, imageDescription, modelConfig, dispatch, buildMarketPulseDimensions]);
 
   const triggerNeuralSynthesis = useCallback(() => {
     if (isEvaluating) return;
@@ -80,16 +103,24 @@ export function useAnalysisFlow() {
     }
 
     const payload = {
-      preSessionContext: selections.preSessionContext || {},
-      htfStructure: selections.htfStructure || {},
-      marketPulse: selections.marketPulse || {},
-      // All analyst notes — every phase note the operator has written.
-      // These are the highest-signal human input and must reach the LLM.
-      notes: {
-        preSessionContext: notes.preSessionContext || '',
-        htfStructure:      notes.htfStructure      || '',
-        marketPulse:       notes.marketPulse       || '',
-        liquidityContext:  notes.liquidityContext  || '',
+      phase_0: {
+        name: 'Maya Chart Analysis',
+        image_description: imageDescStr,
+      },
+      phase_1: {
+        name: 'Pre-Session Context',
+        dimensions: selections.preSessionContext || {},
+        notes: notes.preSessionContext || '',
+      },
+      phase_2: {
+        name: 'HTF Structure',
+        dimensions: selections.htfStructure || {},
+        notes: notes.htfStructure || '',
+      },
+      phase_3: {
+        name: 'Market Pulse',
+        dimensions: buildMarketPulseDimensions(),
+        notes: notes.marketPulse || '',
       },
       provider: providerVal,
       llm_config: { ...modelConfig, model_id: modelIdVal },
@@ -103,14 +134,14 @@ export function useAnalysisFlow() {
       signal: abortControllerRef.current.signal,
     })
       .then((res) => { if (!res.ok) throw new Error(); return res.json(); })
-      .then((envelope: { data?: Record<string, unknown>; thinking?: string }) => {
-        const result = { ...(envelope?.data ?? envelope), thinking: envelope?.thinking ?? '' };
+      .then((envelope: { status?: string; data?: Record<string, unknown>; thinking?: string; error?: string; raw?: unknown }) => {
+        console.info('[NETRA AI] /api/evaluate-netra envelope', envelope);
+        const hasData = envelope?.data && Object.keys(envelope.data).length > 0;
+        const result = hasData
+          ? { ...envelope.data, status: envelope.status, error: envelope.error, thinking: envelope.thinking ?? '' }
+          : { ...envelope, thinking: envelope?.thinking ?? '' };
+        console.info('[NETRA AI] netraOutput dispatched', result);
         dispatch(setNetraOutput(result as Parameters<typeof setNetraOutput>[0]));
-        // Record the recognised state into the session path timeline
-        const r = result as Record<string, unknown>;
-        const rec = r.recognized_state as { state_id?: string } | undefined;
-        const stateId = rec?.state_id || (r.state_id as string | undefined);
-        if (stateId) dispatch(appendStateRecognition(stateId));
         dispatch(setIsEvaluating(false));
         markGuestAiUsed();
         showToast('Neural Synthesis Complete');
@@ -121,7 +152,7 @@ export function useAnalysisFlow() {
         dispatch(setIsEvaluating(false));
         showToast('Neural Engine Sync Failure', 'error');
       });
-  }, [isEvaluating, dispatch, getActiveModel, getAuthHeaders, imageDescription, selections, modelConfig, showToast]);
+  }, [isEvaluating, dispatch, getActiveModel, getAuthHeaders, imageDescription, selections, notes, modelConfig, showToast, buildMarketPulseDimensions]);
 
   const stopSynthesis = useCallback(() => {
     abortControllerRef.current?.abort();
@@ -140,20 +171,36 @@ export function useAnalysisFlow() {
 
     const { provider: providerVal, model_id: modelIdVal } = getActiveModel();
     const payload = {
-      preSessionContext: selections.preSessionContext,
-      htfStructure: selections.htfStructure,
-      marketPulse: selections.marketPulse,
-      command: finalCommand,
-      sts_dims: finalCommand === 'STRIKE' ? strikeSelections : interSelections,
-      // Full notes object so weapon agent has all analyst context
-      notes: {
-        preSessionContext: notes.preSessionContext || '',
-        htfStructure:      notes.htfStructure      || '',
-        marketPulse:       notes.marketPulse       || '',
-        liquidityContext:  notes.liquidityContext  || '',
-        command:           notes.command           || '',
-        weapon_thought:    notes.weapon_thought    || '',
+      phase_0: {
+        name: 'Maya Chart Analysis',
+        image_description: imageDescription || '',
       },
+      phase_1: {
+        name: 'Pre-Session Context',
+        dimensions: selections.preSessionContext || {},
+        notes: notes.preSessionContext || '',
+      },
+      phase_2: {
+        name: 'HTF Structure',
+        dimensions: selections.htfStructure || {},
+        notes: notes.htfStructure || '',
+      },
+      phase_3: {
+        name: 'Market Pulse',
+        dimensions: buildMarketPulseDimensions(),
+        notes: notes.marketPulse || '',
+      },
+      command: finalCommand,
+      sts_dims: finalCommand === 'STRIKE'
+        ? strikeSelections
+        : finalCommand === 'SATURATION'
+          ? saturationSelections
+          : interSelections,
+      available_entry_models: Array.isArray((netraOutput as Record<string, unknown> | null)?.child_states)
+        ? (netraOutput as Record<string, unknown>).child_states
+        : [],
+      command_note: notes.command || '',
+      weapon_thought: notes.weapon_thought || '',
       trader_thought: thought || undefined,
       strategy_reasoning: netraOutput?.analysis,
       provider: providerVal,
@@ -168,8 +215,13 @@ export function useAnalysisFlow() {
       signal: weaponAbortControllerRef.current.signal,
     })
       .then((res) => res.json())
-      .then((envelope: { data?: Record<string, unknown>; thinking?: string }) => {
-        const data = { ...(envelope?.data ?? envelope), thinking: envelope?.thinking ?? '' };
+      .then((envelope: { status?: string; data?: Record<string, unknown>; thinking?: string; error?: string }) => {
+        console.info('[NETRA AI] /api/predict-weapon envelope', envelope);
+        const hasData = envelope?.data && Object.keys(envelope.data).length > 0;
+        const data = hasData
+          ? { ...envelope.data, status: envelope.status, error: envelope.error, thinking: envelope.thinking ?? '' }
+          : { ...envelope, thinking: envelope?.thinking ?? '' };
+        console.info('[NETRA AI] weaponPrediction dispatched', data);
         dispatch(setWeaponPrediction(data));   // keeps the shared store in sync (e.g. session snapshot)
         dispatch(setIsPredictingWeapon(false));
         showToast('Weapon Prediction Ready');
@@ -181,7 +233,7 @@ export function useAnalysisFlow() {
         dispatch(setIsPredictingWeapon(false));
         return null;
       });
-  }, [isPredictingWeapon, dispatch, getActiveModel, getAuthHeaders, selections, finalCommand, strikeSelections, interSelections, notes, netraOutput, modelConfig, imageDescription, showToast]);
+  }, [isPredictingWeapon, dispatch, getActiveModel, getAuthHeaders, selections, finalCommand, strikeSelections, saturationSelections, interSelections, notes, netraOutput, modelConfig, imageDescription, showToast, buildMarketPulseDimensions]);
 
   const stopWeaponPrediction = useCallback(() => {
     weaponAbortControllerRef.current?.abort();

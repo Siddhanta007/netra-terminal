@@ -10,9 +10,9 @@ export function useHTFGate(): HTFGate {
   const continuity = htf?.structuralContinuity || '';
   const maturity = htf?.legMaturity || '';
   const rotation = htf?.rotationDepth || '';
-  const anchor = htf?.anchorCondition || '';
-  const protection = htf?.protectionCondition || '';
-  const objective = htf?.objectiveCondition || '';
+  const anchor = htf?.htfAnchorCondition || htf?.anchorCondition || '';
+  const protection = htf?.htfProtectionCondition || htf?.protectionCondition || '';
+  const objective = htf?.htfObjectiveCondition || htf?.objectiveCondition || '';
 
   if (
     continuity === 'Broken Continuity' ||

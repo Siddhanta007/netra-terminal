@@ -1,10 +1,10 @@
 // Vision phase — upload a chart and get Maya's image description as analysis context.
 
-import { useNetra } from '../../../context/NetraContext';
-import NetraAILabs from '../../../components/Templates/NetraAILabs';
+import { useNetra } from '@/context/NetraContext';
+import NetraAILabs from '@/components/Templates/NetraAILabs';
 
 export default function Phase0Vision() {
-  const { imageDescription, uploadAndDescribeImage, isUploadingImage, stopVisualAnalysis } = useNetra();
+  const { imageDescription, isUploadingImage, stopVisualAnalysis } = useNetra();
 
   return (
     <NetraAILabs
@@ -15,8 +15,10 @@ export default function Phase0Vision() {
       showUpload={true}
       isEvaluating={isUploadingImage}
       output={imageDescription}
-      onAnalyse={uploadAndDescribeImage}
+      onAnalyse={() => {}}
       onStop={stopVisualAnalysis}
+      analyseDisabled={true}
+      analyseDisabledReason="Vision analysis is temporarily disabled to avoid image-analysis API cost."
     />
   );
 }

@@ -14,10 +14,7 @@ export function useAudit() {
 
   const auditData = useSelector((s: RootState) => s.logs.auditData);
   const isAuditing = useSelector((s: RootState) => s.logs.isAuditing);
-  const netraOutput = useSelector((s: RootState) => s.analysis.netraOutput);
-  const weaponPrediction = useSelector((s: RootState) => s.analysis.weaponPrediction);
   const modelConfig = useSelector((s: RootState) => s.model.modelConfig);
-  const imageDescription = useSelector((s: RootState) => s.analysis.imageDescription);
   const activeSessionId = useSelector((s: RootState) => s.session.activeSessionId);
 
   useEffect(() => {
@@ -38,37 +35,58 @@ export function useAudit() {
       headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         ...tradeTelemetry,
-        strategy_analysis: netraOutput?.analysis,
-        execution_plan: (weaponPrediction as { weapon?: string } | null)?.weapon,
         provider: providerVal,
         model_config: { ...modelConfig, model_id: modelIdVal },
-        image_description: imageDescription,
       }),
       signal: auditAbortControllerRef.current.signal,
     })
       .then((res) => res.json())
-      .then((envelope: { data?: unknown }) => {
-        const result = (envelope?.data ?? envelope) as Parameters<typeof setAuditData>[0];
-        dispatch(setAuditData(result));
+      .then((envelope: { status?: string; data?: Record<string, unknown>; thinking?: string; error?: string }) => {
+        const hasData = envelope?.data && Object.keys(envelope.data).length > 0;
+        const data = (hasData ? envelope.data : envelope) as Record<string, unknown>;
+        const rawText =
+          typeof data.analysis === 'string' ? data.analysis :
+          typeof data.raw === 'string' ? data.raw :
+          typeof data.raw_model_response === 'string' ? data.raw_model_response :
+          typeof data.text === 'string' ? data.text :
+          '';
+        const result = (hasData
+          ? {
+              ...envelope.data,
+              analysis: rawText || envelope.data?.analysis,
+              raw: rawText || envelope.data?.raw,
+              response_format: 'text',
+              display_mode: 'text',
+              status: envelope.status,
+              error: envelope.error,
+              thinking: envelope.thinking ?? '',
+            }
+          : {
+              ...envelope,
+              analysis: rawText || envelope.error || '',
+              raw: rawText || envelope.error || '',
+              response_format: 'text',
+              display_mode: 'text',
+              thinking: envelope?.thinking ?? '',
+            }) as Parameters<typeof setAuditData>[0];
+        const appAuditData = {
+          ...result,
+          phase_key: 'phase10',
+          phase_name: 'Maya Audit',
+          saved_at: new Date().toISOString(),
+        } as Parameters<typeof setAuditData>[0];
+        dispatch(setAuditData(appAuditData));
         dispatch(setIsAuditing(false));
         showToast('Tactical Audit Complete');
 
-        // Persist phase10 directly to the trade log
-        if (activeSessionId && result) {
+        // Persist phase10 directly to the trade log. Do not commit learning data here;
+        // learning commit must only happen from the explicit Commit action.
+        if (activeSessionId && appAuditData) {
           fetch(`${API_BASE}/api/logs/${encodeURIComponent(activeSessionId)}/state`, {
             method: 'PUT',
             headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-            body: JSON.stringify({ phase10: result, highestStep: 11, tradeName: '', assetName: '' }),
+            body: JSON.stringify({ phase10: appAuditData, auditor: appAuditData, highestStep: 11 }),
           }).catch(() => { /* silent */ });
-
-          // Commit session to PinakaGraph (PostgreSQL ML store)
-          fetch(`${API_BASE}/api/graph/commit/${encodeURIComponent(activeSessionId)}`, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-          })
-            .then(r => r.json())
-            .then(d => { if (d.committed > 0) showToast(`Graph: ${d.committed} node(s) committed`); })
-            .catch(() => { /* silent — graph failure doesn't affect the session */ });
         }
       })
       .catch((err: Error) => {
@@ -76,7 +94,7 @@ export function useAudit() {
         else showToast('Audit Failure', 'error');
         dispatch(setIsAuditing(false));
       });
-  }, [isAuditing, dispatch, getActiveModel, getAuthHeaders, netraOutput, weaponPrediction, modelConfig, imageDescription, activeSessionId, showToast]);
+  }, [isAuditing, dispatch, getActiveModel, getAuthHeaders, modelConfig, activeSessionId, showToast]);
 
   const stopPostTradeAudit = useCallback(() => {
     auditAbortControllerRef.current?.abort();

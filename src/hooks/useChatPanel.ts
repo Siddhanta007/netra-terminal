@@ -16,6 +16,7 @@ export function useChatPanel() {
   const { getAuthHeaders, showToast, getActiveModel, checkGuestLimit, markGuestAiUsed } = useNetraUtils();
 
   const [uploadedVisionFiles, setUploadedVisionFiles] = useState<File[]>([]);
+  const [chatTitle, setChatTitle] = useState('Maya Chat');
 
   const chatHistory = useSelector((s: RootState) => s.chat.chatHistory);
   const chatInput = useSelector((s: RootState) => s.chat.chatInput);
@@ -35,8 +36,9 @@ export function useChatPanel() {
     if (!chatId) return;
     fetch(`${API_BASE}/api/chat/${encodeURIComponent(chatId)}`, { headers: getAuthHeaders() })
       .then(r => (r.ok ? r.json() : null))
-      .then((thread: { messages?: ChatMessage[] } | null) => {
+      .then((thread: { messages?: ChatMessage[]; title?: string } | null) => {
         if (thread?.messages) dispatch(setChatHistory(thread.messages));
+        if (thread?.title) setChatTitle(thread.title);
       })
       .catch(() => { /* offline / not found — keep local view */ });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -44,10 +46,49 @@ export function useChatPanel() {
 
   const toggle = useCallback((s: ChatSource) => dispatch(toggleSource(s)), [dispatch]);
 
-  const startNewChat = useCallback(() => {
-    dispatch(setChatHistory([]));
-    dispatch(setChatId(null));   // next send creates a fresh server thread
-  }, [dispatch]);
+  const startNewChat = useCallback(async (title = 'New chat') => {
+    const cleanTitle = title.trim() || 'New chat';
+    try {
+      const res = await fetch(`${API_BASE}/api/chat/new`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ user_id: session?.userName || 'Unknown', title: cleanTitle }),
+      });
+      if (!res.ok) throw new Error('Chat create failed');
+      const thread = await res.json() as { chat_id?: string; title?: string };
+      dispatch(setChatHistory([]));
+      dispatch(setChatInput(''));
+      dispatch(setChatId(thread.chat_id || null));
+      setChatTitle(thread.title || cleanTitle);
+      showToast('New Maya chat created');
+    } catch {
+      showToast('Could not create Maya chat', 'error');
+    }
+  }, [dispatch, getAuthHeaders, session?.userName, showToast]);
+
+  const renameChat = useCallback(async (title: string) => {
+    const cleanTitle = title.trim();
+    if (!cleanTitle) return;
+
+    if (!chatId) {
+      await startNewChat(cleanTitle);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/chat/${encodeURIComponent(chatId)}`, {
+        method: 'PATCH',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ title: cleanTitle }),
+      });
+      if (!res.ok) throw new Error('Chat rename failed');
+      const data = await res.json() as { title?: string };
+      setChatTitle(data.title || cleanTitle);
+      showToast('Maya chat renamed');
+    } catch {
+      showToast('Could not rename Maya chat', 'error');
+    }
+  }, [chatId, getAuthHeaders, showToast, startNewChat]);
 
   const summarizeNow = useCallback(async () => {
     if (!chatId || isAiLoading) return;
@@ -139,6 +180,7 @@ export function useChatPanel() {
       // Persist the server-assigned thread id (first message of a new thread)
       if (envelope?.chat_id && envelope.chat_id !== chatId) {
         dispatch(setChatId(envelope.chat_id));
+        setChatTitle(userMsg.text.slice(0, 60) || 'New chat');
       }
 
       const text = envelope?.data?.text ?? envelope?.text ?? 'No response';
@@ -154,8 +196,8 @@ export function useChatPanel() {
   }, [chatInput, isAiLoading, uploadedVisionFiles, sources, chatId, chatHistory, session, activeEditLog, highestStep, selections, notes, imageDescription, modelConfig, dispatch, getActiveModel, getAuthHeaders, showToast, checkGuestLimit, markGuestAiUsed]);
 
   return {
-    chatHistory, chatInput, isAiLoading, sources,
+    chatHistory, chatInput, isAiLoading, sources, chatTitle,
     uploadedVisionFiles, setUploadedVisionFiles,
-    handleSendMessage, toggleSource: toggle, startNewChat, summarizeNow,
+    handleSendMessage, toggleSource: toggle, startNewChat, renameChat, summarizeNow,
   };
 }

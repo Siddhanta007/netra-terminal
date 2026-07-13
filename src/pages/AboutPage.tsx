@@ -1,297 +1,902 @@
-// Marketing 'About' page.
-
 import Footer from '../components/Layout/Footer';
 
-/* ── tokens ─────────────────────────────────────────────────────── */
-const BLUE    = '#4169E1';
-const BLUE_BG = '#edf2fc';       // desaturated blue
-const BLUE_MID= '#dce8fa';
+const BLUE = '#4169E1';
+const INK = '#111827';
+const TEXT = '#243041';
+const MUTED = '#64748b';
+const LINE = 'rgba(17,24,39,0.12)';
+const PAPER = '#f7f8fb';
+const BLUE_SOFT = '#eef3ff';
+const ORANGE_SOFT = '#fff3e8';
+const SKY_SOFT = '#edf6ff';
+const VIOLET_SOFT = '#f3efff';
+const MONO = "'JetBrains Mono', monospace";
+const SERIF = "Georgia, 'Times New Roman', serif";
 
-const ORANGE    = '#f97316';
-const ORANGE_BG = '#fff4ed';     // desaturated orange
-const ORANGE_MID= '#ffe8d4';
-
-const NEON      = '#00e57a';     // neon mint — Maya
-const NEON_BG   = '#edfff5';
-
-const NAVY   = '#0d1528';
-const TEXT   = '#1e293b';
-const MUTED  = '#64748b';
-const SERIF  = "Georgia, 'Times New Roman', serif";
-const MONO   = "'JetBrains Mono', monospace";
-
-/* ── corner circles ──────────────────────────────────────────────── */
-const TR: {cx:number;cy:number;r:number;c:string}[] = [
-  { cx: 720, cy: 10,  r: 55, c: BLUE      }, { cx: 648, cy: -5,  r: 36, c: ORANGE    },
-  { cx: 580, cy: 38,  r: 48, c: '#8b5cf6' }, { cx: 730, cy: 98,  r: 42, c: '#10b981' },
-  { cx: 505, cy: 12,  r: 28, c: '#6366f1' }, { cx: 662, cy: 118, r: 52, c: BLUE      },
-  { cx: 428, cy: 32,  r: 24, c: '#ef4444' }, { cx: 572, cy: 135, r: 34, c: '#0ea5e9' },
-  { cx: 725, cy: 180, r: 38, c: ORANGE    }, { cx: 352, cy: 58,  r: 22, c: '#8b5cf6' },
-  { cx: 490, cy: 105, r: 42, c: BLUE      }, { cx: 620, cy: 198, r: 26, c: '#10b981' },
-  { cx: 275, cy: 28,  r: 18, c: '#6366f1' }, { cx: 548, cy: 225, r: 46, c: ORANGE    },
-  { cx: 718, cy: 258, r: 30, c: '#0ea5e9' }, { cx: 400, cy: 172, r: 20, c: BLUE      },
-  { cx: 670, cy: 298, r: 24, c: '#ef4444' }, { cx: 320, cy: 148, r: 36, c: '#8b5cf6' },
-  { cx: 580, cy: 285, r: 22, c: '#10b981' }, { cx: 460, cy: 260, r: 40, c: '#6366f1' },
-  { cx: 200, cy: 55,  r: 16, c: ORANGE    }, { cx: 245, cy: 118, r: 28, c: BLUE      },
-  { cx: 138, cy: 32,  r: 20, c: '#10b981' }, { cx: 730, cy: 355, r: 28, c: BLUE      },
-  { cx: 505, cy: 335, r: 18, c: ORANGE    }, { cx: 352, cy: 305, r: 32, c: '#0ea5e9' },
-];
-const BL: typeof TR = [
-  { cx: 18,  cy: 640, r: 55, c: BLUE      }, { cx: 105, cy: 658, r: 36, c: '#10b981' },
-  { cx: 188, cy: 622, r: 48, c: ORANGE    }, { cx: 10,  cy: 568, r: 42, c: '#8b5cf6' },
-  { cx: 288, cy: 648, r: 28, c: BLUE      }, { cx: 125, cy: 558, r: 52, c: '#0ea5e9' },
-  { cx: 378, cy: 628, r: 24, c: '#ef4444' }, { cx: 228, cy: 548, r: 34, c: ORANGE    },
-  { cx: 16,  cy: 492, r: 38, c: BLUE      }, { cx: 448, cy: 615, r: 22, c: '#8b5cf6' },
-  { cx: 155, cy: 472, r: 42, c: '#6366f1' }, { cx: 328, cy: 532, r: 26, c: '#10b981' },
-  { cx: 68,  cy: 398, r: 20, c: '#0ea5e9' }, { cx: 255, cy: 435, r: 46, c: BLUE      },
-  { cx: 22,  cy: 318, r: 30, c: '#ef4444' }, { cx: 418, cy: 505, r: 20, c: ORANGE    },
-  { cx: 178, cy: 348, r: 24, c: '#8b5cf6' }, { cx: 385, cy: 408, r: 36, c: '#6366f1' },
-  { cx: 105, cy: 278, r: 22, c: BLUE      }, { cx: 295, cy: 332, r: 40, c: '#0ea5e9' },
-  { cx: 488, cy: 468, r: 18, c: BLUE      }, { cx: 52,  cy: 228, r: 28, c: ORANGE    },
-  { cx: 198, cy: 242, r: 16, c: '#10b981' }, { cx: 342, cy: 268, r: 30, c: '#8b5cf6' },
-  { cx: 480, cy: 368, r: 24, c: '#ef4444' }, { cx: 135, cy: 185, r: 20, c: BLUE      },
+const stack = [
+  'NETRA platform shell and terminal workspaces',
+  'MAYA retrieval, reasoning, critique, and audit layer',
+  'Pinaka model with state tree, command aliases, and child routes',
+  'MongoDB app trades and committed learning records',
+  'Vector memory over closed trade paths',
+  'Postgres tabular path store for structured retrieval',
+  'Profile, access, cost, portfolio, and model-level stats',
 ];
 
-function Corners() {
-  return (
-    <>
-      <div style={{ position: 'fixed', top: 0, right: 0, width: 780, height: 680, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-        <svg width="780" height="680" viewBox="0 0 780 680" fill="none">
-          {TR.map((s, i) => <circle key={i} cx={s.cx} cy={s.cy} r={s.r} fill="none" stroke={s.c} strokeWidth="5.5" strokeOpacity="0.38" />)}
-        </svg>
-      </div>
-      <div style={{ position: 'fixed', bottom: 0, left: 0, width: 660, height: 720, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-        <svg width="660" height="720" viewBox="0 0 660 720" fill="none">
-          {BL.map((s, i) => <circle key={i} cx={s.cx} cy={s.cy} r={s.r} fill="none" stroke={s.c} strokeWidth="5.5" strokeOpacity="0.38" />)}
-        </svg>
-      </div>
-    </>
-  );
-}
+const buildItems = [
+  {
+    label: 'NETRA Platform',
+    body: 'The product layer: authentication, access control, terminal workspaces, model pages, portfolio views, user profile, storage, statistics, and commit workflow.',
+  },
+  {
+    label: 'MAYA Intelligence',
+    body: 'The AI layer inside NETRA: retrieval, reasoning, critique, audit, model routing, token visibility, and human-readable guidance without replacing the trader.',
+  },
+  {
+    label: 'Pinaka Model',
+    body: 'The first trading model hosted by NETRA. Pinaka owns the doctrine, state tree, command aliases, child routes, execution phases, and learning path format.',
+  },
+  {
+    label: 'Learning Memory',
+    body: 'Closed and committed trades become path records: phase dimensions, state, child route, execution events, temporal features, trade stats, and outcome.',
+  },
+];
 
-/* ── section eyebrow ─────────────────────────────────────────────── */
-function Eyebrow({ label, color }: { label: string; color: string }) {
+const metrics = [
+  ['NETRA', 'Platform'],
+  ['MAYA', 'AI layer'],
+  ['Pinaka', 'First model'],
+  ['1', 'End-to-end system'],
+];
+
+const layers = [
+  {
+    name: 'NETRA',
+    role: 'Platform',
+    body: 'Hosts models, terminals, user access, storage, statistics, profile cost visibility, portfolio views, and the commit pipeline.',
+  },
+  {
+    name: 'MAYA',
+    role: 'AI Layer',
+    body: 'Reads phase data, retrieves context, reasons over doctrine and history, critiques decisions, audits trades, and exposes model cost.',
+  },
+  {
+    name: 'Pinaka',
+    role: 'Trading Model',
+    body: 'The first model running inside NETRA. It defines the doctrine tree, state aliases, child routes, execution phases, and learning schema.',
+  },
+];
+
+const pathRows = [
+  ['State', 'NS-02', 'SATURATION alias, dimensions, events'],
+  ['Child Route', 'NS-02-CS01', 'Weapon alias, dimensions, events'],
+  ['Trade', 'Execution', 'entry, exits, cost, temporal actions'],
+  ['Outcome', 'Learning label', 'PnL, R multiple, win/loss, holding time'],
+];
+
+const cornerRects = [
+  [420, 20, 72, 42, '#4169E1'],
+  [528, 6, 46, 46, '#f59e0b'],
+  [606, 44, 84, 54, '#8cc6e8'],
+  [356, 92, 60, 60, '#64748b'],
+  [476, 110, 96, 48, '#4169E1'],
+  [604, 142, 52, 52, '#f59e0b'],
+  [282, 172, 74, 46, '#8cc6e8'],
+  [398, 214, 102, 54, '#4169E1'],
+  [552, 246, 68, 68, '#64748b'],
+  [320, 306, 56, 56, '#f59e0b'],
+];
+
+const pathNodes = [
+  [48, 278, 'P1'],
+  [128, 220, 'P2'],
+  [224, 252, 'P3'],
+  [314, 164, 'P5'],
+  [410, 202, 'P7'],
+  [508, 126, 'T'],
+];
+
+function AboutBackground() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '40px' }}>
-      <div style={{ width: '28px', height: '2px', background: color }} />
-      <span style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.38em', color }}>{label}</span>
+    <div className="about-bg" aria-hidden="true">
+      <svg className="about-bg-top" viewBox="0 0 720 420" fill="none">
+        <path d="M356 40H690V310H606V378H260V268H126V112H356V40Z" stroke="#111827" strokeOpacity="0.08" strokeWidth="1" />
+        <path d="M126 112H356M356 40V268M260 268H606M606 310V142" stroke="#111827" strokeOpacity="0.08" strokeWidth="1" />
+        {cornerRects.map(([x, y, w, h, color], index) => (
+          <rect
+            key={`${x}-${y}-${index}`}
+            x={x}
+            y={y}
+            width={w}
+            height={h}
+            stroke={color}
+            strokeWidth="4"
+            strokeOpacity="0.34"
+            fill="rgba(255,255,255,0.18)"
+          />
+        ))}
+        <path d="M266 338C330 300 382 324 436 284C496 240 540 242 626 198" stroke="#4169E1" strokeOpacity="0.22" strokeWidth="3" />
+        <path d="M284 362C354 324 398 360 462 326C516 298 560 298 652 264" stroke="#f59e0b" strokeOpacity="0.2" strokeWidth="3" />
+      </svg>
+
+      <svg className="about-bg-bottom" viewBox="0 0 600 360" fill="none">
+        <path d="M48 278L128 220L224 252L314 164L410 202L508 126" stroke="#111827" strokeOpacity="0.18" strokeWidth="2" />
+        <path d="M48 278L224 252L410 202" stroke="#4169E1" strokeOpacity="0.2" strokeWidth="5" />
+        <path d="M128 220L314 164L508 126" stroke="#8cc6e8" strokeOpacity="0.18" strokeWidth="5" />
+        {pathNodes.map(([cx, cy, label], index) => (
+          <g key={label}>
+            <rect
+              x={Number(cx) - 28}
+              y={Number(cy) - 18}
+              width="56"
+              height="36"
+              fill="#ffffff"
+              stroke={index % 2 === 0 ? '#4169E1' : '#111827'}
+              strokeOpacity={index % 2 === 0 ? 0.32 : 0.18}
+              strokeWidth="3"
+            />
+            <text
+              x={Number(cx)}
+              y={Number(cy) + 4}
+              textAnchor="middle"
+              fontFamily="JetBrains Mono, monospace"
+              fontSize="13"
+              fontWeight="900"
+              fill="#111827"
+              opacity="0.42"
+            >
+              {label}
+            </text>
+          </g>
+        ))}
+        <path d="M20 320H560M20 80H560M82 42V338M274 42V338M464 42V338" stroke="#111827" strokeOpacity="0.06" />
+      </svg>
     </div>
   );
 }
 
-/* ── data ────────────────────────────────────────────────────────── */
-const PHASES = [
-  { n: 'P1',  name: 'Bias',            desc: 'Daily directional read. Long or short — set before anything else opens.' },
-  { n: 'P2',  name: 'HTF Structure',   desc: 'Higher-timeframe structure must confirm the bias.' },
-  { n: 'P3',  name: 'Liquidity',       desc: 'Map where liquidity sits — who gets stopped before the real move.' },
-  { n: 'P4',  name: 'Command',         desc: 'STRIKE, INTERCEPT, or ABORT. One call. No reversals mid-session.' },
-  { n: 'P5',  name: 'Weapon',          desc: 'Select the instrument: Strike, Agni, Vajra, Manthan.' },
-  { n: 'P6',  name: 'Mission Intel',   desc: 'AI-assisted confluence check against doctrine and trade log.' },
-  { n: 'P7',  name: 'Risk Frame',      desc: 'Entry, stop, and target locked before any execution.' },
-  { n: 'P8',  name: 'Trading Data',    desc: 'Live position tracking — entries, partial exits, P&L.' },
-  { n: 'P9',  name: 'Maya Audit',      desc: 'Post-trade AI review: did execution follow the doctrine?' },
-  { n: 'P10', name: 'Mission Control', desc: 'Final log, outcome classification, archive.' },
-];
+function CaseLabel({ children }: { children: string }) {
+  return (
+    <div className="about-eyebrow">
+      <span />
+      {children}
+    </div>
+  );
+}
 
-const AGENTS = [
-  { n: '01', name: 'Researcher',    desc: 'RAG retrieval over doctrine documents and historical trade log.' },
-  { n: '02', name: 'Doctrine Gate', desc: 'Hard block — cannot produce any suggestion outside doctrine bounds.' },
-  { n: '03', name: 'Strategist',    desc: 'Generates confluence arguments within the permitted doctrine space.' },
-  { n: '04', name: 'Critic',        desc: 'Challenges the strategist before the output reaches the user.' },
-  { n: '05', name: 'Auditor',       desc: 'Post-trade: compares execution against doctrine, flags deviations.' },
-];
+function MiniStat({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="about-stat">
+      <div>{value}</div>
+      <span>{label}</span>
+    </div>
+  );
+}
 
-/* ════════════════════════════════════════════════════════════════════
-   PAGE
-════════════════════════════════════════════════════════════════════ */
+function SystemDiagram() {
+  return (
+    <div className="about-diagram" aria-label="NETRA system architecture diagram">
+      <div className="diagram-row">
+        <div className="diagram-node diagram-node-strong">
+          <small>NETRA</small>
+          Platform Shell
+        </div>
+        <div className="diagram-line" />
+        <div className="diagram-node">
+          <small>Workspace</small>
+          Terminal + Pages
+        </div>
+        <div className="diagram-line" />
+        <div className="diagram-node">
+          <small>Storage</small>
+          App + Stats
+        </div>
+      </div>
+
+      <div className="diagram-row diagram-row-offset">
+        <div className="diagram-node diagram-node-blue">
+          <small>MAYA</small>
+          AI Layer
+        </div>
+        <div className="diagram-line" />
+        <div className="diagram-node diagram-node-blue">
+          <small>Retrieval</small>
+          Doctrine + Memory
+        </div>
+        <div className="diagram-line" />
+        <div className="diagram-node diagram-node-blue">
+          <small>Audit</small>
+          Critique + Cost
+        </div>
+      </div>
+
+      <div className="diagram-row">
+        <div className="diagram-node diagram-node-orange">
+          <small>Pinaka</small>
+          First Model
+        </div>
+        <div className="diagram-line" />
+        <div className="diagram-node diagram-node-orange">
+          <small>Doctrine</small>
+          State + Child Route
+        </div>
+        <div className="diagram-line" />
+        <div className="diagram-node diagram-node-sky">
+          <small>Learning</small>
+          Vector + SQL Path
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AboutPage() {
   return (
-    <div style={{ background: '#ffffff', flex: 1, position: 'relative', overflowX: 'hidden' }}>
-      <Corners />
+    <div className="about-page">
+      <style>{`
+        .about-page {
+          position: relative;
+          min-height: 100%;
+          background:
+            linear-gradient(180deg, #fbfcff 0%, #f3f6fb 52%, #ffffff 100%);
+          color: ${TEXT};
+          overflow-x: hidden;
+        }
 
-      <div style={{ maxWidth: '1280px', width: '100%', margin: '0 auto', padding: '72px 56px 0', position: 'relative', zIndex: 1 }}>
+        .about-bg {
+          position: fixed;
+          inset: 0;
+          pointer-events: none;
+          z-index: 0;
+          overflow: hidden;
+        }
 
+        .about-bg-top,
+        .about-bg-bottom {
+          position: absolute;
+          display: block;
+        }
 
-        {/* ════════════════════════════════════════
-            ABOUT ME
-        ════════════════════════════════════════ */}
-        <Eyebrow label="About Me" color={BLUE} />
+        .about-bg-top {
+          width: min(720px, 54vw);
+          top: 6px;
+          right: -88px;
+          opacity: 0.9;
+        }
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: '24px', marginBottom: '24px', alignItems: 'stretch' }}>
+        .about-bg-bottom {
+          width: min(600px, 50vw);
+          left: -84px;
+          bottom: 44px;
+          opacity: 0.74;
+        }
 
-          {/* name + pitch */}
-          <div style={{ background: '#fff4ed', padding: '48px 52px', border: '1px solid rgba(249,115,22,0.15)' }}>
-            <div style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.32em', color: MUTED, marginBottom: '24px' }}>
-              Quant Researcher · Systems Builder
-            </div>
-            <h1 style={{ fontFamily: SERIF, fontSize: '84px', fontWeight: 700, color: NAVY, letterSpacing: '-0.04em', lineHeight: 0.9, margin: '0 0 28px 0' }}>
-              Sri<br />Krishna
+        .about-shell {
+          position: relative;
+          z-index: 1;
+          width: min(1180px, calc(100vw - 48px));
+          margin: 0 auto;
+          padding: 72px 0 0;
+        }
+
+        .about-hero {
+          min-height: calc(100vh - 148px);
+          display: grid;
+          grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
+          gap: 28px;
+          align-items: stretch;
+          padding-bottom: 44px;
+        }
+
+        .about-hero-copy {
+          padding: 42px 0 0;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+        }
+
+        .about-eyebrow {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          font-family: ${MONO};
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: 0.28em;
+          text-transform: uppercase;
+          color: ${BLUE};
+          margin-bottom: 22px;
+        }
+
+        .about-eyebrow span {
+          width: 30px;
+          height: 2px;
+          background: ${BLUE};
+          display: inline-block;
+        }
+
+        .about-title {
+          margin: 0;
+          font-family: ${SERIF};
+          font-size: clamp(62px, 8vw, 112px);
+          line-height: 0.88;
+          letter-spacing: -0.055em;
+          color: ${INK};
+        }
+
+        .about-title-mark {
+          display: block;
+          color: ${BLUE};
+        }
+
+        .about-lead {
+          max-width: 620px;
+          margin: 30px 0 0;
+          font-size: 18px;
+          line-height: 1.8;
+          color: ${TEXT};
+        }
+
+        .about-lead strong {
+          color: ${INK};
+          font-weight: 850;
+        }
+
+        .about-sublead {
+          max-width: 620px;
+          margin: 18px 0 0;
+          font-size: 14px;
+          line-height: 1.85;
+          color: ${MUTED};
+        }
+
+        .about-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-top: 34px;
+        }
+
+        .about-button {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 40px;
+          padding: 0 20px;
+          border: 1px solid ${INK};
+          background: ${INK};
+          color: #ffffff;
+          text-decoration: none;
+          font-family: ${MONO};
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          border-radius: 0;
+          transition: transform 160ms ease, background 160ms ease, color 160ms ease;
+        }
+
+        .about-button:hover {
+          transform: translateY(-1px);
+          background: ${BLUE};
+          border-color: ${BLUE};
+        }
+
+        .about-button-secondary {
+          background: transparent;
+          color: ${INK};
+        }
+
+        .about-button-secondary:hover {
+          color: #ffffff;
+        }
+
+        .about-product-card {
+          position: relative;
+          background: rgba(247,248,251,0.92);
+          border: 1px solid ${LINE};
+          border-radius: 0;
+          padding: 26px;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          box-shadow: 0 24px 70px rgba(15,23,42,0.08);
+        }
+
+        .about-product-card:before {
+          content: "";
+          position: absolute;
+          inset: 0 0 auto 0;
+          height: 4px;
+          background: linear-gradient(90deg, #4169E1, #f59e0b, #8cc6e8);
+        }
+
+        .about-card-head {
+          display: flex;
+          justify-content: space-between;
+          gap: 14px;
+          align-items: flex-start;
+          margin-bottom: 22px;
+        }
+
+        .about-card-head h2 {
+          margin: 0;
+          font-size: 28px;
+          line-height: 1;
+          letter-spacing: -0.03em;
+          color: ${INK};
+        }
+
+        .about-card-head span {
+          font-family: ${MONO};
+          font-size: 9px;
+          font-weight: 900;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          color: #4169E1;
+          background: ${SKY_SOFT};
+          border: 1px solid rgba(65,105,225,0.18);
+          padding: 7px 9px;
+          border-radius: 0;
+        }
+
+        .about-diagram {
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+          padding: 20px 0 24px;
+        }
+
+        .diagram-row {
+          display: grid;
+          grid-template-columns: 1fr 34px 1fr 34px 1fr;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .diagram-row-offset {
+          padding-left: 20px;
+          padding-right: 20px;
+        }
+
+        .diagram-node {
+          min-height: 72px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 7px;
+          padding: 14px;
+          background: #ffffff;
+          border: 1px solid ${LINE};
+          border-radius: 0;
+          font-family: ${MONO};
+          font-size: 11px;
+          font-weight: 900;
+          color: ${INK};
+          letter-spacing: 0.03em;
+        }
+
+        .diagram-node small {
+          font-size: 8px;
+          font-weight: 900;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          color: ${MUTED};
+        }
+
+        .diagram-node-strong {
+          background: ${INK};
+          color: #ffffff;
+          border-color: ${INK};
+        }
+
+        .diagram-node-blue {
+          background: ${BLUE_SOFT};
+          border-color: rgba(65,105,225,0.24);
+        }
+
+        .diagram-node-sky {
+          background: ${SKY_SOFT};
+          border-color: rgba(140,198,232,0.24);
+        }
+
+        .diagram-node-orange {
+          background: ${ORANGE_SOFT};
+          border-color: rgba(180,83,9,0.18);
+        }
+
+        .diagram-line {
+          height: 1px;
+          background: ${LINE};
+        }
+
+        .about-stat-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 10px;
+          margin-top: 12px;
+        }
+
+        .about-stat {
+          background: #ffffff;
+          border: 1px solid ${LINE};
+          border-radius: 0;
+          padding: 17px 14px;
+        }
+
+        .about-stat div {
+          font-family: ${MONO};
+          font-size: 30px;
+          font-weight: 950;
+          color: ${BLUE};
+          line-height: 1;
+          margin-bottom: 8px;
+        }
+
+        .about-stat span {
+          font-family: ${MONO};
+          font-size: 8px;
+          font-weight: 900;
+          letter-spacing: 0.15em;
+          text-transform: uppercase;
+          color: ${MUTED};
+        }
+
+        .about-section {
+          padding: 68px 0;
+          border-top: 1px solid ${LINE};
+        }
+
+        .about-section-title {
+          display: grid;
+          grid-template-columns: minmax(240px, 0.42fr) 1fr;
+          gap: 34px;
+          align-items: start;
+          margin-bottom: 28px;
+        }
+
+        .about-section-title h2 {
+          margin: 0;
+          font-family: ${SERIF};
+          font-size: clamp(34px, 4vw, 54px);
+          letter-spacing: -0.045em;
+          line-height: 0.98;
+          color: ${INK};
+        }
+
+        .about-section-title p {
+          margin: 7px 0 0;
+          font-size: 15px;
+          line-height: 1.85;
+          color: ${MUTED};
+          max-width: 720px;
+        }
+
+        .about-grid-2 {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 18px;
+        }
+
+        .about-layer-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 18px;
+        }
+
+        .about-block {
+          border: 1px solid ${LINE};
+          border-radius: 0;
+          padding: 26px;
+          background: rgba(255,255,255,0.92);
+        }
+
+        .about-block-blue { background: ${BLUE_SOFT}; }
+        .about-block-orange { background: ${ORANGE_SOFT}; }
+        .about-block-violet { background: ${VIOLET_SOFT}; }
+        .about-block-sky { background: ${SKY_SOFT}; }
+
+        .about-block h3 {
+          margin: 0 0 14px;
+          font-size: 17px;
+          color: ${INK};
+          letter-spacing: -0.01em;
+        }
+
+        .about-block p {
+          margin: 0;
+          font-size: 13px;
+          line-height: 1.75;
+          color: ${TEXT};
+        }
+
+        .about-layer {
+          min-height: 260px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          border: 1px solid ${LINE};
+          border-radius: 0;
+          background: rgba(255,255,255,0.92);
+          padding: 24px;
+        }
+
+        .about-layer:nth-child(1) { background: ${BLUE_SOFT}; }
+        .about-layer:nth-child(2) { background: ${SKY_SOFT}; }
+        .about-layer:nth-child(3) { background: ${ORANGE_SOFT}; }
+
+        .about-layer small {
+          font-family: ${MONO};
+          font-size: 9px;
+          font-weight: 900;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          color: ${MUTED};
+        }
+
+        .about-layer h3 {
+          margin: 18px 0 14px;
+          font-family: ${SERIF};
+          font-size: 38px;
+          line-height: 0.95;
+          letter-spacing: -0.045em;
+          color: ${INK};
+        }
+
+        .about-layer p {
+          margin: 0;
+          font-size: 13px;
+          line-height: 1.8;
+          color: ${TEXT};
+        }
+
+        .about-layer-mark {
+          width: 100%;
+          height: 1px;
+          margin-top: 24px;
+          background: rgba(17,24,39,0.2);
+        }
+
+        .about-stack {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          border: 1px solid ${LINE};
+          border-radius: 0;
+          overflow: hidden;
+          background: #ffffff;
+        }
+
+        .about-stack div {
+          min-height: 104px;
+          padding: 16px 13px;
+          border-right: 1px solid ${LINE};
+          display: flex;
+          align-items: flex-end;
+          font-family: ${MONO};
+          font-size: 9px;
+          font-weight: 850;
+          line-height: 1.55;
+          letter-spacing: 0.04em;
+          color: ${INK};
+          background: linear-gradient(180deg, #ffffff, #f8fafc);
+        }
+
+        .about-stack div:nth-child(2n) {
+          background: ${BLUE_SOFT};
+        }
+
+        .about-stack div:last-child {
+          border-right: none;
+        }
+
+        .about-table {
+          border: 1px solid ${LINE};
+          border-radius: 0;
+          overflow: hidden;
+          background: #ffffff;
+        }
+
+        .about-table-row {
+          display: grid;
+          grid-template-columns: 0.8fr 0.9fr 1.7fr;
+          border-bottom: 1px solid ${LINE};
+        }
+
+        .about-table-row:last-child {
+          border-bottom: none;
+        }
+
+        .about-table-row div {
+          padding: 18px 20px;
+          border-right: 1px solid ${LINE};
+          font-size: 13px;
+          line-height: 1.55;
+        }
+
+        .about-table-row div:last-child {
+          border-right: none;
+          color: ${MUTED};
+        }
+
+        .about-table-row div:first-child {
+          font-family: ${MONO};
+          font-size: 10px;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 0.16em;
+          color: ${BLUE};
+        }
+
+        .about-table-row div:nth-child(2) {
+          font-family: ${MONO};
+          font-weight: 900;
+          color: ${INK};
+        }
+
+        .about-close {
+          margin: 72px 0 84px;
+          padding: 42px;
+          border-radius: 0;
+          border: 1px solid rgba(65,105,225,0.18);
+          background: linear-gradient(135deg, ${BLUE_SOFT}, #ffffff 58%, ${ORANGE_SOFT});
+        }
+
+        .about-close h2 {
+          margin: 0;
+          max-width: 900px;
+          font-family: ${SERIF};
+          font-size: clamp(36px, 4vw, 60px);
+          line-height: 1.02;
+          letter-spacing: -0.045em;
+          color: ${INK};
+        }
+
+        .about-close p {
+          max-width: 760px;
+          margin: 22px 0 0;
+          font-size: 15px;
+          line-height: 1.85;
+          color: ${TEXT};
+        }
+
+        @media (max-width: 980px) {
+          .about-shell { width: min(100% - 28px, 760px); padding-top: 46px; }
+          .about-hero,
+          .about-section-title,
+          .about-grid-2,
+          .about-layer-grid {
+            grid-template-columns: 1fr;
+          }
+          .about-product-card { min-height: auto; }
+          .about-stat-grid { grid-template-columns: repeat(2, 1fr); }
+          .about-stack { grid-template-columns: 1fr; }
+          .about-stack div { min-height: 58px; border-right: none; border-bottom: 1px solid ${LINE}; }
+          .about-stack div:last-child { border-bottom: none; }
+          .about-table-row { grid-template-columns: 1fr; }
+          .about-table-row div { border-right: none; border-bottom: 1px solid ${LINE}; }
+          .about-table-row div:last-child { border-bottom: none; }
+          .diagram-row { grid-template-columns: 1fr; }
+          .diagram-line { height: 18px; width: 1px; margin: 0 auto; }
+          .diagram-row-offset { padding: 0; }
+        }
+      `}</style>
+
+      <AboutBackground />
+
+      <main className="about-shell">
+        <section className="about-hero">
+          <div className="about-hero-copy">
+            <CaseLabel>Product Case Study</CaseLabel>
+            <h1 className="about-title">
+              NETRA
+              <span className="about-title-mark">Platform</span>
             </h1>
-            <div style={{ width: '36px', height: '2px', background: BLUE, marginBottom: '28px' }} />
-            <p style={{ fontSize: '16px', lineHeight: 1.85, color: TEXT, margin: '0 0 18px 0', maxWidth: '500px' }}>
-              I reverse-engineer how markets actually move — from price itself, not a syllabus — and turn that read into systematic, rules-first strategies. Then I build the software that runs them end to end.
+            <p className="about-lead">
+              I built <strong>NETRA</strong> as an AI-assisted trading research platform for retail decision discipline.
             </p>
-            <p style={{ fontSize: '14px', lineHeight: 1.85, color: MUTED, margin: '0 0 40px 0', maxWidth: '500px' }}>
-              Range is the edge: I do the statistics and the ML, and I ship the production system around it — the doctrine, the multi-agent AI engine, the entire platform you're looking at right now. Headed into quant research and ML engineering, where the work speaks louder than the résumé.
+            <p className="about-sublead">
+              NETRA is the platform. MAYA is the intelligence layer inside the platform. Pinaka is the first trading model hosted by NETRA. This separation matters because the product is not a single strategy page. It is a system for running models, logging decisions, auditing trades, and turning committed outcomes into learning memory.
             </p>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <a href="https://github.com/Siddhanta007" target="_blank" rel="noopener noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '10px 22px', background: NAVY, color: '#fff', fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.18em', textDecoration: 'none' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.85'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+            <div className="about-actions">
+              <a className="about-button" href="mailto:www.srikrishna111@gmail.com">Contact</a>
+              <a className="about-button about-button-secondary" href="https://github.com/Siddhanta007" target="_blank" rel="noopener noreferrer">GitHub</a>
+            </div>
+          </div>
+
+          <aside className="about-product-card">
+            <div>
+              <div className="about-card-head">
+                <h2>Platform first. AI second. Model third.</h2>
+                <span>Live Build</span>
+              </div>
+              <SystemDiagram />
+            </div>
+            <div className="about-stat-grid">
+              {metrics.map(([value, label]) => <MiniStat key={label} value={value} label={label} />)}
+            </div>
+          </aside>
+        </section>
+
+        <section className="about-section">
+          <div className="about-section-title">
+            <h2>Three layers, deliberately separated.</h2>
+            <p>
+              NETRA is designed as a platform that can host more than one trading model. MAYA provides the AI workflow across those models. Pinaka is the first model proving the architecture.
+            </p>
+          </div>
+          <div className="about-layer-grid">
+            {layers.map(layer => (
+              <article className="about-layer" key={layer.name}>
+                <div>
+                  <small>{layer.role}</small>
+                  <h3>{layer.name}</h3>
+                  <p>{layer.body}</p>
+                </div>
+                <div className="about-layer-mark" />
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="about-section">
+          <div className="about-section-title">
+            <h2>What makes this a fintech product problem?</h2>
+            <p>
+              Retail trading tools usually optimize for speed, charts, or signals. NETRA optimizes for decision quality: what the trader saw, what model was active, what the AI reviewed, how the position was managed, and what the outcome teaches the system after commit.
+            </p>
+          </div>
+          <div className="about-grid-2">
+            {buildItems.map((item, index) => (
+              <article
+                className={`about-block ${index === 0 ? 'about-block-blue' : index === 1 ? 'about-block-orange' : index === 2 ? 'about-block-sky' : 'about-block-violet'}`}
+                key={item.label}
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
-                GitHub
-              </a>
-              <a href="mailto:www.srikrishna111@gmail.com"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '10px 22px', border: `1px solid ${NAVY}`, color: NAVY, fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.18em', textDecoration: 'none', background: 'transparent' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = NAVY; (e.currentTarget as HTMLElement).style.color = '#fff'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = NAVY; }}
-              >
-                Contact
-              </a>
-            </div>
-          </div>
-
-          {/* research focus */}
-          <div style={{ background: '#f3f0ff', padding: '40px 36px', border: '1px solid rgba(139,92,246,0.15)' }}>
-            <div style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.32em', color: '#7c3aed', marginBottom: '28px' }}>
-              Research Focus
-            </div>
-            {[
-              { label: 'Statistical Inference',  sub: 'Hypothesis testing, distribution fitting, backtesting edge validity' },
-              { label: 'Time Series Analysis',   sub: 'ARIMA, stationarity testing, regime detection, volatility modelling' },
-              { label: 'ML for Finance',         sub: 'Feature engineering from OHLCV data, classification, sequential models' },
-              { label: 'Multi-Agent AI Systems', sub: 'LangGraph pipelines, RAG over structured knowledge, tool-use agents — built and deployed in production' },
-              { label: 'Systematic Execution',   sub: 'Rules-based doctrine design, position lifecycle management, structured decision frameworks' },
-            ].map((item, i) => (
-              <div key={item.label} style={{ borderTop: `1px solid ${BLUE}22`, padding: '16px 0' }}>
-                <div style={{ fontSize: '12px', fontWeight: 700, color: TEXT, marginBottom: '4px' }}>{item.label}</div>
-                <div style={{ fontSize: '11px', color: MUTED, lineHeight: 1.55 }}>{item.sub}</div>
-              </div>
+                <h3>{item.label}</h3>
+                <p>{item.body}</p>
+              </article>
             ))}
           </div>
-        </div>
+        </section>
 
-        {/* NETRA platform strip */}
-        <div style={{ borderLeft: `3px solid #0d9488`, padding: '20px 32px', marginBottom: '88px', background: '#edfafa' }}>
-          <div style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#0d9488', marginBottom: '8px' }}>NETRA Platform</div>
-          <p style={{ fontSize: '15px', fontWeight: 500, color: TEXT, margin: 0, lineHeight: 1.7, fontFamily: SERIF, fontStyle: 'italic' }}>
-            NETRA is the platform. Each model inside it is a separate doctrine — its own scope, its own rules, its own AI layer. Pinaka is live. Trishul is in design. More follow as the research matures.
-          </p>
-        </div>
-
-
-        {/* ════════════════════════════════════════
-            PINAKA
-        ════════════════════════════════════════ */}
-        {/* Pinaka hero — 2 col */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
-
-          {/* description card */}
-          <div style={{ background: BLUE_BG, padding: '44px 48px', border: `1px solid ${BLUE}22` }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-              <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981' }} />
-              <span style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.2em', color: '#10b981' }}>Live · NSE F&O · Intraday</span>
-            </div>
-            <h2 style={{ fontFamily: SERIF, fontSize: '52px', fontWeight: 700, color: NAVY, letterSpacing: '-0.03em', lineHeight: 0.95, margin: '0 0 20px 0' }}>PINAKA</h2>
-            <div style={{ width: '32px', height: '2px', background: BLUE, marginBottom: '24px' }} />
-            <p style={{ fontSize: '15px', lineHeight: 1.8, color: TEXT, margin: '0 0 16px 0' }}>
-              Entry-level AI-assisted trading assistant for the retail trader who wants to think more clearly — not just trade faster.
-            </p>
-            <p style={{ fontSize: '13px', lineHeight: 1.8, color: MUTED, margin: 0 }}>
-              Not a signal generator. A structured reasoning environment. The AI can analyse and audit. It cannot override the doctrine.
+        <section className="about-section">
+          <div className="about-section-title">
+            <h2>Built end to end.</h2>
+            <p>
+              This is not a UI mockup. I designed the platform surface, the AI workflow, the Pinaka doctrine model, the storage schema, the retrieval layer, and the product mechanics that make it usable for a retail trader under pressure.
             </p>
           </div>
+          <div className="about-stack">
+            {stack.map(item => <div key={item}>{item}</div>)}
+          </div>
+        </section>
 
-          {/* stats — 2x2 on white */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            {[
-              { n: '10', label: 'Gating Phases',   sub: 'Each is a hard gate — nothing skips forward' },
-              { n: '5',  label: 'AI Agents',        sub: 'MAYA: researcher → gate → critic → audit' },
-              { n: '3',  label: 'RAG Collections',  sub: 'Doctrine, trade history, market knowledge' },
-              { n: '∅',  label: 'Zero Overrides',   sub: 'The doctrine is the final word' },
-            ].map(s => (
-              <div key={s.label} style={{ background: BLUE_MID, padding: '28px 24px', border: `1px solid ${BLUE}22` }}>
-                <div style={{ fontFamily: MONO, fontSize: '44px', fontWeight: 900, color: BLUE, letterSpacing: '-0.05em', lineHeight: 1, marginBottom: '8px' }}>{s.n}</div>
-                <div style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: NAVY, marginBottom: '5px' }}>{s.label}</div>
-                <div style={{ fontSize: '11px', color: MUTED, lineHeight: 1.5 }}>{s.sub}</div>
+        <section className="about-section">
+          <div className="about-section-title">
+            <h2>The learning unit is a path.</h2>
+            <p>
+              Inside Pinaka, every committed trade becomes one learning record. NETRA does not just store PnL. It stores the path followed through the model, then connects that path to execution behavior, temporal features, and outcome.
+            </p>
+          </div>
+          <div className="about-table">
+            {pathRows.map(row => (
+              <div className="about-table-row" key={row[0]}>
+                <div>{row[0]}</div>
+                <div>{row[1]}</div>
+                <div>{row[2]}</div>
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
-        {/* Phase pipeline */}
-        <div style={{ marginBottom: '16px' }}>
-          <div style={{ background: BLUE_BG, padding: '18px 40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `2px solid ${BLUE}33` }}>
-            <span style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: BLUE }}>The 10-Phase Pipeline</span>
-            <span style={{ fontSize: '10px', fontWeight: 600, color: MUTED, fontFamily: MONO }}>PINAKA DOCTRINE v3</span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '2px', background: `${BLUE}18` }}>
-            {PHASES.map(p => (
-              <div key={p.n} style={{ background: BLUE_BG, padding: '22px 20px', borderBottom: `2px solid ${BLUE}22` }}>
-                <div style={{ fontFamily: MONO, fontSize: '10px', fontWeight: 900, color: BLUE, marginBottom: '10px' }}>{p.n}</div>
-                <div style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: NAVY, marginBottom: '7px' }}>{p.name}</div>
-                <p style={{ fontSize: '11px', color: MUTED, lineHeight: 1.6, margin: 0 }}>{p.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* MAYA — neon */}
-        <div style={{ marginBottom: '88px' }}>
-          <div style={{ background: NEON_BG, padding: '18px 40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `2px solid ${NEON}66` }}>
-            <span style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#00994d' }}>MAYA — AI Engine</span>
-            <span style={{ fontSize: '10px', fontWeight: 600, color: MUTED, fontFamily: MONO }}>LangGraph · Multi-Agent</span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '2px', background: `${NEON}33` }}>
-            {AGENTS.map(a => (
-              <div key={a.name} style={{ background: NEON_BG, padding: '26px 20px', borderBottom: `2px solid ${NEON}55` }}>
-                <div style={{ fontFamily: MONO, fontSize: '11px', fontWeight: 900, color: '#00994d', marginBottom: '10px' }}>{a.n}</div>
-                <div style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: NAVY, marginBottom: '7px' }}>{a.name}</div>
-                <p style={{ fontSize: '11px', color: MUTED, lineHeight: 1.6, margin: 0 }}>{a.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-
-        {/* ════════════════════════════════════════
-            HORIZON — the model roadmap (Trishul leads)
-        ════════════════════════════════════════ */}
-        <Eyebrow label="On the Horizon" color={MUTED} />
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '88px' }}>
-          {[
-            { n: '02', name: 'TRISHUL',  sub: 'Swing · Positional · Quant',     color: ORANGE, bg: ORANGE_BG,
-              desc: 'A quant-informed positional swing model — same doctrine-first spine as Pinaka, built on statistical edge measurement, regime detection, and institutional-grade risk. In active design as the research deepens.' },
-            { n: '03', name: 'DRISHTI',  sub: 'Market Vision · Options Flow',   color: '#8b5cf6', bg: '#f3f0ff',
-              desc: 'OI analysis, unusual flow detection, and IV regime interpretation. For options traders who want to read the table before placing a bet.' },
-            { n: '04', name: 'CHAKRA',   sub: 'Portfolio · Correlation Engine', color: '#0ea5e9', bg: '#f0f9ff',
-              desc: 'Multi-position correlation management. Prevents concentration risk across simultaneously open trades with shared underlying exposure.' },
-            { n: '···', name: '···',     sub: 'More as research matures',       color: MUTED, bg: '#f8f9fb',
-              desc: 'New models are added when the doctrine behind them is well-defined and testable. Not before. NETRA grows with the research.' },
-          ].map(m => (
-            <div key={m.name} style={{ background: m.bg, padding: '32px 30px', border: `1px solid ${m.color}22`, borderTop: `3px solid ${m.color}` }}>
-              <div style={{ fontFamily: MONO, fontSize: '10px', fontWeight: 700, color: m.color, marginBottom: '8px' }}>{m.n}</div>
-              <div style={{ fontFamily: SERIF, fontSize: '22px', fontWeight: 700, color: NAVY, marginBottom: '6px' }}>{m.name}</div>
-              <div style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.2em', color: m.color, marginBottom: '16px' }}>{m.sub}</div>
-              <p style={{ fontSize: '12px', color: MUTED, lineHeight: 1.75, margin: 0 }}>{m.desc}</p>
-            </div>
-          ))}
-        </div>
-
-
-        {/* QUOTE */}
-        <div style={{ borderLeft: `4px solid ${BLUE}`, padding: '40px 52px', marginBottom: '72px', background: BLUE_BG }}>
-          <div style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.32em', color: BLUE, marginBottom: '20px' }}>Pinaka Doctrine · Core Axiom</div>
-          <p style={{ fontFamily: SERIF, fontSize: '24px', fontWeight: 700, color: NAVY, lineHeight: 1.65, margin: '0 0 24px 0', letterSpacing: '-0.01em', maxWidth: '780px' }}>
-            "The market does not reward the analyst who knows the most. It rewards the one who has the clearest rules for acting correctly under uncertainty — and the discipline to follow them when it matters."
+        <section className="about-close">
+          <h2>I built NETRA to show platform thinking, not just strategy thinking.</h2>
+          <p>
+            NETRA proves the platform, MAYA proves the intelligence layer, and Pinaka proves the first model. Together they show product judgment, frontend execution, backend schema design, AI orchestration, retrieval systems, and trading-domain reasoning.
           </p>
-          <div style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.25em', color: MUTED }}>Sri Krishna · Pinaka Doctrine</div>
-        </div>
+        </section>
+      </main>
 
-      </div>
       <Footer />
     </div>
   );

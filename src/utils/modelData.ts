@@ -55,12 +55,12 @@ export const MODEL_DATA: Record<string, ModelPageData> = {
       },
     ],
     params: [
-      { label: 'Model Type', value: 'AI-Assisted Retail · Institutional Price Action' },
-      { label: 'Protocols', value: 'Strike · Interception' },
-      { label: 'Strike Weapons', value: 'TRSH · BRAM · AGN' },
-      { label: 'Interception Weapons', value: 'AKA · TEER · PNKA · PRTH' },
-      { label: 'AI Engine', value: 'Maya (Multi-modal, RAG-backed)' },
-      { label: 'Status', value: 'Live — v2.0' },
+      { label: 'Model Type', value: 'AI-assisted intraday decision framework' },
+      { label: 'Workflow', value: 'Macro Map · Market Pulse · State Recognition · Command · STS · Mission Control · Audit' },
+      { label: 'Protocols', value: 'Strike continuation · Interception reversal' },
+      { label: 'Weapons', value: 'TRSH · BRAM · AGN · AKA · TEER · PNKA · PRTH' },
+      { label: 'AI Layer', value: 'Maya agents · Vision · Information RAG · Historian · Selector · Critic · Auditor' },
+      { label: 'Release', value: 'First user release' },
     ],
   },
 
