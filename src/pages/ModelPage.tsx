@@ -1,6 +1,6 @@
 // ModelPage — the Pinaka/Trishul trading-model showcase page (spec cards + slides).
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Footer from '../components/Layout/Footer';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
@@ -9,19 +9,20 @@ import { TradeLog } from '../types';
 import { useNetra } from '../context/NetraContext';
 import { API_BASE } from '../utils/constants';
 import { useNetraUtils } from '../hooks/useNetraUtils';
-import { computeStats, fmtDate, fmtPrice, SortIcon } from './modelPage/helpers';
+import { fmtDate, SortIcon } from './modelPage/helpers';
 import { PageGraphics } from '../components/UI/PageGraphics';
+import { buildForkName } from '../utils/forkNaming';
 
 interface Props {
   model: ModelPageData;
   onBack: () => void;
   fetchLogs: (modelId: string) => void;
   resumeSession: (log: TradeLog) => void;
-  forkSession: (log: TradeLog, name: string) => void;
+  forkSession: (log: TradeLog, name: string) => Promise<boolean>;
   onView?: (log: TradeLog) => void;
   initializeMission?: () => void;
   deleteTradeLog?: (id: number) => void;
-  downloadCSV?: () => void;
+  downloadCSV?: (modelId: string) => void;
   isDownloading?: boolean;
 }
 
@@ -31,12 +32,15 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
   const [sortCol, setSortCol] = useState('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [filterOutcome, setFilterOutcome] = useState('all');
-  const [filterWeapon, setFilterWeapon] = useState('all');
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterCommand, setFilterCommand] = useState('all');
-  const [filterPL, setFilterPL] = useState('all');
+  const [nameColumnWidth, setNameColumnWidth] = useState(180);
+  const nameResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const tradeLogs = useSelector((s: RootState) => s.logs.tradeLogs);
+  const modelTradeLogs = useMemo(() => tradeLogs.filter(log => {
+    const storedModel = log.model_id || ((log as unknown as { metadata?: { model_id?: string } }).metadata?.model_id) || 'pinaka';
+    return storedModel.toLowerCase() === model.id.toLowerCase();
+  }), [tradeLogs, model.id]);
   const { session } = useNetra();
   const { getAuthHeaders } = useNetraUtils();
   const username = session?.userName || '';
@@ -77,20 +81,30 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
   useEffect(() => {
     const target = statsUser || username;
     if (!target) return;
+    const controller = new AbortController();
+    let current = true;
     setStatsLoading(true);
     const rangeKey = statsTab === 'today' ? 'week' : statsTab;
     const headers = getAuthHeaders();
     Promise.all([
-      fetch(`${API_BASE}/api/stats/daily?model_id=${model.id}&username=${encodeURIComponent(target)}&date=${statsDate}`, { headers }).then(r => r.json()),
-      fetch(`${API_BASE}/api/stats/range?model_id=${model.id}&username=${encodeURIComponent(target)}&range=${rangeKey}`, { headers }).then(r => r.json()),
+      fetch(`${API_BASE}/api/stats/daily?model_id=${model.id}&username=${encodeURIComponent(target)}&date=${statsDate}`, { headers, signal: controller.signal }).then(r => r.json()),
+      fetch(`${API_BASE}/api/stats/range?model_id=${model.id}&username=${encodeURIComponent(target)}&range=${rangeKey}`, { headers, signal: controller.signal }).then(r => r.json()),
     ]).then(([daily, range]) => {
-      setDailyStats(daily);
-      setRangeStats(range);
-    }).catch(console.error).finally(() => setStatsLoading(false));
+      if (!current) return;
+      if (String(daily?.model_id || '').toLowerCase() === model.id.toLowerCase()) setDailyStats(daily);
+      if (String(range?.model_id || '').toLowerCase() === model.id.toLowerCase()) setRangeStats(range);
+    }).catch(error => {
+      if (error?.name !== 'AbortError') console.error(error);
+    }).finally(() => {
+      if (current) setStatsLoading(false);
+    });
+    return () => {
+      current = false;
+      controller.abort();
+    };
   }, [model.id, statsUser, username, statsDate, statsTab, getAuthHeaders]);
 
   const slide = model.slides[slideIdx];
-  const stats = computeStats(tradeLogs);
   const { color } = model;
 
   const BOX_SHADOW = '0 4px 40px rgba(0,0,0,0.08)';
@@ -106,11 +120,39 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
   const getLogOperator = (log: TradeLog) =>
     log.created_by || log.username || (log.phase1?.username as string | undefined) || '';
 
-  const allWeapons = Array.from(new Set(tradeLogs.map(l => (l.phase3?.manual_weapon || l.weapon || '').toUpperCase()).filter(Boolean))).sort();
-  const allCommands = Array.from(new Set(tradeLogs.map(l => ((l.phase1?.protocol as string) || (l.session_state?.finalCommand as string) || '').toUpperCase()).filter(Boolean))).sort();
-  const hasActiveFilter = filterOutcome !== 'all' || filterWeapon !== 'all' || filterCommand !== 'all' || filterPL !== 'all' || search !== '';
+  const getLogAsset = (log: TradeLog) => {
+    const canonicalTrade = ((log.phase_9 as Record<string, any> | undefined)?.trade_1?.trade || {}) as Record<string, any>;
+    return String(
+      log.assetName
+      || log.phase2?.trading_asset
+      || log.phase2?.asset_ticker
+      || log.phase1?.assetName
+      || log.phase1?.asset_ticker
+      || log.asset
+      || canonicalTrade.thesis_asset
+      || canonicalTrade.execution_instrument
+      || '',
+    );
+  };
 
-  const clearFilters = () => { setFilterOutcome('all'); setFilterWeapon('all'); setFilterCommand('all'); setFilterPL('all'); setSearch(''); };
+  const getSessionCommand = (log: TradeLog) => String(log.phase6?.command || log.session_state?.finalCommand || '—');
+  const getSessionStep = (log: TradeLog) => Number(log.highestStep ?? log.session_state?.highestStep ?? 1);
+  const getSessionProgress = (log: TradeLog) => {
+    const step = getSessionStep(log);
+    return ({ 0: 'Chart Analysis', 1: 'Pre-Session', 2: 'HTF Mapping', 3: 'Market Pulse', 4: 'Decision Path', 5: 'Trading Data', 6: 'Maya Audit' } as Record<number, string>)[step] || `Step ${step}`;
+  };
+  const getBranch = (log: TradeLog) => (log.branch || {}) as Record<string, any>;
+  const getForkPoint = (log: TradeLog) => String(getBranch(log).fork?.label || 'Root Session');
+  const getSessionStatus = (log: TradeLog) => {
+    if (log.auditor || log.phase10) return 'Audited';
+    if (getSessionStep(log) >= 5 || (log.phase9?.length || Object.keys(log.phase_9 || {}).length)) return 'Trading Data';
+    return 'In Progress';
+  };
+
+  const allCommands = Array.from(new Set(modelTradeLogs.map(l => getSessionCommand(l).toUpperCase()).filter(command => command !== '—'))).sort();
+  const hasActiveFilter = filterCommand !== 'all' || search !== '';
+
+  const clearFilters = () => { setFilterCommand('all'); setSearch(''); };
 
   const isWithinSelectedRange = (timestamp?: string) => {
     if (statsTab === 'all') return true;
@@ -128,15 +170,15 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
     return new Date(timestamp) >= from && new Date(timestamp) <= today;
   };
 
-  const filteredLogs = tradeLogs
+  const filteredLogs = modelTradeLogs
     .filter(l => {
       if (search) {
         const s = search.toLowerCase();
-        const asset = (l.phase2?.asset_ticker || l.phase1?.asset_ticker || l.asset || '').toLowerCase();
-        const weapon = (l.phase3?.manual_weapon || l.weapon || '').toLowerCase();
-        const outcome = (l.phase4?.outcome || '').toLowerCase();
+        const asset = getLogAsset(l).toLowerCase();
+        const command = getSessionCommand(l).toLowerCase();
+        const forkPoint = getForkPoint(l).toLowerCase();
         const creator = getLogOperator(l).toLowerCase();
-        if (!asset.includes(s) && !weapon.includes(s) && !outcome.includes(s) && !creator.includes(s) && !fmtDate(l.timestamp).toLowerCase().includes(s) && !(l.name || '').toLowerCase().includes(s)) return false;
+        if (!asset.includes(s) && !command.includes(s) && !forkPoint.includes(s) && !creator.includes(s) && !fmtDate(l.timestamp).toLowerCase().includes(s) && !(l.name || '').toLowerCase().includes(s)) return false;
       }
       const selectedUser = statsUser || username;
       if (selectedUser && selectedUser !== 'all') {
@@ -144,34 +186,21 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
         if (creator !== selectedUser.toLowerCase()) return false;
       }
       if (!isWithinSelectedRange(l.timestamp)) return false;
-      if (filterOutcome !== 'all') {
-        const o = (l.phase4?.outcome || '').toLowerCase();
-        if (filterOutcome === 'open' && o !== '' && o !== 'open') return false;
-        if (filterOutcome === 'open' && o === '' ) { /* keep */ }
-        else if (filterOutcome !== 'open' && o !== filterOutcome) return false;
-      }
-      if (filterWeapon !== 'all') {
-        const w = (l.phase3?.manual_weapon || l.weapon || '').toUpperCase();
-        if (w !== filterWeapon) return false;
-      }
       if (filterCommand !== 'all') {
-        const cmd = ((l.phase1?.protocol as string) || (l.session_state?.finalCommand as string) || '').toUpperCase();
+        const cmd = getSessionCommand(l).toUpperCase();
         if (cmd !== filterCommand) return false;
-      }
-      if (filterPL !== 'all') {
-        const pl = parseFloat(String(l.phase4?.pl ?? ''));
-        if (filterPL === 'profit' && (isNaN(pl) || pl <= 0)) return false;
-        if (filterPL === 'loss'   && (isNaN(pl) || pl >= 0)) return false;
       }
       return true;
     })
     .sort((a, b) => {
       let va: string | number = 0, vb: string | number = 0;
       if (sortCol === 'date') { va = new Date(a.timestamp).getTime(); vb = new Date(b.timestamp).getTime(); }
-      else if (sortCol === 'asset') { va = a.phase2?.asset_ticker || a.phase1?.asset_ticker || a.asset || ''; vb = b.phase2?.asset_ticker || b.phase1?.asset_ticker || b.asset || ''; }
-      else if (sortCol === 'weapon') { va = a.phase3?.manual_weapon || a.weapon || ''; vb = b.phase3?.manual_weapon || b.weapon || ''; }
-      else if (sortCol === 'pl') { va = parseFloat(String(a.phase4?.pl || '0')) || 0; vb = parseFloat(String(b.phase4?.pl || '0')) || 0; }
-      else if (sortCol === 'result') { va = a.phase4?.outcome || ''; vb = b.phase4?.outcome || ''; }
+      else if (sortCol === 'asset') { va = getLogAsset(a); vb = getLogAsset(b); }
+      else if (sortCol === 'command') { va = getSessionCommand(a); vb = getSessionCommand(b); }
+      else if (sortCol === 'progress') { va = getSessionStep(a); vb = getSessionStep(b); }
+      else if (sortCol === 'fork') { va = getForkPoint(a); vb = getForkPoint(b); }
+      else if (sortCol === 'branch') { va = getBranch(a).parent_session_id ? 'Fork' : 'Root'; vb = getBranch(b).parent_session_id ? 'Fork' : 'Root'; }
+      else if (sortCol === 'status') { va = getSessionStatus(a); vb = getSessionStatus(b); }
       else if (sortCol === 'created_by') { va = getLogOperator(a); vb = getLogOperator(b); }
       else if (sortCol === 'name') { va = a.name || ''; vb = b.name || ''; }
       if (va < vb) return sortDir === 'asc' ? -1 : 1;
@@ -179,8 +208,16 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
       return 0;
     });
 
-  const plColor = stats.totalPL > 0 ? '#10b981' : stats.totalPL < 0 ? '#ef4444' : '#0f172a';
-  const cmdEntries = Object.entries(stats.cmdMap);
+  const commandCounts = modelTradeLogs.reduce<Record<string, number>>((counts, log) => {
+    const command = getSessionCommand(log).toUpperCase();
+    if (command !== '—') counts[command] = (counts[command] || 0) + 1;
+    return counts;
+  }, {});
+  const commandEntries = Object.entries(commandCounts).sort((a, b) => b[1] - a[1]);
+  const rootSessionCount = modelTradeLogs.filter(log => !getBranch(log).parent_session_id).length;
+  const forkedSessionCount = modelTradeLogs.length - rootSessionCount;
+  const ledgerGridTemplate = `${nameColumnWidth}px 90px 110px 90px 105px 115px 130px 80px 105px minmax(160px, 1fr)`;
+  const ledgerMinWidth = nameColumnWidth + 1077;
 
   return (
     <div style={{ background: '#eef0f5', flex: 1, position: 'relative', overflowX: 'hidden' }}>
@@ -217,7 +254,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
                   onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
                 >
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  Initialize Mission
+                  Start Trading Session
                 </button>
               )}
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', border: `1px solid ${color}60`, padding: '5px 16px', background: `${color}18` }}>
@@ -226,7 +263,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
               </div>
               {model.status === 'planning' && (
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', border: '1px solid #d9770660', padding: '5px 14px', background: '#ece8df' }}>
-                  <span style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#d97706' }}>Planning Phase</span>
+                  <span style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#d97706' }}>In Development</span>
                 </div>
               )}
               {model.status === 'live' && (
@@ -414,24 +451,23 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
               )
             )}
 
-            {/* Row 2: Command-wise profitability + Top weapon */}
+            {/* Row 2: Session command and branch summary */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: `1px solid ${color}20` }}>
-              {/* Command breakdown */}
               <div style={{ padding: '24px 28px', borderRight: `1px solid ${color}20` }}>
-                <div style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.25em', color, marginBottom: '16px' }}>Command-Wise Profitability</div>
-                {cmdEntries.length === 0 ? (
+                <div style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.25em', color, marginBottom: '16px' }}>Command Distribution</div>
+                {commandEntries.length === 0 ? (
                   <span style={{ fontSize: '11px', color: 'rgba(15,23,42,0.3)', fontStyle: 'italic' }}>No data yet</span>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {cmdEntries.map(([cmd, { wins, total }]) => {
-                      const pct = total > 0 ? Math.round((wins / total) * 100) : 0;
+                    {commandEntries.map(([cmd, total]) => {
+                      const pct = modelTradeLogs.length > 0 ? Math.round((total / modelTradeLogs.length) * 100) : 0;
                       return (
                         <div key={cmd} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <span style={{ fontSize: '10px', fontWeight: 900, letterSpacing: '0.12em', color: '#0f172a', minWidth: '110px', textTransform: 'uppercase' }}>{cmd}</span>
                           <div style={{ flex: 1, height: '4px', background: `${color}20`, borderRadius: '2px', overflow: 'hidden' }}>
                             <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '2px', transition: 'width 600ms ease' }} />
                           </div>
-                          <span style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'monospace', color: '#0f172a', minWidth: '52px', textAlign: 'right' }}>{pct}% <span style={{ fontSize: '9px', color: 'rgba(15,23,42,0.4)', fontWeight: 600 }}>({wins}/{total})</span></span>
+                          <span style={{ fontSize: '11px', fontWeight: 700, fontFamily: 'monospace', color: '#0f172a', minWidth: '72px', textAlign: 'right' }}>{total} <span style={{ fontSize: '9px', color: 'rgba(15,23,42,0.4)', fontWeight: 600 }}>sessions</span></span>
                         </div>
                       );
                     })}
@@ -439,27 +475,12 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
                 )}
               </div>
 
-              {/* Top weapon */}
               <div style={{ padding: '24px 28px' }}>
-                <div style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.25em', color, marginBottom: '16px' }}>Top Performing Weapon</div>
-                {stats.topWeapon ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
-                      <span style={{ fontSize: '36px', fontWeight: 950, color, letterSpacing: '-0.03em', fontFamily: 'monospace' }}>{stats.topWeapon[0]}</span>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#10b981' }}>{stats.topWeapon[1].wins} wins</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ height: '4px', background: `${color}20`, borderRadius: '2px', flex: 1, overflow: 'hidden' }}>
-                        <div style={{ width: `${stats.topWeapon[1].total > 0 ? Math.round((stats.topWeapon[1].wins / stats.topWeapon[1].total) * 100) : 0}%`, height: '100%', background: '#10b981', borderRadius: '2px' }} />
-                      </div>
-                      <span style={{ fontSize: '10px', fontWeight: 700, fontFamily: 'monospace', color: 'rgba(15,23,42,0.6)' }}>
-                        {stats.topWeapon[1].total > 0 ? Math.round((stats.topWeapon[1].wins / stats.topWeapon[1].total) * 100) : 0}% win rate · {stats.topWeapon[1].total} deployed
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <span style={{ fontSize: '11px', color: 'rgba(15,23,42,0.3)', fontStyle: 'italic' }}>No data yet</span>
-                )}
+                <div style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.25em', color, marginBottom: '16px' }}>Branch Summary</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '32px' }}>
+                  <div><span style={{ fontSize: '36px', fontWeight: 950, color, fontFamily: 'monospace' }}>{rootSessionCount}</span><span style={{ marginLeft: '8px', fontSize: '10px', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Roots</span></div>
+                  <div><span style={{ fontSize: '36px', fontWeight: 950, color, fontFamily: 'monospace' }}>{forkedSessionCount}</span><span style={{ marginLeft: '8px', fontSize: '10px', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Forks</span></div>
+                </div>
               </div>
             </div>
 
@@ -485,12 +506,12 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
             {/* Ledger header */}
             <div style={{ padding: '18px 28px', borderBottom: `1px solid ${color}18` }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color, flexShrink: 0 }}>Trade Ledger</span>
+                <span style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color, flexShrink: 0 }}>Terminal Sessions</span>
 
                 {/* Search */}
                 <div style={{ flex: 1, position: 'relative' }}>
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(15,23,42,0.35)" strokeWidth="2" style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-                  <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search asset, weapon, date..." style={{ width: '100%', height: '30px', paddingLeft: '28px', paddingRight: '10px', border: `1px solid ${color}22`, background: `${color}06`, outline: 'none', fontSize: '11px', color: '#0f172a', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                  <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search session, asset, command, fork point..." style={{ width: '100%', height: '30px', paddingLeft: '28px', paddingRight: '10px', border: `1px solid ${color}22`, background: `${color}06`, outline: 'none', fontSize: '11px', color: '#0f172a', fontFamily: 'inherit', boxSizing: 'border-box' }} />
                 </div>
 
                 {/* Filter button + dropdown */}
@@ -509,30 +530,6 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
                       <div style={{ position: 'fixed', inset: 0, zIndex: 10 }} onClick={() => setFilterOpen(false)} />
                       <div style={{ position: 'absolute', top: '36px', right: 0, width: '280px', background: '#ffffff', border: `1px solid ${color}28`, padding: '16px', zIndex: 20, boxShadow: '0 8px 24px rgba(0,0,0,0.10)' }}>
 
-                        {/* Result */}
-                        <div style={{ marginBottom: '14px' }}>
-                          <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.18em', color: 'rgba(15,23,42,0.4)', marginBottom: '8px' }}>Result</div>
-                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                            {(['all', 'win', 'loss', 'open'] as const).map(v => {
-                              const ac = v === 'win' ? '#10b981' : v === 'loss' ? '#ef4444' : color;
-                              const active = filterOutcome === v;
-                              return <button key={v} onClick={() => setFilterOutcome(v)} style={{ height: '24px', padding: '0 10px', fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', border: `1px solid ${active ? ac : 'rgba(15,23,42,0.15)'}`, background: active ? `${ac}15` : 'transparent', color: active ? ac : 'rgba(15,23,42,0.45)', cursor: 'pointer', fontFamily: 'inherit' }}>{v === 'all' ? 'All' : v.charAt(0).toUpperCase() + v.slice(1)}</button>;
-                            })}
-                          </div>
-                        </div>
-
-                        {/* P&L */}
-                        <div style={{ marginBottom: '14px' }}>
-                          <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.18em', color: 'rgba(15,23,42,0.4)', marginBottom: '8px' }}>P&L</div>
-                          <div style={{ display: 'flex', gap: '6px' }}>
-                            {([{ v: 'all', label: 'All' }, { v: 'profit', label: 'Profit' }, { v: 'loss', label: 'Loss' }]).map(({ v, label }) => {
-                              const ac = v === 'profit' ? '#10b981' : v === 'loss' ? '#ef4444' : color;
-                              const active = filterPL === v;
-                              return <button key={v} onClick={() => setFilterPL(v)} style={{ height: '24px', padding: '0 10px', fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', border: `1px solid ${active ? ac : 'rgba(15,23,42,0.15)'}`, background: active ? `${ac}15` : 'transparent', color: active ? ac : 'rgba(15,23,42,0.45)', cursor: 'pointer', fontFamily: 'inherit' }}>{label}</button>;
-                            })}
-                          </div>
-                        </div>
-
                         {/* Command */}
                         {allCommands.length > 0 && (
                           <div style={{ marginBottom: '14px' }}>
@@ -541,19 +538,6 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
                               {(['all', ...allCommands]).map(v => {
                                 const active = filterCommand === v;
                                 return <button key={v} onClick={() => setFilterCommand(v)} style={{ height: '24px', padding: '0 10px', fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', border: `1px solid ${active ? color : 'rgba(15,23,42,0.15)'}`, background: active ? `${color}12` : 'transparent', color: active ? color : 'rgba(15,23,42,0.45)', cursor: 'pointer', fontFamily: 'inherit' }}>{v === 'all' ? 'All' : v}</button>;
-                              })}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Weapon */}
-                        {allWeapons.length > 0 && (
-                          <div style={{ marginBottom: '14px' }}>
-                            <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.18em', color: 'rgba(15,23,42,0.4)', marginBottom: '8px' }}>Weapon</div>
-                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                              {(['all', ...allWeapons]).map(v => {
-                                const active = filterWeapon === v;
-                                return <button key={v} onClick={() => setFilterWeapon(v)} style={{ height: '24px', padding: '0 10px', fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', border: `1px solid ${active ? color : 'rgba(15,23,42,0.15)'}`, background: active ? `${color}12` : 'transparent', color: active ? color : 'rgba(15,23,42,0.45)', cursor: 'pointer', fontFamily: 'inherit' }}>{v === 'all' ? 'All' : v}</button>;
                               })}
                             </div>
                           </div>
@@ -573,10 +557,10 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
                 {/* Download CSV */}
                 {downloadCSV && (
                   <button
-                    onClick={downloadCSV}
-                    disabled={isDownloading || tradeLogs.length === 0}
-                    style={{ height: '30px', padding: '0 12px', display: 'flex', alignItems: 'center', gap: '6px', border: `1px solid ${color}38`, background: `${color}08`, color, cursor: tradeLogs.length === 0 ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', transition: 'all 150ms', opacity: isDownloading || tradeLogs.length === 0 ? 0.45 : 1, flexShrink: 0 }}
-                    onMouseEnter={e => { if (!isDownloading && tradeLogs.length > 0) e.currentTarget.style.background = `${color}18`; }}
+                    onClick={() => downloadCSV(model.id)}
+                    disabled={isDownloading || modelTradeLogs.length === 0}
+                    style={{ height: '30px', padding: '0 12px', display: 'flex', alignItems: 'center', gap: '6px', border: `1px solid ${color}38`, background: `${color}08`, color, cursor: modelTradeLogs.length === 0 ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', transition: 'all 150ms', opacity: isDownloading || modelTradeLogs.length === 0 ? 0.45 : 1, flexShrink: 0 }}
+                    onMouseEnter={e => { if (!isDownloading && modelTradeLogs.length > 0) e.currentTarget.style.background = `${color}18`; }}
                     onMouseLeave={e => { e.currentTarget.style.background = `${color}08`; }}
                   >
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -584,77 +568,102 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
                   </button>
                 )}
 
-                <span style={{ fontSize: '9px', fontWeight: 700, fontFamily: 'monospace', color: 'rgba(15,23,42,0.35)', flexShrink: 0 }}>{filteredLogs.length} scoped / {tradeLogs.length} total</span>
+                <span style={{ fontSize: '9px', fontWeight: 700, fontFamily: 'monospace', color: 'rgba(15,23,42,0.35)', flexShrink: 0 }}>{filteredLogs.length} scoped / {modelTradeLogs.length} total</span>
               </div>
             </div>
 
-            {filteredLogs.length === 0 && tradeLogs.length === 0 ? (
+            {filteredLogs.length === 0 && modelTradeLogs.length === 0 ? (
               <div style={{ padding: '80px 36px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', opacity: 0.3 }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-                <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em' }}>No missions logged yet</span>
+                <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em' }}>No terminal sessions recorded yet</span>
               </div>
             ) : filteredLogs.length === 0 ? (
               <div style={{ padding: '60px 36px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', opacity: 0.4 }}>
-                <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em' }}>No records match the selected scope</span>
+                <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em' }}>No sessions match the selected scope</span>
               </div>
             ) : (
-              <>
+              <div style={{ width: '100%', overflowX: 'auto', overflowY: 'hidden', scrollbarGutter: 'stable' }}>
                 {/* Column headers (sortable) */}
-                <div style={{ display: 'grid', gridTemplateColumns: '120px 90px 110px 90px 90px 90px 90px 75px 70px 1fr', padding: '10px 28px', borderBottom: `1px solid ${color}20`, gap: '8px', background: `${color}08` }}>
+                <div style={{ display: 'grid', gridTemplateColumns: ledgerGridTemplate, minWidth: `${ledgerMinWidth}px`, boxSizing: 'border-box', padding: '10px 28px', borderBottom: `1px solid ${color}20`, gap: '8px', background: `${color}08` }}>
                   {([
                     { key: 'name', label: 'Name' },
                     { key: 'created_by', label: 'Operator' },
                     { key: 'date', label: 'Date' },
                     { key: 'asset', label: 'Asset' },
-                    { key: 'weapon', label: 'Weapon' },
-                    { key: 'entry', label: 'Entry' },
-                    { key: 'exit', label: 'Exit' },
-                    { key: 'pl', label: 'P&L' },
-                    { key: 'result', label: 'Result' },
+                    { key: 'command', label: 'Command' },
+                    { key: 'progress', label: 'Progress' },
+                    { key: 'fork', label: 'Fork Point' },
+                    { key: 'branch', label: 'Branch' },
+                    { key: 'status', label: 'Status' },
                     { key: '', label: '' },
                   ] as { key: string; label: string }[]).map(h => (
                     <button
                       key={h.key || 'actions'}
                       onClick={() => h.key && handleSort(h.key)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', padding: 0, cursor: h.key ? 'pointer' : 'default', textAlign: 'left' }}
+                      style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', padding: 0, cursor: h.key ? 'pointer' : 'default', textAlign: 'left', minWidth: 0 }}
                     >
                       <span style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.18em', color: sortCol === h.key ? color : 'rgba(15,23,42,0.45)' }}>{h.label}</span>
                       {h.key && <SortIcon col={h.key} active={sortCol === h.key} dir={sortDir} />}
+                      {h.key === 'name' && (
+                        <span
+                          role="separator"
+                          aria-label="Resize name column"
+                          aria-orientation="vertical"
+                          title="Drag to resize · Double-click to reset"
+                          onClick={event => event.stopPropagation()}
+                          onDoubleClick={event => { event.stopPropagation(); setNameColumnWidth(180); }}
+                          onPointerDown={event => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            nameResizeRef.current = { startX: event.clientX, startWidth: nameColumnWidth };
+                            event.currentTarget.setPointerCapture(event.pointerId);
+                          }}
+                          onPointerMove={event => {
+                            const resize = nameResizeRef.current;
+                            if (!resize) return;
+                            setNameColumnWidth(Math.max(100, Math.min(520, resize.startWidth + event.clientX - resize.startX)));
+                          }}
+                          onPointerUp={event => {
+                            nameResizeRef.current = null;
+                            if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+                          }}
+                          onPointerCancel={() => { nameResizeRef.current = null; }}
+                          style={{ position: 'absolute', top: '-10px', right: '-5px', bottom: '-10px', width: '10px', cursor: 'col-resize', touchAction: 'none', zIndex: 2 }}
+                        >
+                          <span style={{ position: 'absolute', top: '3px', bottom: '3px', left: '4px', width: '1px', background: `${color}55` }} />
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
 
                 {filteredLogs.map((log, rowIdx) => {
-                  const outcome = log.phase4?.outcome?.toLowerCase() || '';
-                  const isWin = outcome === 'win';
-                  const isLoss = outcome === 'loss';
-                  const accentLine = isWin ? '#10b981' : isLoss ? '#ef4444' : 'transparent';
                   const isExpanded = expandedId === log.id;
-                  const hasSession = !!log.session_state;
-                  const cmd = (log.phase1?.protocol as string) || (log.session_state?.finalCommand as string) || '';
+                  const branch = getBranch(log);
+                  const isFork = !!branch.parent_session_id;
+                  const accentLine = isFork ? color : 'transparent';
+                  const cmd = getSessionCommand(log);
+                  const progress = getSessionProgress(log);
+                  const status = getSessionStatus(log);
 
                   return (
                     <div key={log.id}>
                       {/* Main row */}
                       <div
                         onClick={() => setExpandedId(isExpanded ? null : log.id)}
-                        style={{ display: 'grid', gridTemplateColumns: '120px 90px 110px 90px 90px 90px 90px 75px 70px 1fr', padding: '13px 28px', borderBottom: `1px solid ${color}0e`, gap: '8px', alignItems: 'center', borderLeft: `3px solid ${accentLine}`, background: isExpanded ? `${color}12` : (rowIdx % 2 === 0 ? `${color}0d` : LEDGER_BG), transition: 'background 150ms', cursor: 'pointer' }}
+                        style={{ display: 'grid', gridTemplateColumns: ledgerGridTemplate, minWidth: `${ledgerMinWidth}px`, boxSizing: 'border-box', padding: '13px 28px', borderBottom: `1px solid ${color}0e`, gap: '8px', alignItems: 'center', borderLeft: `3px solid ${accentLine}`, background: isExpanded ? `${color}12` : (rowIdx % 2 === 0 ? `${color}0d` : LEDGER_BG), transition: 'background 150ms', cursor: 'pointer' }}
                         onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = `${color}16`; }}
                         onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = rowIdx % 2 === 0 ? `${color}0d` : LEDGER_BG; }}
                       >
                         <span style={{ fontSize: '10px', fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.name || '—'}>{log.name || '—'}</span>
                         <span style={{ fontSize: '10px', fontWeight: 700, fontFamily: 'monospace', color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={getLogOperator(log) || '—'}>{getLogOperator(log) || '—'}</span>
                         <span style={{ fontSize: '11px', fontWeight: 600, color: '#334155', fontFamily: 'monospace' }}>{fmtDate(log.timestamp)}</span>
-                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#0f172a' }}>{log.phase2?.asset_ticker || log.phase1?.asset_ticker || log.asset || '—'}</span>
-                        <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.06em', color }}>{log.phase3?.manual_weapon || log.weapon || '—'}</span>
-                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#475569', fontFamily: 'monospace' }}>{fmtPrice(log.phase2?.entry_price)}</span>
-                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#475569', fontFamily: 'monospace' }}>{fmtPrice(log.phase4?.exit_price)}</span>
-                        <span style={{ fontSize: '11px', fontWeight: 700, color: isWin ? '#10b981' : isLoss ? '#ef4444' : '#94a3b8', fontFamily: 'monospace' }}>
-                          {log.phase4?.pl !== undefined && log.phase4?.pl !== '' ? String(log.phase4.pl) : '—'}
-                        </span>
-                        <span style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: isWin ? '#10b981' : isLoss ? '#ef4444' : '#94a3b8' }}>
-                          {log.phase4?.outcome || 'Open'}
-                        </span>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={getLogAsset(log) || '—'}>{getLogAsset(log) || '—'}</span>
+                        <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.06em', color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cmd}</span>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={progress}>{progress}</span>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={getForkPoint(log)}>{getForkPoint(log)}</span>
+                        <span style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: isFork ? color : '#64748b' }} title={isFork ? String(branch.parent_session_id) : 'Root session'}>{isFork ? 'Fork' : 'Root'}</span>
+                        <span style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: status === 'Audited' ? '#10b981' : status === 'Trading Data' ? color : '#f59e0b' }}>{status}</span>
 
                         {/* Action buttons */}
                         <div onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
@@ -670,8 +679,8 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
                           {/* Fork */}
                           <button
                             onClick={() => {
-                              const name = window.prompt('Fork name:', `FORK_${log.name || log.id}`) ?? '';
-                              if (name) forkSession(log, name);
+                              const name = window.prompt('Fork name:', buildForkName(log.name || String(log.id), 'Manual Branch')) ?? '';
+                              if (name) void forkSession(log, name);
                             }}
                             style={{ height: '22px', padding: '0 8px', fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', border: `1px solid ${color}38`, background: `${color}10`, color, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 150ms' }}
                             onMouseEnter={e => { e.currentTarget.style.background = `${color}25`; }}
@@ -696,34 +705,32 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
 
                       {/* Expanded detail row */}
                       {isExpanded && (
-                        <div style={{ padding: '16px 28px 20px 31px', borderBottom: `1px solid ${color}15`, background: `${color}05`, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px 24px' }}>
+                        <div style={{ minWidth: `${ledgerMinWidth}px`, boxSizing: 'border-box', padding: '16px 28px 20px 31px', borderBottom: `1px solid ${color}15`, background: `${color}05`, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px 24px' }}>
                           {[
-                            { label: 'Mission Name', value: log.name || '—' },
-                            { label: 'Protocol / Command', value: cmd || '—' },
-                            { label: 'Mission ID', value: String(log.id) },
-                            { label: 'Stop Loss', value: fmtPrice(log.phase2?.stop_loss) },
+                            { label: 'Session Name', value: log.name || '—' },
+                            { label: 'Command', value: cmd },
+                            { label: 'Session ID', value: String(log.id) },
+                            { label: 'Model', value: log.model_id || model.id },
                             { label: 'Operator', value: getLogOperator(log) || '—' },
-                            { label: 'Execution Rating', value: log.phase4?.execution_rating ? `${log.phase4.execution_rating}/10` : '—' },
-                            { label: 'Weapon', value: log.phase3?.manual_weapon || log.weapon || '—' },
-                            { label: 'Target', value: fmtPrice(log.phase2?.take_profit) },
+                            { label: 'Progress', value: progress },
+                            { label: 'Fork Point', value: getForkPoint(log) },
+                            { label: 'Branch Type', value: isFork ? 'Forked Session' : 'Root Session' },
+                            { label: 'Parent Session ID', value: branch.parent_session_id ? String(branch.parent_session_id) : '—' },
+                            { label: 'Root Session ID', value: branch.root_session_id ? String(branch.root_session_id) : String(log.id) },
+                            { label: 'Status', value: status },
+                            { label: 'Created At', value: log.timestamp || '—' },
                           ].map(item => (
                             <div key={item.label}>
                               <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgba(15,23,42,0.45)', marginBottom: '4px' }}>{item.label}</div>
                               <div style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>{item.value}</div>
                             </div>
                           ))}
-                          {log.phase4?.user_thought && (
-                            <div style={{ gridColumn: '1 / -1' }}>
-                              <div style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgba(15,23,42,0.45)', marginBottom: '4px' }}>Operator Notes</div>
-                              <div style={{ fontSize: '12px', fontWeight: 500, color: '#334155', lineHeight: 1.6 }}>{log.phase4.user_thought as string}</div>
-                            </div>
-                          )}
                         </div>
                       )}
                     </div>
                   );
                 })}
-              </>
+              </div>
             )}
           </div>
         </div>

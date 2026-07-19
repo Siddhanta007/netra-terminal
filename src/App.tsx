@@ -2,7 +2,7 @@
 // (P1–P9), the Maya chat sidebar, the trade logger, modals, and the marketing routes.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useLocation, Navigate } from 'react-router-dom';
+import { useLocation, useNavigate, Navigate } from 'react-router-dom';
 
 import { useNetra } from './context/NetraContext';
 import { useSelector, useDispatch } from 'react-redux';
@@ -11,8 +11,9 @@ import { setSelectedModel, setModelConfig } from './store/slices/modelSlice';
 import { setTradeName, setLogSearchTerm, setLogFilterOutcome, setLogSortOrder } from './store/slices/logsSlice';
 import { setSessionInput, setSession } from './store/slices/sessionSlice';
 import { setPrepStep, setActiveView, setIsLoggerOpen } from './store/slices/uiSlice';
-import { setRulesAcknowledged } from './store/slices/analysisSlice';
+import { setRulesAcknowledged, setLiveMarketContext } from './store/slices/analysisSlice';
 import { API_BASE } from './utils/constants';
+import { SAVE_TRADE_CARDS_EVENT, type SaveTradeCardsRequest } from './features/terminal/phases/phase-10-mission-control/missionControl/helpers';
 import Login from './components/Auth/Login';
 import GlobalOverlay from './components/Layout/GlobalOverlay';
 import MayaChatPanel from './components/Layout/MayaChatPanel';
@@ -37,12 +38,14 @@ import ProfilePage from './pages/ProfilePage';
 import AboutPage from './pages/AboutPage';
 import PortfolioPage from './pages/PortfolioPage';
 import ForkButton from './components/UI/ForkButton';
+import { buildForkName } from './utils/forkNaming';
 import { LuxuryShapeSpinner } from './components/UI/LuxuryShapeSpinner';
 import Footer from './components/Layout/Footer';
 import ModelPage from './pages/ModelPage';
 import { MODEL_DATA } from './utils/modelData';
 import { TimeInput, NumInput, PageCorners } from './app/widgets';
 import { TERMINAL_STATS_EVENT, computeTerminalSessionStats, tradeCardsStorageKey } from './features/terminal/phases/phase-10-mission-control/missionControl/helpers';
+import { saveState } from './utils/storage';
 
 const FULL_ACCESS_PAGES = ["home", "pinaka", "trishul", "about", "portfolio"];
 const HEADER_GRADIENTS = [
@@ -118,7 +121,8 @@ export default function NetraTerminal() {
     confirmModal,
     updateTradeLog, deleteTradeLog, fetchLogs,
     resumeSession, forkSession, forkCurrentSession, loadSessionById, resetTerminalState,
-    initializeMission, handleGlobalSave,
+    initializeMission,
+    isInitializingMission,
     saveSession,
     confirmStep, editStep, doResetStep,
     fetchAnalytics,
@@ -133,14 +137,35 @@ export default function NetraTerminal() {
 
   const dispatch = useDispatch();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const [forkModalState, setForkModalState] = useState<{
     isOpen: boolean;
     log?: any;
     phaseNum?: number;
+    forkRecord?: { recordKey: string; label: string; clearSelectionKeys?: string[] };
     defaultName: string;
   }>({ isOpen: false, defaultName: '' });
   const [forkInputName, setForkInputName] = useState('');
+  const [isForkingSession, setIsForkingSession] = useState(false);
+  const forkConfirmButtonRef = useRef<HTMLButtonElement>(null);
+  const [liveCorrelation, setLiveCorrelation] = useState('');
+  const [liveDisplacement, setLiveDisplacement] = useState('');
+  const [liveDisplacementSize, setLiveDisplacementSize] = useState('');
+  const [liveContextNote, setLiveContextNote] = useState('');
+  const [isLiveContextEditing, setIsLiveContextEditing] = useState(true);
+  const [branchTree, setBranchTree] = useState<Array<any>>([]);
+  const [isTreeOpen, setIsTreeOpen] = useState(false);
+
+  const saveAllData = useCallback(async (): Promise<boolean> => {
+    // Mounted trade cards contribute their MongoDB upsert tasks synchronously.
+    // saveSession also stores their complete phase-9 snapshot on the session.
+    const request: SaveTradeCardsRequest = { tasks: [] };
+    window.dispatchEvent(new CustomEvent(SAVE_TRADE_CARDS_EVENT, { detail: request }));
+    const tradeResults = await Promise.all(request.tasks);
+    const sessionSaved = await saveSession({ silent: true });
+    return sessionSaved && tradeResults.every(Boolean);
+  }, [saveSession]);
 
   // Inline rename for asset/trade name in subheader
   const [renamingField, setRenamingField]   = useState<'asset' | 'trade' | null>(null);
@@ -162,14 +187,31 @@ export default function NetraTerminal() {
     setRenamingField(null);
   };
 
-  const handleConfirmFork = () => {
+  const handleConfirmFork = async () => {
+    if (isForkingSession) return;
     const name = forkInputName || forkModalState.defaultName;
-    if (forkModalState.log) {
-      forkSession(forkModalState.log, name);
-    } else if (forkModalState.phaseNum !== undefined) {
-      forkCurrentSession(forkModalState.phaseNum, name);
-    }
+    const request = forkModalState;
     setForkModalState({ ...forkModalState, isOpen: false });
+    setIsForkingSession(true);
+    try {
+      if (request.log) {
+        const forked = await forkSession(request.log, name);
+        if (!forked) setForkModalState({ ...request, isOpen: true });
+      } else if (request.phaseNum !== undefined) {
+        // Materialize the latest Redux snapshot in Mongo before the server
+        // copies the parent. The explicit overlay spans both requests so the
+        // old branch can never flash between save and fork.
+        const saved = await saveSession({ silent: true });
+        if (!saved) {
+          setForkModalState({ ...request, isOpen: true });
+          return;
+        }
+        const forked = await forkCurrentSession(request.phaseNum, name, request.forkRecord);
+        if (!forked) setForkModalState({ ...request, isOpen: true });
+      }
+    } finally {
+      setIsForkingSession(false);
+    }
   };
 
   const toast = useSelector((s: RootState) => s.ui.toast);
@@ -179,6 +221,105 @@ export default function NetraTerminal() {
   const logFilterOutcome = useSelector((s: RootState) => s.logs.logFilterOutcome);
   const logSortOrder = useSelector((s: RootState) => s.logs.logSortOrder);
   const activeEditLog = useSelector((s: RootState) => s.logs.activeEditLog);
+
+  // The URL is the source of truth for top-level pages. This keeps refreshes on
+  // About/Profile/Portfolio and restores the correct model console route.
+  useEffect(() => {
+    const path = location.pathname;
+    const leaveTerminalSession = () => {
+      if (activeSessionId !== null) setActiveSessionId(null);
+      saveState('activeSessionId', null);
+      ctxSetIsLoggerOpen(false);
+      setIsAiPaneOpen(false);
+    };
+
+    if (path === '/about') {
+      leaveTerminalSession();
+      ctxSetActiveView('about');
+    } else if (path === '/portfolio') {
+      leaveTerminalSession();
+      ctxSetActiveView('portfolio');
+    } else if (path === '/profile') {
+      leaveTerminalSession();
+      ctxSetActiveView('profile');
+    } else if (path === '/home') {
+      leaveTerminalSession();
+      ctxSetActiveView('terminal');
+      ctxSetPrepStep(1);
+    } else if (path === '/mission/trishul') {
+      ctxSetActiveView('trishul');
+      setCurrentModel('trishul');
+      if (!activeSessionId) ctxSetPrepStep(5);
+    } else if (path === '/mission/pinaka') {
+      ctxSetActiveView('terminal');
+      setCurrentModel('pinaka');
+      if (!activeSessionId) ctxSetPrepStep(5);
+    }
+  // Route changes are the trigger; context setters deliberately stay out.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const live = (activeEditLog as any)?.phaseLiveContext
+      || (activeEditLog as any)?.market_snapshot?.correlated_market_context
+      || (activeEditLog as any)?.session_state?.liveMarketContext
+      || {};
+    setLiveCorrelation(String(live.correlatedMarketAlignment || ''));
+    setLiveDisplacement(String(live.preSessionDisplacement || ''));
+    setLiveDisplacementSize(String(live.displacementSize || ''));
+    setLiveContextNote(String(live.note || (activeEditLog as any)?.phase2?.note || ''));
+    setIsLiveContextEditing(!live.confirmed_at && !Object.values(live).some(Boolean));
+  }, [activeEditLog, activeSessionId]);
+  useEffect(() => {
+    dispatch(setLiveMarketContext({
+      correlatedMarketAlignment: liveCorrelation,
+      preSessionDisplacement: liveDisplacement,
+      displacementSize: liveDisplacementSize,
+      note: liveContextNote,
+    }));
+  }, [dispatch, liveCorrelation, liveDisplacement, liveDisplacementSize, liveContextNote]);
+  useEffect(() => {
+    if (!activeSessionId) { setBranchTree([]); return; }
+    let cancelled = false;
+    fetch(`${API_BASE}/api/logs/${encodeURIComponent(activeSessionId)}/tree`)
+      .then(response => response.ok ? response.json() : null)
+      .then(data => { if (!cancelled) setBranchTree(Array.isArray(data?.nodes) ? data.nodes : []); })
+      .catch(() => { if (!cancelled) setBranchTree([]); });
+    return () => { cancelled = true; };
+  }, [activeSessionId]);
+
+  const saveLiveMarketContext = async (next?: Partial<{ correlatedMarketAlignment: string; preSessionDisplacement: string; displacementSize: string; note: string }>) => {
+    const saved = await saveSession({
+      silent: true,
+      liveMarketContext: {
+        correlatedMarketAlignment: next?.correlatedMarketAlignment ?? liveCorrelation,
+        preSessionDisplacement: next?.preSessionDisplacement ?? liveDisplacement,
+        displacementSize: next?.displacementSize ?? liveDisplacementSize,
+        note: next?.note ?? liveContextNote,
+        updated_at: new Date().toISOString(),
+        confirmed_at: new Date().toISOString(),
+      },
+    });
+    if (saved) {
+      setIsLiveContextEditing(false);
+      showToast('Correlated market context saved', 'success');
+    } else {
+      showToast('Could not save correlated market context', 'error');
+    }
+    return saved;
+  };
+
+  const editLiveMarketContext = () => {
+    setLiveCorrelation('');
+    setLiveDisplacement('');
+    setLiveDisplacementSize('');
+    setLiveContextNote('');
+    setIsLiveContextEditing(true);
+    void saveSession({ silent: true, liveMarketContext: {
+      correlatedMarketAlignment: '', preSessionDisplacement: '', displacementSize: '', note: '',
+      updated_at: new Date().toISOString(), confirmed_at: null,
+    } });
+  };
   const editFormData = useSelector((s: RootState) => s.logs.editFormData);
   const sessionInput = useSelector((s: RootState) => s.session.sessionInput);
   const rAmount = useSelector((s: RootState) => s.analysis.rAmount);
@@ -195,8 +336,12 @@ export default function NetraTerminal() {
   const selections = useSelector((s: RootState) => s.analysis.selections);
   const notes = useSelector((s: RootState) => s.analysis.notes);
   const finalCommand = useSelector((s: RootState) => s.analysis.finalCommand);
+  const recognitionCheckpoints = useSelector((s: RootState) => s.analysis.recognitionCheckpoints);
   const netraOutput = useSelector((s: RootState) => s.analysis.netraOutput);
   const highestStep = useSelector((s: RootState) => s.analysis.highestStep);
+  const confirmedDecisionNode = recognitionCheckpoints.find(checkpoint => checkpoint.pathConfirmed);
+  const decisionPathConfirmed = !!confirmedDecisionNode;
+  const netraStateConfirmed = !!confirmedDecisionNode?.commandSelected;
   const stepTimestamps = useSelector((s: RootState) => s.analysis.stepTimestamps);
   const interSelections = useSelector((s: RootState) => s.analysis.interSelections);
   const strikeSelections = useSelector((s: RootState) => s.analysis.strikeSelections);
@@ -289,13 +434,14 @@ export default function NetraTerminal() {
     return () => clearInterval(id);
   }, [prepStep]);
 
-  const downloadCSV = () => {
-    if (!tradeLogs || tradeLogs.length === 0) { showToast('No records available for export', 'error'); return; }
+  const downloadCSV = (modelId = currentModel || 'pinaka') => {
+    const scopedLogs = (tradeLogs || []).filter(log => String(log.model_id || 'pinaka').toLowerCase() === modelId.toLowerCase());
+    if (scopedLogs.length === 0) { showToast('No records available for export', 'error'); return; }
     setIsDownloading(true);
     try {
       const headers = ['MISSION_ID', 'TIMESTAMP', 'ASSET', 'MISSION_NAME', 'OPERATOR', 'PROTOCOL', 'WEAPON', 'BIAS_SELECT', 'AUCTION_SELECT', 'LIQUIDITY_SELECT', 'BEHAVIOUR_SELECT', 'ENTRY_PRICE', 'STOP_LOSS', 'EXIT_PRICE', 'OUTCOME', 'NET_PL', 'OPERATOR_THOUGHT'];
-      const rows = tradeLogs.map(log => [
-        log.id, new Date(log.timestamp).toISOString(), log.phase1?.asset_ticker || '—', log.name || 'UNNAMED_MISSION', log.created_by || log.username || 'ANONYMOUS', log.phase1?.protocol || '—', log.weapon || '—',
+      const rows = scopedLogs.map(log => [
+        log.id, new Date(log.timestamp).toISOString(), log.assetName || log.phase2?.trading_asset || log.phase2?.asset_ticker || log.phase1?.asset_ticker || log.asset || '—', log.name || 'UNNAMED_MISSION', log.created_by || log.username || 'ANONYMOUS', log.phase1?.protocol || '—', log.weapon || '—',
         Object.values(log.phase1?.preSessionContext || log.phase1?.realBias || {}).join('|'), Object.values(log.phase1?.htfStructure || {}).join('|'), Object.values(log.phase1?.marketPulse || {}).join('|'), Object.values(log.phase1?.liquidityContext || {}).join('|'),
         log.phase2?.entry_price || '0', log.phase2?.stop_loss || '0', log.phase4?.exit_price || '0', log.phase4?.outcome || 'OPEN', log.phase4?.pl || '0', (String(log.phase4?.user_thought || '')).replace(/"/g, '""'),
       ]);
@@ -303,7 +449,7 @@ export default function NetraTerminal() {
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.setAttribute('href', url); link.setAttribute('download', `NETRA_LEDGER_EXPORT_${Date.now()}.csv`); link.style.visibility = 'hidden';
+      link.setAttribute('href', url); link.setAttribute('download', `${modelId.toUpperCase()}_LEDGER_EXPORT_${Date.now()}.csv`); link.style.visibility = 'hidden';
       document.body.appendChild(link); link.click(); document.body.removeChild(link);
       showToast('Tactical Ledger Exported Successfully');
     } catch { showToast('Export Protocol Failure', 'error'); }
@@ -376,7 +522,7 @@ export default function NetraTerminal() {
           </button>
 
           {/* Logo */}
-          <button onClick={() => { if (session) { ctxSetPrepStep(1); setActiveSessionId(null); } }} style={{ background: 'none', border: 'none', padding: '0 4px', cursor: session ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button onClick={() => { if (session) { ctxSetPrepStep(1); setActiveSessionId(null); saveState('activeSessionId', null); navigate('/home'); } }} style={{ background: 'none', border: 'none', padding: '0 4px', cursor: session ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <h1 style={{ fontSize: '16px', fontWeight: 950, letterSpacing: '0.14em', color: darkMode ? '#ffffff' : '#0f172a', lineHeight: 1, margin: 0, textTransform: 'uppercase', transition: 'color 300ms' }}>NETRA</h1>
           </button>
 
@@ -389,26 +535,26 @@ export default function NetraTerminal() {
               const navItems = [];
 
               if (allowedPages.includes('home')) {
-                navItems.push({ label: 'Home', active: prepStep === 1 && activeView !== 'profile' && activeView !== 'about' && activeView !== 'admin' && activeView !== 'portfolio', action: () => { ctxSetPrepStep(1); ctxSetActiveView('terminal'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } });
+                navItems.push({ label: 'Home', active: prepStep === 1 && activeView !== 'profile' && activeView !== 'about' && activeView !== 'admin' && activeView !== 'portfolio', action: () => { ctxSetPrepStep(1); ctxSetActiveView('terminal'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); navigate('/home'); } });
               }
               if (allowedPages.includes('pinaka')) {
-                navItems.push({ label: 'Pinaka', active: prepStep === 5 && currentModel === 'pinaka' && activeView !== 'profile' && activeView !== 'about' && activeView !== 'admin' && activeView !== 'portfolio', action: () => { setCurrentModel('pinaka'); setActiveSessionId(null); ctxSetPrepStep(5); ctxSetActiveView('terminal'); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } });
+                navItems.push({ label: 'Pinaka', active: prepStep === 5 && currentModel === 'pinaka' && activeView !== 'profile' && activeView !== 'about' && activeView !== 'admin' && activeView !== 'portfolio', action: () => { setCurrentModel('pinaka'); setActiveSessionId(null); ctxSetPrepStep(5); ctxSetActiveView('terminal'); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); navigate('/mission/pinaka'); } });
               }
               if (allowedPages.includes('trishul')) {
-                navItems.push({ label: 'Trishul', active: prepStep === 5 && currentModel === 'trishul' && activeView !== 'profile' && activeView !== 'about' && activeView !== 'admin' && activeView !== 'portfolio', action: () => { setCurrentModel('trishul'); setActiveSessionId(null); ctxSetPrepStep(5); ctxSetActiveView('trishul'); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } });
+                navItems.push({ label: 'Trishul', active: prepStep === 5 && currentModel === 'trishul' && activeView !== 'profile' && activeView !== 'about' && activeView !== 'admin' && activeView !== 'portfolio', action: () => { setCurrentModel('trishul'); setActiveSessionId(null); ctxSetPrepStep(5); ctxSetActiveView('trishul'); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); navigate('/mission/trishul'); } });
               }
               if (allowedPages.includes('portfolio')) {
                 navItems.push({
                   label: 'Portfolio',
                   active: activeView === 'portfolio',
-                  action: () => { ctxSetActiveView('portfolio'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); }
+                  action: () => { ctxSetActiveView('portfolio'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); navigate('/portfolio'); }
                 });
               }
 
               navItems.push({
                 label: 'About',
                 active: activeView === 'about',
-                action: () => { ctxSetActiveView('about'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); }
+                action: () => { ctxSetActiveView('about'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); navigate('/about'); }
               });
 
 
@@ -469,7 +615,7 @@ export default function NetraTerminal() {
                   </div>
                   <div style={{ padding: '6px' }}>
                     <button
-                      onClick={() => { ctxSetActiveView('profile'); setIsProfileOpen(false); }}
+                      onClick={() => { ctxSetActiveView('profile'); setIsProfileOpen(false); navigate('/profile'); }}
                       style={{ width: '100%', padding: '10px 14px', border: 'none', background: 'none', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 150ms' }}
                       onMouseEnter={e => { e.currentTarget.style.background = darkMode ? 'rgba(65,105,225,0.12)' : 'rgba(65,105,225,0.06)'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
@@ -506,142 +652,58 @@ export default function NetraTerminal() {
                     <div style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '0 14px', fontSize: '8px', fontWeight: 900, letterSpacing: '0.2em', color: '#ffffff', textTransform: 'uppercase', fontFamily: 'JetBrains Mono, monospace' }}>LEDGER</div>
                   </div>
                 </div>
-
-                {(() => {
-                  // ── Fork-tree helpers ──────────────────────────────────
-                  const sessId = (sessionRegistry.activeId ?? activeSessionId ?? '') as string;
-                  const sessRec = sessionRegistry.sessions.find(s => s.id === sessId);
-                  const rootId  = (sessRec?.parentId ?? sessId) as string;
-                  const allForks = sessionRegistry.sessions.filter(s => s.parentId === rootId);
-                  const rootRec  = sessionRegistry.sessions.find(s => s.id === rootId);
-
-                  const dotClr = (n: { status: string; pnl: string | null }): string =>
-                    n.status === 'active' ? '#00e5a0' : n.status === 'open' ? '#f59e0b' :
-                    n.pnl && parseFloat(n.pnl) >= 0 ? '#8cc6e8' : '#ef4444';
-
-                  // Renders the inline branch graph right after a given phase step
-                  const forkVizAt = (step: number): React.ReactNode => {
-                    const atStep = allForks.filter(b => b.forkPoint === step);
-                    if (atStep.length === 0) return null;
-                    const nodes = rootRec ? [rootRec, ...atStep] : atStep;
-                    return (
-                      <div style={{ margin: '6px 0 4px 6px' }}>
-                        {nodes.map((n, idx) => {
-                          const isCurrent = n.id === sessId;
-                          const isLast    = idx === nodes.length - 1;
-                          const dc        = dotClr(n);
-                          return (
-                            <div key={n.id} style={{ display: 'flex', alignItems: 'stretch', marginBottom: isLast ? 0 : '2px' }}>
-                              {/* Tree connector glyphs */}
-                              <div style={{ width: '18px', flexShrink: 0, position: 'relative', userSelect: 'none' }}>
-                                {/* vertical trunk line above mid-point */}
-                                {idx > 0 && <div style={{ position: 'absolute', top: 0, bottom: '50%', left: '6px', width: '1px', background: 'rgba(255,255,255,0.1)' }} />}
-                                {/* vertical trunk line below mid-point (only if not last) */}
-                                {!isLast && <div style={{ position: 'absolute', top: '50%', bottom: 0, left: '6px', width: '1px', background: 'rgba(255,255,255,0.1)' }} />}
-                                {/* horizontal branch arm */}
-                                <div style={{ position: 'absolute', top: '50%', left: '6px', width: '10px', height: '1px', background: 'rgba(255,255,255,0.1)' }} />
-                              </div>
-                              {/* Node row */}
-                              <div
-                                onClick={() => !isCurrent && loadSessionById(n.id)}
-                                style={{
-                                  flex: 1, display: 'flex', alignItems: 'center', gap: '7px',
-                                  padding: '4px 8px',
-                                  cursor: isCurrent ? 'default' : 'pointer',
-                                  background: isCurrent ? 'rgba(65,105,225,0.1)' : 'transparent',
-                                  borderLeft: isCurrent ? `2px solid #4169E1` : '2px solid rgba(255,255,255,0.06)',
-                                  transition: 'background 150ms',
-                                }}
-                                onMouseEnter={e => { if (!isCurrent) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
-                                onMouseLeave={e => { if (!isCurrent) e.currentTarget.style.background = 'transparent'; }}
-                              >
-                                <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: dc, flexShrink: 0, boxShadow: isCurrent ? `0 0 5px ${dc}80` : 'none' }} />
-                                <span style={{ fontSize: '9px', fontWeight: 700, color: isCurrent ? '#fff' : 'var(--text-3)', fontFamily: 'monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {n.name || n.id}
-                                </span>
-                                {n.weapon && <span style={{ fontSize: '7px', fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.1em', flexShrink: 0, textTransform: 'uppercase' }}>{n.weapon}</span>}
-                                {n.pnl && <span style={{ fontSize: '9px', fontWeight: 900, fontFamily: 'monospace', color: parseFloat(n.pnl) >= 0 ? '#8cc6e8' : '#ef4444', flexShrink: 0 }}>{parseFloat(n.pnl) >= 0 ? '+' : ''}{n.pnl}</span>}
-                              </div>
-                            </div>
-                          );
-                        })}
+                <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '8px', fontWeight: 900, letterSpacing: '0.16em', color: '#38bdf8', textTransform: 'uppercase', marginBottom: '8px' }}>Correlated Market Context</div>
+                  {([
+                    ['correlatedMarketAlignment', 'Correlated Market Alignment', liveCorrelation, setLiveCorrelation],
+                    ['preSessionDisplacement', 'Pre-Session Displacement', liveDisplacement, setLiveDisplacement],
+                    ['displacementSize', 'Displacement Size', liveDisplacementSize, setLiveDisplacementSize],
+                  ] as const).map(([id, label, value, setValue]) => (
+                    <div key={id} style={{ marginTop: id === 'correlatedMarketAlignment' ? 0 : '12px' }}>
+                      <div style={{ fontSize: '8px', fontWeight: 800, color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '6px' }}>{label}</div>
+                      <div className="precision-selector flex flex-wrap gap-1">
+                        {(sysData?.preSessionContext?.dimensions || []).find(d => d.id === id)?.options?.map(option => (
+                          <button key={option} type="button" disabled={!isLiveContextEditing} onClick={() => {
+                            const next = value === option ? '' : option;
+                            setValue(next);
+                          }} className={`precision-opt ${value === option ? 'selected' : ''}`} style={{ padding: '4px 7px', fontSize: '8px', opacity: isLiveContextEditing ? 1 : 0.5, cursor: isLiveContextEditing ? 'pointer' : 'not-allowed' }}>{option}</button>
+                        ))}
                       </div>
-                    );
-                  };
-
-                  // ── Ledger body ────────────────────────────────────────
-                  return (
-                    <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-1">
-                      {/* Phases 00–03 with inline fork visualization after each */}
-                      {([
-                        { phase: '00 · PRE-SESSION CONTEXT', color: '#4169E1', val: activeEditLog ? (activeEditLog.phase1?.preSessionContext || activeEditLog.phase1?.realBias) : selections.preSessionContext, step: 1 },
-                        { phase: '01 · HTF STRUCTURE',     color: '#6366f1', val: activeEditLog ? activeEditLog.phase1?.htfStructure    : selections.htfStructure,     step: 2 },
-                        { phase: '02 · MARKET PULSE',      color: '#0ea5e9', val: activeEditLog ? activeEditLog.phase1?.marketPulse     : selections.marketPulse,      step: 3 },
-                        { phase: '03 · LIQUIDITY CONTEXT', color: '#f59e0b', val: activeEditLog ? activeEditLog.phase1?.liquidityContext : selections.liquidityContext, step: 4 },
-                      ] as Array<{ phase: string; color: string; val: Record<string, string> | undefined; step: number }>).map((p, i) => {
-                        const entries = p.val ? Object.entries(p.val).filter(([, v]) => !!v) : [];
-                        return (
-                          <React.Fragment key={i}>
-                            {forkVizAt(p.step)}
-                            <div>
-                              <div style={{ fontSize: '8px', fontWeight: 900, color: p.color, letterSpacing: '0.2em', textTransform: 'uppercase', padding: '10px 4px 4px 4px', opacity: 0.9 }}>{p.phase}</div>
-                              {entries.length > 0 ? entries.map(([key, value]) => (
-                                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '3px 8px', borderLeft: `2px solid ${p.color}30` }}>
-                                  <span style={{ fontSize: '9px', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                                  <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--text-1)', fontFamily: 'monospace' }}>{String(value)}</span>
-                                </div>
-                              )) : (
-                                <div style={{ padding: '3px 8px', borderLeft: `2px solid ${p.color}20`, fontSize: '9px', color: 'var(--text-4)', fontStyle: 'italic', opacity: 0.5 }}>pending</div>
-                              )}
-                            </div>
-                          </React.Fragment>
-                        );
-                      })}
-
-                      {forkVizAt(5)}
-                      {/* 04 · COMMAND */}
-                      <div style={{ marginTop: '8px' }}>
-                        <div style={{ fontSize: '8px', fontWeight: 900, letterSpacing: '0.2em', textTransform: 'uppercase', padding: '10px 4px 4px 4px', color: finalCommand === 'STRIKE' ? '#ffd700' : finalCommand === 'INTERCEPTION' ? '#38bdf8' : finalCommand === 'SATURATION' ? '#f97316' : finalCommand === 'NO ENGAGEMENT' ? '#ef4444' : '#ffffff', opacity: 0.9 }}>04 · COMMAND</div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '3px 8px', borderLeft: ' 2px solid rgba(255,255,255,0.12)' }}>
-                          <span style={{ fontSize: '9px', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Protocol</span>
-                          <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--text-1)', fontFamily: 'monospace' }}>{finalCommand || '—'}</span>
-                        </div>
-                      </div>
-
-                      {/* STS · EXECUTION TREE */}
-                      {finalCommand && finalCommand !== 'NO ENGAGEMENT' && (() => {
-                        const stsEntries = Object.entries(
-                          finalCommand === 'INTERCEPTION' ? interSelections : finalCommand === 'STRIKE' ? strikeSelections : {}
-                        ).filter(([, v]) => !!v);
-                        const stsColor = finalCommand === 'STRIKE' ? '#ffd700' : finalCommand === 'INTERCEPTION' ? '#38bdf8' : '#f97316';
-                        return (
-                          <div>
-                            <div style={{ fontSize: '8px', fontWeight: 900, color: stsColor, letterSpacing: '0.2em', textTransform: 'uppercase', padding: '10px 4px 4px 4px', opacity: 0.9 }}>STS · EXECUTION TREE</div>
-                            {stsEntries.length > 0 ? stsEntries.map(([key, value]) => (
-                              <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '3px 8px', borderLeft: `2px solid ${stsColor}30` }}>
-                                <span style={{ fontSize: '9px', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                                <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--text-1)', fontFamily: 'monospace' }}>{String(value)}</span>
-                              </div>
-                            )) : (
-                              <div style={{ padding: '3px 8px', borderLeft: `2px solid ${stsColor}20`, fontSize: '9px', color: 'var(--text-4)', fontStyle: 'italic', opacity: 0.5 }}>pending</div>
-                            )}
-                          </div>
-                        );
-                      })()}
-
-                      {forkVizAt(6)}
-                      {/* 05 · WEAPON */}
-                      <div style={{ marginTop: '8px', paddingBottom: '20px' }}>
-                        <div style={{ fontSize: '8px', fontWeight: 900, color: '#4169E1', letterSpacing: '0.2em', textTransform: 'uppercase', padding: '10px 4px 4px 4px', opacity: 0.9 }}>05 · WEAPON</div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '3px 8px', borderLeft: '2px solid rgba(16,185,129,0.3)' }}>
-                          <span style={{ fontSize: '9px', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Identity</span>
-                          <span style={{ fontSize: '10px', fontWeight: 900, color: '#4169E1', fontFamily: 'monospace' }}>{selectedWeaponId || activeEditLog?.weapon || '—'}</span>
-                        </div>
-                      </div>
-                      {forkVizAt(7)}
                     </div>
-                  );
-                })()}
+                  ))}
+                  <div style={{ marginTop: '12px' }}>
+                    <div style={{ fontSize: '8px', fontWeight: 800, color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '6px' }}>Notes</div>
+                    <textarea
+                      value={liveContextNote}
+                      disabled={!isLiveContextEditing}
+                      onChange={event => setLiveContextNote(event.target.value)}
+                      placeholder="Live correlation / displacement observation…"
+                      rows={2}
+                      className="w-full bg-transparent outline-none resize-none text-[11px] text-[var(--text-2)] placeholder:text-[var(--text-4)] leading-relaxed min-h-[44px]"
+                      style={{ opacity: isLiveContextEditing ? 1 : 0.6 }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+                    <button type="button" disabled={isLiveContextEditing} onClick={editLiveMarketContext} className="btn-edit w-20" style={{ fontSize: '8px' }}>Edit</button>
+                    <button type="button" disabled={!isLiveContextEditing} onClick={() => {
+                      setLiveCorrelation('');
+                      setLiveDisplacement('');
+                      setLiveDisplacementSize('');
+                      setLiveContextNote('');
+                    }} className="btn-reset w-20" style={{ fontSize: '8px' }}>Reset</button>
+                    <button type="button" disabled={!isLiveContextEditing} onClick={() => void saveLiveMarketContext()} className="btn-confirm flex-1" style={{ fontSize: '8px' }}>Confirm Context</button>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
+                  <div style={{ fontSize: '8px', fontWeight: 900, color: '#38bdf8', letterSpacing: '0.18em', textTransform: 'uppercase', padding: '0 4px 10px' }}>Terminal Statistics</div>
+                  {[
+                    ['Trades', terminalStats.total, '#ffffff'], ['Active', terminalStats.active, '#f59e0b'], ['Closed', terminalStats.closed, '#ffffff'],
+                    ['Wins', terminalStats.wins, '#8cc6e8'], ['Losses', terminalStats.losses, '#ef4444'],
+                    ['Realised', `₹${Math.round(terminalStats.realisedPnl).toLocaleString('en-IN')}`, terminalStats.realisedPnl >= 0 ? '#8cc6e8' : '#ef4444'],
+                    ['Exposure', `₹${Math.round(terminalStats.openExposure).toLocaleString('en-IN')}`, '#ffffff'], ['Cost', `₹${Math.round(terminalStats.brokerage).toLocaleString('en-IN')}`, '#ffffff'],
+                  ].map(([label, value, color]) => <div key={String(label)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 8px', borderBottom: '1px solid var(--border)' }}><span style={{ fontSize: '8px', color: 'var(--text-4)', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{label}</span><span style={{ fontSize: '11px', color, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace' }}>{value}</span></div>)}
+                </div>
               </div>
             </aside>
           )}
@@ -688,7 +750,7 @@ export default function NetraTerminal() {
               );
 
               return (
-                <div style={{ height: '42px', background: darkMode ? '#090c14' : '#f4f6fa', borderBottom: `1px solid ${bdr}`, display: 'flex', alignItems: 'center', zIndex: 90, flexShrink: 0, gap: 0 }} className="desktop-only">
+                <div data-loading-region="header" style={{ height: '42px', background: darkMode ? '#090c14' : '#f4f6fa', borderBottom: `1px solid ${bdr}`, display: 'flex', alignItems: 'center', zIndex: 90, flexShrink: 0, gap: 0 }} className="desktop-only">
 
                   {/* LEFT: ledger toggle + identity */}
                   <div style={{ display: 'flex', alignItems: 'center', height: '100%', borderRight: `1px solid ${bdr}`, flexShrink: 0 }}>
@@ -726,76 +788,8 @@ export default function NetraTerminal() {
                     </div>
                   </div>
 
-                  {/* CENTRE: terminal session stats in terminal, page stats elsewhere */}
-                  <div style={{ display: 'flex', alignItems: 'center', flex: 1, overflowX: 'auto', padding: '0 20px', gap: 0, scrollbarWidth: 'none' } as React.CSSProperties}>
-                    {isTerminalView ? (
-                      <>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '16px' }}>
-                          <span style={lbl}>Trades</span>
-                          <span style={val}>{terminalStats.total}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '16px' }}>
-                          <span style={lbl}>Active</span>
-                          <span style={{ ...val, color: '#f59e0b' }}>{terminalStats.active}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '16px' }}>
-                          <span style={lbl}>Closed</span>
-                          <span style={val}>{terminalStats.closed}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '16px' }}>
-                          <span style={{ ...val, color: '#8cc6e8' }}>{terminalStats.wins}</span>
-                          <span style={lbl}>W</span>
-                          <span style={{ ...lbl }}>/</span>
-                          <span style={{ ...val, color: '#ef4444' }}>{terminalStats.losses}</span>
-                          <span style={lbl}>L</span>
-                        </div>
-                        {vbar}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '16px' }}>
-                          <span style={lbl}>Realised</span>
-                          <span style={{ ...val, color: terminalStats.realisedPnl === 0 ? txt : terminalStats.realisedPnl > 0 ? '#8cc6e8' : '#ef4444' }}>
-                            {`${terminalStats.realisedPnl >= 0 ? '+' : ''}₹${Math.round(terminalStats.realisedPnl).toLocaleString('en-IN')}`}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '16px' }}>
-                          <span style={lbl}>Exposure</span>
-                          <span style={val}>{`₹${Math.round(terminalStats.openExposure).toLocaleString('en-IN')}`}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={lbl}>Cost</span>
-                          <span style={val}>{`₹${Math.round(terminalStats.brokerage).toLocaleString('en-IN')}`}</span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '16px' }}>
-                          <span style={lbl}>Sessions</span>
-                          <span style={val}>{todayStats?.total ?? '—'}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '16px' }}>
-                          <span style={lbl}>Open</span>
-                          <span style={{ ...val, color: '#f59e0b' }}>{todayStats?.open ?? '—'}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginRight: '16px' }}>
-                          <span style={{ ...val, color: '#8cc6e8' }}>{todayStats?.wins ?? '—'}</span>
-                          <span style={lbl}>W</span>
-                          <span style={{ ...lbl }}>/</span>
-                          <span style={{ ...val, color: '#ef4444' }}>{todayStats?.losses ?? '—'}</span>
-                          <span style={lbl}>L</span>
-                        </div>
-                        {vbar}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '16px' }}>
-                          <span style={lbl}>Win%</span>
-                          <span style={val}>{todayStats?.win_rate != null ? `${todayStats.win_rate}%` : '—'}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={lbl}>P&amp;L</span>
-                          <span style={{ ...val, color: todayStats?.total_pnl == null ? txt : todayStats.total_pnl >= 0 ? '#8cc6e8' : '#ef4444' }}>
-                            {todayStats?.total_pnl != null ? `${todayStats.total_pnl >= 0 ? '+' : ''}₹${todayStats.total_pnl.toLocaleString('en-IN')}` : '—'}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  <div style={{ flex: 1 }} />
+                  <button type="button" onClick={() => setIsTreeOpen(true)} style={{ height: '26px', marginRight: '12px', padding: '0 11px', border: '1px solid rgba(56,189,248,0.42)', background: 'rgba(56,189,248,0.08)', color: '#38bdf8', fontSize: '8px', fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', cursor: 'pointer', fontFamily: MONO }}>Tree</button>
 
                   {/* RIGHT: action buttons */}
                   {prepStep >= 2 && (activeView === 'terminal' || activeView === 'trishul') && (
@@ -807,13 +801,19 @@ export default function NetraTerminal() {
                       )}
                       {subBtn('Save',
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
-                        () => { handleGlobalSave(); showToast('Session Saved', 'success'); },
+                        () => {
+                          void saveAllData().then(saved => {
+                            if (saved) showToast('Session and trades saved to MongoDB', 'success');
+                            else showToast('Save incomplete — session or trade write failed', 'error');
+                          });
+                        },
                         '#60a5fa', isAiLoading
                       )}
                       {subBtn('Cut',
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
                         () => {
-                          handleGlobalSave();
+                          void saveAllData().then(saved => {
+                            if (!saved) return;
                           setActiveSessionId(null);
                           ctxSetPrepStep(5);
                           ctxSetActiveView(currentModel === 'trishul' ? 'trishul' : 'terminal');
@@ -823,6 +823,7 @@ export default function NetraTerminal() {
                           ctxSetIsLoggerOpen(false);
                           setIsAiPaneOpen(false);
                           showToast('Session Saved & Returned to Model Console', 'success');
+                          });
                         },
                         '#ef4444'
                       )}
@@ -832,6 +833,43 @@ export default function NetraTerminal() {
                 </div>
               );
             })()}
+
+            {isTreeOpen && (
+              <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: '#090c14', color: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <div style={{ height: '56px', display: 'flex', alignItems: 'center', padding: '0 22px', borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+                  <div>
+                    <div style={{ fontSize: '9px', color: '#38bdf8', fontWeight: 900, letterSpacing: '0.2em', textTransform: 'uppercase' }}>Terminal Tree</div>
+                    <div style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.06em', marginTop: '3px' }}>Market-branch timeline</div>
+                  </div>
+                  <div style={{ flex: 1 }} />
+                  <button type="button" onClick={() => setIsTreeOpen(false)} style={{ height: '28px', padding: '0 12px', border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: '#fff', fontSize: '8px', fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', cursor: 'pointer' }}>Cut · Terminal</button>
+                </div>
+                <div className="custom-scrollbar" style={{ flex: 1, overflow: 'auto', padding: '34px clamp(24px, 8vw, 140px)' }}>
+                  {(() => {
+                    const children = new Map<string, any[]>();
+                    branchTree.forEach(node => {
+                      const parentId = node.branch?.parent_session_id as string | undefined;
+                      if (parentId) children.set(parentId, [...(children.get(parentId) || []), node]);
+                    });
+                    const roots = branchTree.filter(node => !node.branch?.parent_session_id);
+                    const nodeView = (node: any, depth = 0): React.ReactNode => {
+                      const isActive = String(node.id) === String(activeSessionId);
+                      const fork = node.branch?.fork;
+                      return <div key={node.id} style={{ marginLeft: depth ? '32px' : 0, position: 'relative' }}>
+                        {depth > 0 && <div style={{ position: 'absolute', left: '-18px', top: 0, height: '25px', width: '18px', borderLeft: '1px solid rgba(56,189,248,0.35)', borderBottom: '1px solid rgba(56,189,248,0.35)' }} />}
+                        <button type="button" onClick={() => { if (!isActive) void loadSessionById(String(node.id)); setIsTreeOpen(false); }} style={{ width: 'min(100%, 660px)', margin: '7px 0', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left', border: `1px solid ${isActive ? 'rgba(56,189,248,0.7)' : 'rgba(255,255,255,0.12)'}`, background: isActive ? 'rgba(56,189,248,0.1)' : 'rgba(255,255,255,0.025)', color: '#fff', cursor: isActive ? 'default' : 'pointer' }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: isActive ? '#00e5a0' : '#f59e0b', boxShadow: isActive ? '0 0 10px #00e5a0' : 'none' }} />
+                          <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: 'block', fontSize: '11px', fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{node.name || node.id}</span>{fork && <span style={{ display: 'block', marginTop: '5px', fontSize: '8px', color: '#38bdf8', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{fork.label || fork.record_key}</span>}</span>
+                          <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.45)', fontFamily: 'JetBrains Mono, monospace' }}>{new Date(node.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </button>
+                        {(children.get(node.id) || []).map(child => nodeView(child, depth + 1))}
+                      </div>;
+                    };
+                    return roots.length ? roots.map(root => nodeView(root)) : <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '11px' }}>No persisted branches yet.</div>;
+                  })()}
+                </div>
+              </div>
+            )}
 
             <main className={prepStep === 1 || prepStep === 5 || prepStep === 3 || prepStep === 4 || activeView === 'profile' || activeView === 'about' || activeView === 'portfolio' ? '' : 'terminal-main'} style={{ flex: 1, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
 
@@ -900,13 +938,13 @@ export default function NetraTerminal() {
                       <div className="home-slide-up" style={{ animationDelay: '0ms' }}>
                         <h1 style={{ fontSize: '80px', fontWeight: 950, letterSpacing: '-0.05em', lineHeight: 0.88, textTransform: 'uppercase', margin: 0 }}>
                           <span style={{ color: '#0f172a' }}>NETRA</span><br />
-                          <span style={{ color: '#2563eb' }}>COMMAND</span>
+                          <span style={{ color: '#2563eb' }}>PLATFORM</span>
                         </h1>
                       </div>
                       <div className="home-fade" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '14px', paddingBottom: '6px', animationDelay: '200ms' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end' }}>
                           <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4169E1', boxShadow: '0 0 8px #4169E1' }} className="pulse-dot" />
-                          <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.25em', color: '#4169E1' }}>System Online</span>
+                          <span style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.25em', color: '#4169E1' }}>Platform Online</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <button
@@ -919,7 +957,7 @@ export default function NetraTerminal() {
                             onMouseLeave={e => { e.currentTarget.style.background = '#2563eb'; }}
                           >
                             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                            Initialize Trade
+                            Start Trading Session
                           </button>
                           <button
                             onClick={() => {
@@ -932,7 +970,7 @@ export default function NetraTerminal() {
                             onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = 'rgba(37,99,235,0.28)'; }}
                           >
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                            View Trades
+                            Open Trade Records
                           </button>
                         </div>
                       </div>
@@ -941,10 +979,10 @@ export default function NetraTerminal() {
                     {/* AUTO-SLIDING CAROUSEL */}
                     {(() => {
                       const slides = [
-                        { label: 'On discipline', quote: 'Structure before direction. Conviction before entry. The market does not reward eagerness — it punishes it.', accent: '#2563eb', bg: '#e4e8f0', image: '/image_1.avif' },
-                        { label: 'On patience', quote: 'The edge is not in the setup. It is in the patience to wait for one that is undeniable. Most sessions end without a trade. That is the correct outcome.', accent: '#059669', bg: '#e5ebe5', image: '/image_2.jpg' },
-                        { label: 'On capital', quote: 'Capital lost cannot analyse. Capital preserved can deploy again. Survival is the precondition for every future trade.', accent: '#d97706', bg: '#ece8df', image: '/image_3.jpg' },
-                        { label: 'On confluence', quote: 'One signal is noise. Two signals are coincidence. Five aligned structural signals is a command. Deploy only at command level.', accent: '#7c3aed', bg: '#e9e6ee', image: '/image_4.jpg' },
+                        { label: 'NETRA / Platform', quote: 'A cloud-hosted market decision platform that connects guided model workflows, AI intelligence, persistent sessions, trade records, and performance review.', accent: '#2563eb', bg: '#e4e8f0', image: '/image_1.avif' },
+                        { label: 'MAYA / Intelligence', quote: 'A shared AI layer for conversation, retrieval, chart understanding, historical comparison, bounded reasoning, critique, and post-trade audit.', accent: '#059669', bg: '#e5ebe5', image: '/image_2.jpg' },
+                        { label: 'Pinaka / Operational Model', quote: 'A human-in-the-loop retail trading doctrine that converts live market observations into a legal state, command, execution route, and auditable outcome.', accent: '#d97706', bg: '#ece8df', image: '/image_3.jpg' },
+                        { label: 'Trishul / In Development', quote: 'A quantitative research engine that will convert hypotheses into reproducible experiments and accept or reject them from statistical evidence.', accent: '#7c3aed', bg: '#e9e6ee', image: '/image_4.jpg' },
                       ];
                       const slide = slides[slideIdx];
                       return (
@@ -993,12 +1031,12 @@ export default function NetraTerminal() {
                     {/* ── BOX 1: WHAT THIS IS ── */}
                     <div className="home-slide-up" style={{ animationDelay: '150ms', marginBottom: '20px' }}>
                       <div style={{ background: '#ece5e6', padding: '56px 60px' }}>
-                        <div style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#e11d48', marginBottom: '32px' }}>The system</div>
+                        <div style={{ fontSize: '8px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#e11d48', marginBottom: '32px' }}>The product</div>
                         <p style={{ fontSize: '26px', fontWeight: 700, color: '#0f172a', lineHeight: 1.45, margin: '0 0 28px 0', letterSpacing: '-0.02em', maxWidth: '820px' }}>
-                          NETRA is not a signal generator. It is a <span style={{ color: '#e11d48' }}>decision enforcement system</span> — a structured process that removes emotion and forces every assumption about the market to be verified before capital is deployed.
+                          NETRA is the <span style={{ color: '#e11d48' }}>fintech product and platform</span> that hosts trading models, coordinates MAYA&apos;s intelligence, guides model-specific sessions, persists their state, records trades, and connects decisions with their outcomes.
                         </p>
                         <p style={{ fontSize: '15px', fontWeight: 500, color: '#475569', lineHeight: 1.75, margin: 0, maxWidth: '700px' }}>
-                          Every session begins with a hypothesis. Every hypothesis is tested against a sequence of structural gates. Setups that clear every gate reach execution. Setups that do not are observations — and observations are not losses.
+                          Its frontend provides the working surface; its backend governs authentication, model services, AI workflows, storage, and analytics. Pinaka and Trishul are models developed on the platform—not alternative names for NETRA itself.
                         </p>
                       </div>
                     </div>
@@ -1013,15 +1051,15 @@ export default function NetraTerminal() {
                           name: 'PINAKA',
                           color: '#3b82f6',
                           image: '/pinaka.avif',
-                          type: 'AI-Assisted Retail Model',
-                          philosophy: 'Retail precision built on institutional logic. Every entry is verified through a structural sequence — no assumptions, no shortcuts, no emotional overrides.',
-                          detail: 'Pinaka is an AI-assisted retail trading model built on institutional price action. It operates across two protocols — Strike and Interception. Strike engages post-BOS continuation setups. Interception engages post-sweep reversal setups. Maya, the AI engine, supports every session with structural context and bias validation.',
+                          type: 'Human-in-the-Loop Retail Model',
+                          philosophy: 'The trader captures the live market. The doctrine constrains the classification. MAYA assists. The human owns the decision.',
+                          detail: 'Pinaka is NETRA\'s first operational model. It converts a trader\'s live observations into structured context and classifies that evidence within an explicit price-action doctrine. Legal states determine the available command, posture, routes, and transitions; MAYA supports recognition, retrieval, historical comparison, critique, and audit without taking ownership of the trade.',
                           stats: [
-                            { label: 'Protocols', value: 'Strike · Interception' },
-                            { label: 'Strike Weapons', value: 'TRSH · BRAM · AGN' },
-                            { label: 'Interception Weapons', value: 'AKA · TEER · PNKA · PRTH' },
-                            { label: 'AI Engine', value: 'Maya — Vision · RAG · Historian · Critic' },
-                            { label: 'Release', value: 'First user release' },
+                            { label: 'Commands', value: 'Strike · Interception · Saturation · No Engagement' },
+                            { label: 'Input', value: 'Human-captured live market features' },
+                            { label: 'Doctrine', value: 'Legal state · posture · routes · transitions' },
+                            { label: 'MAYA', value: 'Vision · RAG · Historian · Recognition · Critique · Audit' },
+                            { label: 'Status', value: 'First operational NETRA model' },
                           ],
                         },
                         {
@@ -1031,15 +1069,15 @@ export default function NetraTerminal() {
                           name: 'TRISHUL',
                           color: '#f59e0b',
                           image: '/trishul.avif',
-                          type: 'Quant-Institutional Swing Model',
-                          philosophy: 'Where quantitative logic meets institutional price action — designed for short-term equity swing trading with AI-assisted validation.',
-                          detail: 'Trishul is a planned hybrid model combining quantitative stock screening with institutional price action entry logic. It targets equities for short-term swing trades — buy-side only. The model is currently in research and planning phase. Deployment is planned once the quantitative screening layer is validated against sufficient historical data.',
+                          type: 'Quantitative Research Engine',
+                          philosophy: 'Turn a market observation into a mathematical hypothesis, test it honestly, and keep only what survives out-of-sample evidence.',
+                          detail: 'Trishul will be NETRA\'s quantitative research engine. It will define hypotheses mathematically, construct datasets and features, test relationships statistically, compare predictive models, and use time-aware walk-forward validation. Its output will quantify probability, expected value, calibration, confidence, and out-of-sample reliability.',
                           stats: [
-                            { label: 'Asset Class', value: 'Equities — Long only' },
-                            { label: 'Hold Period', value: 'Short-term swing · 1–5 sessions' },
-                            { label: 'Approach', value: 'Quant filter + Institutional PA entry' },
-                            { label: 'Direction', value: 'Buy-side only · No shorts' },
-                            { label: 'Status', value: '🔬 Planning Phase — Not deployed' },
+                            { label: 'Purpose', value: 'Hypothesis research and validation' },
+                            { label: 'Pipeline', value: 'Definition · data · features · statistics · ML · walk-forward' },
+                            { label: 'Evidence', value: 'Probability · expected value · calibration · robustness' },
+                            { label: 'Scope', value: 'Regime · forecasts · alpha · portfolio · execution' },
+                            { label: 'Status', value: 'In development' },
                           ],
                         },
                       ];
@@ -1161,9 +1199,9 @@ export default function NetraTerminal() {
                     <div className="home-slide-up" style={{ animationDelay: '220ms', marginBottom: '20px' }}>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', background: '#ece8df' }}>
                         {([
-                          { n: '01', title: 'Read the market first.', body: 'No directional bias is valid without structural confirmation. The market\'s current state — whether it is in balance, relocation, or transition — determines which trades are even available today.' },
-                          { n: '02', title: 'Risk is decided at the start.', body: 'R is fixed before entry. Position size is derived from it. The stop is never moved to save a trade. When the stop is hit, the analysis was wrong. That is the correct conclusion every time.' },
-                          { n: '03', title: 'No trade is a trade.', body: 'A session that ends with no execution but full capital is a successful session. Low-conviction setups are not small trades — they are full-size losses waiting. Patience is the only edge that compounds.' },
+                          { n: '01', title: 'Models define the decision space.', body: 'Each model owns its doctrine, inputs, states, legal routes, and outputs. NETRA provides the common product infrastructure without flattening every form of market research into the same workflow.' },
+                          { n: '02', title: 'MAYA supplies shared intelligence.', body: 'Agents, retrieval, GraphRAG, episodic memory, tools, vision, critique, and audit are reusable across the platform. AI interprets context while model rules keep the result bounded.' },
+                          { n: '03', title: 'Completed paths become evidence.', body: 'NETRA preserves observations, model classifications, AI suggestions, human commitments, execution events, and outcomes. Later workflows can retrieve similar episodes instead of losing the reasoning when a session ends.' },
                         ] as Array<{ n: string; title: string; body: string }>).map((p, i, arr) => (
                           <div key={p.n} className="home-reveal" style={{ animationDelay: `${280 + i * 80}ms`, padding: '44px 40px', borderRight: i < arr.length - 1 ? '1px solid rgba(217,119,6,0.15)' : 'none' }}>
                             <div style={{ fontSize: '48px', fontWeight: 950, letterSpacing: '-0.05em', color: '#d97706', opacity: 0.2, lineHeight: 1, marginBottom: '24px', fontFamily: 'monospace' }}>{p.n}</div>
@@ -1178,9 +1216,9 @@ export default function NetraTerminal() {
                     <div className="home-slide-up" style={{ animationDelay: '300ms', marginBottom: '48px' }}>
                       <div style={{ background: '#e4eae8', padding: '64px 60px', position: 'relative', overflow: 'hidden' }}>
                         <div style={{ fontSize: '200px', fontWeight: 950, color: '#0d9488', opacity: 0.07, position: 'absolute', right: '-20px', bottom: '-40px', lineHeight: 1, fontFamily: 'monospace', userSelect: 'none', letterSpacing: '-0.05em' }}>"</div>
-                        <div style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#0d9488', marginBottom: '28px' }}>Trading is a discipline problem, not an information problem</div>
+                        <div style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#0d9488', marginBottom: '28px' }}>The operating principle</div>
                         <p style={{ fontSize: '32px', fontWeight: 700, color: '#0f172a', lineHeight: 1.35, margin: '0 0 32px 0', letterSpacing: '-0.03em', maxWidth: '860px' }}>
-                          The analyst who waits for the right setup and misses it loses nothing. The analyst who forces an entry where none exists loses capital, confidence, and the ability to see the next real setup clearly.
+                          Human observation captures what is happening now. Model doctrine defines what decisions are legal. MAYA retrieves and interprets evidence. NETRA preserves the complete path so the decision can be reviewed against what happened next.
                         </p>
                         <div style={{ height: '2px', background: '#0d9488', width: '64px' }} />
                       </div>
@@ -1195,13 +1233,13 @@ export default function NetraTerminal() {
                         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#ede9fe'; }}
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#f5f3ff'; }}
                       >
-                        <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#2563eb', marginBottom: '20px' }}>New Session</div>
-                        <div style={{ fontSize: '40px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '-0.03em', color: '#0f172a', lineHeight: 1, marginBottom: '16px' }}>Initialize<br />Mission</div>
+                        <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#2563eb', marginBottom: '20px' }}>Pinaka Session</div>
+                        <div style={{ fontSize: '40px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '-0.03em', color: '#0f172a', lineHeight: 1, marginBottom: '16px' }}>Start Trading<br />Session</div>
                         <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.65, maxWidth: '440px' }}>
-                          Deploy a full multi-phase structural analysis session. Real Bias → HTF Structure → Market Pulse → Liquidity → Command → Weapon → Trading Data.
+                          Capture market context and move through Pinaka&apos;s guided path: structure, market pulse, liquidity, state recognition, command, execution, and audit.
                         </div>
                         <div style={{ marginTop: '32px', display: 'flex', alignItems: 'center', gap: '8px', color: '#2563eb' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase' }}>Begin</span>
+                          <span style={{ fontSize: '11px', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase' }}>Start</span>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6" /></svg>
                         </div>
                       </button>
@@ -1213,12 +1251,12 @@ export default function NetraTerminal() {
                         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#fed7aa'; }}
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff7ed'; }}
                       >
-                        <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#2563eb', marginBottom: '20px' }}>Archive</div>
-                        <div style={{ fontSize: '40px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '-0.03em', color: '#0f172a', lineHeight: 1, marginBottom: '16px' }}>Mission<br />Ledger</div>
+                        <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#2563eb', marginBottom: '20px' }}>Recorded Trades</div>
+                        <div style={{ fontSize: '40px', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '-0.03em', color: '#0f172a', lineHeight: 1, marginBottom: '16px' }}>Trade<br />Records</div>
                         <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.65 }}>
                           {(tradeLogs?.length ?? 0) > 0
-                            ? `${tradeLogs!.length} missions on record.`
-                            : 'No missions logged yet.'}
+                            ? `${tradeLogs!.length} trades on record.`
+                            : 'No trades recorded yet.'}
                         </div>
                         <div style={{ marginTop: '32px', display: 'flex', alignItems: 'center', gap: '8px', color: '#2563eb' }}>
                           <span style={{ fontSize: '11px', fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase' }}>View</span>
@@ -1298,7 +1336,7 @@ export default function NetraTerminal() {
                       <div style={{ marginBottom: '28px' }}>
                         <label style={{ fontSize: '8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgba(15,23,42,0.5)', display: 'block', marginBottom: '10px' }}>Trading Model</label>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                          {([{ id: 'pinaka', name: 'Pinaka', desc: 'Strike · Interception', color: '#3b82f6' }, { id: 'trishul', name: 'Trishul', desc: 'Quant · Swing', color: '#f59e0b' }]).map(m => {
+                          {([{ id: 'pinaka', name: 'Pinaka', desc: 'Human-in-the-loop doctrine', color: '#3b82f6' }, { id: 'trishul', name: 'Trishul', desc: 'Quantitative research engine', color: '#f59e0b' }]).map(m => {
                             const active = sessionInput.modelName === m.id;
                             return (
                               <button key={m.id} onClick={() => { dispatch(setSessionInput({ ...sessionInput, modelName: m.id })); setCurrentModel(m.id); }}
@@ -1314,7 +1352,16 @@ export default function NetraTerminal() {
                       {/* Actions */}
                       <div style={{ display: 'flex', gap: '12px' }}>
                         <button onClick={() => ctxSetPrepStep(1)} style={{ flex: 1, height: '42px', border: '1px solid rgba(15,23,42,0.15)', background: '#ffffff', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#475569', cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
-                        <button onClick={initializeMission} style={{ flex: 2, height: '42px', border: 'none', background: '#4169E1', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#ffffff', cursor: 'pointer', fontFamily: 'inherit' }}>Initialize Terminal</button>
+                        <button
+                          onClick={initializeMission}
+                          data-loading-scope="global"
+                          data-loading-label="Initializing Terminal"
+                          disabled={isInitializingMission}
+                          aria-busy={isInitializingMission}
+                          style={{ flex: 2, height: '42px', border: 'none', background: '#4169E1', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#ffffff', cursor: isInitializingMission ? 'wait' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '9px', opacity: isInitializingMission ? 0.8 : 1 }}
+                        >
+                          {isInitializingMission ? 'Initializing Terminal…' : 'Initialize Terminal'}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1341,8 +1388,8 @@ export default function NetraTerminal() {
                       {/* Model cards */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {([
-                          { id: 'pinaka', name: 'Pinaka', sub: 'AI-Assisted Retail · Strike + Interception', color: '#3b82f6', action: () => { setCurrentModel('pinaka'); setActiveSessionId(null); ctxSetPrepStep(5); } },
-                          { id: 'trishul', name: 'Trishul', sub: 'Quant-Institutional Swing · Planning Phase', color: '#f59e0b', action: () => { setCurrentModel('trishul'); setActiveSessionId(null); ctxSetPrepStep(5); } },
+                          { id: 'pinaka', name: 'Pinaka', sub: 'Human-in-the-loop retail doctrine · Operational', color: '#3b82f6', action: () => { setCurrentModel('pinaka'); setActiveSessionId(null); ctxSetPrepStep(5); } },
+                          { id: 'trishul', name: 'Trishul', sub: 'Quantitative research engine · In development', color: '#f59e0b', action: () => { setCurrentModel('trishul'); setActiveSessionId(null); ctxSetPrepStep(5); } },
                         ] as Array<{id: string; name: string; sub: string; color: string; action: () => void}>).map(m => (
                           <button key={m.id} onClick={m.action}
                             style={{ padding: '20px 20px 20px 24px', border: '1px solid rgba(15,23,42,0.1)', background: '#f8fafc', borderLeft: `4px solid ${m.color}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', transition: 'all 150ms' }}
@@ -1420,10 +1467,6 @@ export default function NetraTerminal() {
                       <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
                       <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>MAYA CHART ANALYSIS</span>
                       <div style={{ flex: 1 }} />
-                      <ForkButton onClick={() => {
-                        setForkModalState({ isOpen: true, phaseNum: 0, defaultName: `FORK_${tradeName || 'Trade'}_P0` });
-                        setForkInputName(`FORK_${tradeName || 'Trade'}_P0`);
-                      }} size="sm" style={{ marginRight: '8px' }} />
                       <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Chart Context Analysis</span>
                     </div>
                     <div className="phase-card-body" style={{ padding: '12px' }}><Phase0Vision /></div>
@@ -1495,8 +1538,9 @@ export default function NetraTerminal() {
                           <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '11px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase', flexShrink: 0 }}>Component 2 — HTF Structure</span>
                           <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
                           <ForkButton onClick={() => {
-                            setForkModalState({ isOpen: true, phaseNum: 2, defaultName: `FORK_${tradeName || 'Trade'}_HTF` });
-                            setForkInputName(`FORK_${tradeName || 'Trade'}_HTF`);
+                            const defaultName = buildForkName(tradeName, 'HTF Structure');
+                            setForkModalState({ isOpen: true, phaseNum: 2, forkRecord: { recordKey: 'htf_structure', label: 'HTF Structure' }, defaultName });
+                            setForkInputName(defaultName);
                           }} size="sm" />
                         </div>
                         <HTFDimensions />
@@ -1509,8 +1553,9 @@ export default function NetraTerminal() {
                           <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '11px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase', flexShrink: 0 }}>Component 3 — HTF Events</span>
                           <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
                           <ForkButton onClick={() => {
-                            setForkModalState({ isOpen: true, phaseNum: 2, defaultName: `FORK_${tradeName || 'Trade'}_HTF_EVENTS` });
-                            setForkInputName(`FORK_${tradeName || 'Trade'}_HTF_EVENTS`);
+                            const defaultName = buildForkName(tradeName, 'HTF Events');
+                            setForkModalState({ isOpen: true, phaseNum: 2, forkRecord: { recordKey: 'htf_events', label: 'HTF Events', clearSelectionKeys: (sysData?.htfStructure?.dimensions || []).filter(dim => dim.multiselect).map(dim => dim.id) }, defaultName });
+                            setForkInputName(defaultName);
                           }} size="sm" />
                         </div>
                         <HTFEvents />
@@ -1529,18 +1574,14 @@ export default function NetraTerminal() {
                         <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>MARKET PULSE</span>
                         <div style={{ flex: 1 }} />
-                        <ForkButton onClick={() => {
-                          setForkModalState({ isOpen: true, phaseNum: 3, defaultName: `FORK_${tradeName || 'Trade'}_P3` });
-                          setForkInputName(`FORK_${tradeName || 'Trade'}_P3`);
-                        }} size="sm" style={{ marginRight: '8px' }} />
                         {stepTimestamps.marketPulse
                           ? <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', fontWeight: 700, color: 'var(--phase-accent)', letterSpacing: '0.1em' }}>✓ LOCKED · {stepTimestamps.marketPulse}</span>
                           : <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Auction State · Price Behaviour · Liquidity Context</span>
                         }
                       </div>
                       <div className="phase-card-body">
-                        <Phase3MarketPulse onFork={(phaseNum, defaultName) => {
-                          setForkModalState({ isOpen: true, phaseNum, defaultName });
+                        <Phase3MarketPulse onFork={(phaseNum, defaultName, forkRecord) => {
+                          setForkModalState({ isOpen: true, phaseNum, forkRecord, defaultName });
                           setForkInputName(defaultName);
                         }} />
                       </div>
@@ -1548,52 +1589,58 @@ export default function NetraTerminal() {
                   )}
 
                   {/* P4: BEHAVIOUR */}
-                  {/* P5: SYNTHESIS */}
+                  {/* P5: DECISION PATH */}
                   {highestStep >= 4 && (
                     <div className="phase-card" data-phase="5" data-active={highestStep === 4 ? 'true' : undefined}>
                       <div className="phase-card-header">
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P5</span>
                         <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>RECOGNITION</span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>DECISION PATH</span>
                         <div style={{ flex: 1 }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Maya — Market Type Recognition</span>
+                        {decisionPathConfirmed
+                          ? <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.1em' }}>✓ LOCKED</span>
+                          : <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Recognition · WAIT · Command Selection</span>
+                        }
                       </div>
                       <div className="phase-card-body" style={{ padding: '12px' }}><Phase5Synthesis /></div>
                     </div>
                   )}
 
-                  {/* P6: NETRA STATE — recognised state + forward-path graph */}
-                  {highestStep >= 4 && (
+                  {/* P6: PINAKA STATE — recognised state + forward-path graph */}
+                  {highestStep >= 4 && decisionPathConfirmed && (
                     <div className="phase-card" data-phase="5" data-active={highestStep === 4 ? 'true' : undefined}>
                       <div className="phase-card-header">
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P6</span>
                         <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>NETRA STATE</span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>PINAKA STATE</span>
                         <div style={{ flex: 1 }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Recognised State &amp; Transitions</span>
+                        {netraStateConfirmed
+                          ? <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.1em' }}>✓ LOCKED</span>
+                          : <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Recognised State &amp; Transitions</span>
+                        }
                       </div>
                       <div className="phase-card-body" style={{ padding: '12px' }}><PhaseNetraState /></div>
                     </div>
                   )}
 
                   {/* P7: COMMAND */}
-                  {highestStep >= 4 && (
+                  {highestStep >= 4 && netraStateConfirmed && (
                     <div className="phase-card cmd-card phase-theme-2" data-phase="6" data-active={highestStep === 4 ? 'true' : undefined}>
                       <div className="phase-card-header">
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P7</span>
                         <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
                         <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>COMMAND</span>
                         <div style={{ flex: 1 }} />
-                        <ForkButton onClick={() => {
-                          setForkModalState({ isOpen: true, phaseNum: 4, defaultName: `FORK_${tradeName || 'Trade'}_P4` });
-                          setForkInputName(`FORK_${tradeName || 'Trade'}_P4`);
-                        }} size="sm" style={{ marginRight: '8px' }} />
                         {stepTimestamps.command
                           ? <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', fontWeight: 700, color: '#4169E1', letterSpacing: '0.1em' }}>✓ LOCKED · {stepTimestamps.command}</span>
                           : <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Doctrine Selection & STS</span>
                         }
                       </div>
-                      <div className="phase-card-body"><Phase6Command /></div>
+                      <div className="phase-card-body"><Phase6Command onFork={(point, clearSelectionKeys) => {
+                        const name = buildForkName(tradeName, point === 'command_dimensions' ? 'Command Dimensions' : 'Command Events');
+                        setForkModalState({ isOpen: true, phaseNum: 4, forkRecord: { recordKey: point === 'command_dimensions' ? 'state_dimensions' : 'state_events', label: point === 'command_dimensions' ? 'Command Dimensions' : 'Command Events', clearSelectionKeys }, defaultName: name });
+                        setForkInputName(name);
+                      }} /></div>
                     </div>
                   )}
 
@@ -1661,11 +1708,11 @@ export default function NetraTerminal() {
           <button onClick={() => dispatch({ type: 'ui/setMobileMenuOpen', payload: false })} className="absolute top-8 right-8 p-4 text-[var(--text-1)]"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
           <div className="flex flex-col gap-10 text-center">
             {([
-              allowedPages.includes('home') ? { label: 'Home', active: prepStep === 1 && activeView !== 'profile' && activeView !== 'about', action: () => { ctxSetPrepStep(1); ctxSetActiveView('terminal'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } } : null,
-              allowedPages.includes('pinaka') ? { label: 'Pinaka', active: prepStep === 5 && currentModel === 'pinaka' && activeView !== 'about' && activeView !== 'profile', action: () => { setCurrentModel('pinaka'); setActiveSessionId(null); ctxSetPrepStep(5); ctxSetActiveView('terminal'); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } } : null,
-              allowedPages.includes('trishul') ? { label: 'Trishul', active: prepStep === 5 && currentModel === 'trishul' && activeView !== 'about' && activeView !== 'profile', action: () => { setCurrentModel('trishul'); setActiveSessionId(null); ctxSetPrepStep(5); ctxSetActiveView('trishul'); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } } : null,
-              allowedPages.includes('portfolio') ? { label: 'Portfolio', active: activeView === 'portfolio', action: () => { ctxSetActiveView('portfolio'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } } : null,
-              { label: 'About', active: activeView === 'about', action: () => { ctxSetActiveView('about'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); } },
+              allowedPages.includes('home') ? { label: 'Home', active: prepStep === 1 && activeView !== 'profile' && activeView !== 'about', action: () => { ctxSetPrepStep(1); ctxSetActiveView('terminal'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); navigate('/home'); } } : null,
+              allowedPages.includes('pinaka') ? { label: 'Pinaka', active: prepStep === 5 && currentModel === 'pinaka' && activeView !== 'about' && activeView !== 'profile', action: () => { setCurrentModel('pinaka'); setActiveSessionId(null); ctxSetPrepStep(5); ctxSetActiveView('terminal'); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); navigate('/mission/pinaka'); } } : null,
+              allowedPages.includes('trishul') ? { label: 'Trishul', active: prepStep === 5 && currentModel === 'trishul' && activeView !== 'about' && activeView !== 'profile', action: () => { setCurrentModel('trishul'); setActiveSessionId(null); ctxSetPrepStep(5); ctxSetActiveView('trishul'); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); navigate('/mission/trishul'); } } : null,
+              allowedPages.includes('portfolio') ? { label: 'Portfolio', active: activeView === 'portfolio', action: () => { ctxSetActiveView('portfolio'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); navigate('/portfolio'); } } : null,
+              { label: 'About', active: activeView === 'about', action: () => { ctxSetActiveView('about'); setActiveSessionId(null); ctxSetIsLoggerOpen(false); setIsAiPaneOpen(false); navigate('/about'); } },
             ].filter(Boolean) as Array<{ label: string; active: boolean; action: () => void }>).map((nav) => (
               <button key={nav.label} onClick={() => { nav.action(); dispatch({ type: 'ui/setMobileMenuOpen', payload: false }); }} className="text-3xl font-black uppercase tracking-widest transition-all" style={{ color: nav.active ? 'var(--accent)' : 'var(--text-1)' }}>{nav.label}</button>
             ))}
@@ -1673,7 +1720,16 @@ export default function NetraTerminal() {
         </div>
       )}
 
-      {forkModalState.isOpen && (
+      {isForkingSession && (
+        <div className="netra-lux-loader netra-global-action-loader" role="status" aria-live="assertive" aria-label="Forking Branch" style={{ zIndex: 10001 }}>
+          <div className="netra-lux-grain" />
+          <div className="netra-lux-frame">
+            <LuxuryShapeSpinner label="Forking Branch" />
+          </div>
+        </div>
+      )}
+
+      {forkModalState.isOpen && !isForkingSession && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: '8px', padding: '24px', width: '320px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ fontSize: '12px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-1)' }}>Fork Session</div>
@@ -1685,7 +1741,7 @@ export default function NetraTerminal() {
               placeholder={forkModalState.defaultName}
               style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '4px', padding: '8px', color: 'var(--text-1)', fontSize: '12px', outline: 'none' }}
               onKeyDown={e => {
-                if (e.key === 'Enter') handleConfirmFork();
+                if (e.key === 'Enter') forkConfirmButtonRef.current?.click();
                 if (e.key === 'Escape') setForkModalState({ ...forkModalState, isOpen: false });
               }}
             />
@@ -1697,6 +1753,7 @@ export default function NetraTerminal() {
                 Cancel
               </button>
               <button 
+                ref={forkConfirmButtonRef}
                 onClick={handleConfirmFork}
                 style={{ height: '28px', padding: '0 12px', borderRadius: '4px', border: '1px solid var(--accent)', background: 'var(--accent-bg)', cursor: 'pointer', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent)' }}
               >

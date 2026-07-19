@@ -9,6 +9,8 @@ import type { TradeCard } from './types';
 
 export const CARDS_KEY = 'netra_trade_cards_v1';
 export const TERMINAL_STATS_EVENT = 'netra-terminal-stats-updated';
+export const SAVE_TRADE_CARDS_EVENT = 'netra-save-trade-cards';
+export interface SaveTradeCardsRequest { tasks: Array<Promise<boolean>> }
 export const tradeCardsStorageKey = (terminalSessionId?: string | number | null) =>
   terminalSessionId ? `${CARDS_KEY}:${terminalSessionId}` : `${CARDS_KEY}:draft`;
 export const autoTime  = () => new Date().toTimeString().slice(0, 5);

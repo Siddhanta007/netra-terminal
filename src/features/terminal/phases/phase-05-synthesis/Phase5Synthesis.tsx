@@ -1,22 +1,8 @@
-// Synthesis phase — the Maya recognition box (Market Type Selector).
-// The recognised NETRA state + forward-path graph live in their own phase
-// (PhaseNetraState), reading the same recognition output from the store.
+// Decision Path phase — Maya recognition followed by the analyst's WAIT or
+// Command route choice. NETRA State remains a separate phase.
 
-import { useNetra } from '@/context/NetraContext';
-import NetraAILabs from '@/components/Templates/NetraAILabs';
+import RecognitionCheckpointFlow from './RecognitionCheckpointFlow';
 
 export default function Phase5Synthesis() {
-  const { netraOutput, isEvaluating, triggerNeuralSynthesis, stopSynthesis } = useNetra();
-
-  return (
-    <NetraAILabs
-      title="NETRA AI LABS"
-      subheading="MAYA — Market Type Selector"
-      showUpload={false}
-      isEvaluating={isEvaluating}
-      output={netraOutput}
-      onAnalyse={triggerNeuralSynthesis}
-      onStop={stopSynthesis}
-    />
-  );
+  return <RecognitionCheckpointFlow />;
 }

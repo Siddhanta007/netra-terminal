@@ -63,6 +63,42 @@ export interface StrikeSelections {
   entryPattern: string;
 }
 
+export interface WaitSelections {
+  [key: string]: string;
+  waitingFor: string;
+  referenceLocation: string;
+  requiredResolution: string;
+  developmentStage: string;
+  institutionalSignature: string;
+  validityHorizon: string;
+  waitNote: string;
+  resolutionStatus: string;
+  resolutionEvent: string;
+  resolutionNote: string;
+  openedAt: string;
+  resolvedAt: string;
+}
+
+export interface RecognitionCheckpoint {
+  id: string;
+  sequence: number;
+  createdAt: string;
+  nodeType?: 'AI' | 'COMMAND';
+  output: NetraOutput | null;
+  evidence: {
+    preSessionContext: Record<string, string>;
+    htfStructure: Record<string, string>;
+    marketPulse: Record<string, string>;
+    liquidityContext: Record<string, string>;
+  };
+  selectedState: Record<string, unknown> | null;
+  eligibility: '' | 'ACTIVE' | 'DEVELOPING' | 'INSUFFICIENT' | 'INELIGIBLE';
+  wait: WaitSelections | null;
+  pathConfirmed?: boolean;
+  commandSelected?: boolean;
+  reassessmentRequired?: boolean;
+}
+
 export interface NetraOutput {
   cmd: string;
   conviction: string;
@@ -173,6 +209,8 @@ export interface SessionState {
   notes: Notes;
   interSelections: InterSelections;
   strikeSelections: StrikeSelections;
+  waitSelections: WaitSelections;
+  recognitionCheckpoints: RecognitionCheckpoint[];
   finalCommand: string | null;
   netraOutput: NetraOutput | null;
   selectedNetraState: Record<string, unknown> | null;
@@ -196,7 +234,7 @@ export interface TradePhase2 { selections?: Record<string, string>; note?: strin
 export interface TradePhase3 { selections?: Record<string, string>; note?: string }
 export interface TradePhase4 { marketPulse?: Record<string, string>; liquidityContext?: Record<string, string>; marketPulse_note?: string; liquidityContext_note?: string }
 export interface TradePhase5 extends NetraOutput {}
-export interface TradePhase6 { command?: string; confirmed_at?: string; selected_state?: Record<string, unknown> | null; recommendation?: Record<string, unknown> }
+export interface TradePhase6 { command?: string; confirmed_at?: string; selected_state?: Record<string, unknown> | null; recommendation?: Record<string, unknown>; recognition_checkpoints?: RecognitionCheckpoint[] }
 export interface TradePhase7 extends WeaponPrediction {}
 export interface TradePhase8 { weapon_id?: string; dimensions?: Record<string, string> }
 export interface TradePhase9Card {
@@ -274,9 +312,11 @@ export interface Toast {
 export interface ConfirmModal {
   title: string;
   desc: string;
-  onConfirm: () => void;
+  /** May be async. The global dialog keeps itself open and shows progress until it resolves. */
+  onConfirm: () => void | Promise<void>;
   confirmText?: string;
   cancelText?: string;
+  loadingText?: string;
   isDanger?: boolean;
 }
 
@@ -382,6 +422,11 @@ export interface SysData {
   marketPulseExtras?: MarketPulseExtras;
   executionMarks?: ChecklistMark[];
   weaponStages?: string[];
+  waitCheckpoint?: {
+    title?: string;
+    dimensions: SystemDimension[];
+    resolutionEvents: string[];
+  };
   tradeStatuses?: string[];
   exitTypes?: string[];
   tactical_provider?: string;
@@ -428,7 +473,9 @@ export interface SessionMeta {
   id: string;
   name: string;
   parentId: string | null;
-  forkPoint: number | null;
+  forkPoint: number | string | null;
+  rootId?: string;
+  fork?: { recordKey: string; label: string; createdAt?: string } | null;
   weapon: string | null;
   command: FinalCommand;
   status: 'active' | 'open' | 'closed';

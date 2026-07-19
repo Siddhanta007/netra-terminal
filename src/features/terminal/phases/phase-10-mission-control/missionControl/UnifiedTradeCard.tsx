@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import { useNetra } from '@/context/NetraContext';
 import { WeaponPrediction } from '@/types';
 import type { TradeCard } from './types';
-import { mkCard, computeCardStats, autoTimeSeconds, localDateStr, MONO, StatCell, Field, sep, SEP6, bare } from './helpers';
+import { mkCard, computeCardStats, autoTimeSeconds, localDateStr, MONO, StatCell, Field, sep, SEP6, bare, SAVE_TRADE_CARDS_EVENT, type SaveTradeCardsRequest } from './helpers';
 import { RecognizedState, TransitionBranch } from '@/components/Templates/StateGraph';
 import { API_BASE } from '@/utils/constants';
 import { SliderRow } from '@/components/Templates/aiLabs/SliderRow';
@@ -462,6 +462,17 @@ export default function UnifiedTradeCard({
   isLocked: boolean;
   getAuthHeaders: (extra?: Record<string, string>) => Record<string, string>;
 }) {
+  const saveToDbRef = useRef<() => Promise<string | null>>(async () => null);
+  const shouldSaveToDbRef = useRef(false);
+
+  useEffect(() => {
+    const handleSaveAll = (event: Event) => {
+      const request = (event as CustomEvent<SaveTradeCardsRequest>).detail;
+      if (shouldSaveToDbRef.current) request?.tasks.push(saveToDbRef.current().then(Boolean));
+    };
+    window.addEventListener(SAVE_TRADE_CARDS_EVENT, handleSaveAll);
+    return () => window.removeEventListener(SAVE_TRADE_CARDS_EVENT, handleSaveAll);
+  }, []);
   const {
     SYSTEM_DATA, triggerWeaponPrediction, stopWeaponPrediction, finalCommand, netraOutput, selectedNetraState,
     AVAILABLE_MODELS, selectedModel, setSelectedModel, modelConfig, setModelConfig, session,
@@ -485,6 +496,10 @@ export default function UnifiedTradeCard({
   const [deletingCard, setDeletingCard] = useState(false);
   const [saved,      setSaved]        = useState(false);
   const [saveError,  setSaveError]    = useState('');
+  shouldSaveToDbRef.current = Boolean(
+    card.dbId || card.entry || card.assetSuffix || card.weapon || card.notes ||
+    card.addEntries.length || card.partialExits.length,
+  );
 
   const [thinkOpen, setThinkOpen] = useState(false);
   const [traceOpen, setTraceOpen] = useState(false);
@@ -975,6 +990,7 @@ export default function UnifiedTradeCard({
       setSaving(false);
     }
   };
+  saveToDbRef.current = () => saveToDb();
 
   const commitToLearning = async (overrides: Partial<TradeCard> = {}) => {
     setCommitting(true);
@@ -1090,12 +1106,25 @@ export default function UnifiedTradeCard({
 	    });
 	  };
 
-  const handleDeleteCard = () => {
+  const handleDeleteCard = async () => {
     if (deletingCard || isLocked) return;
     setDeletingCard(true);
-    window.setTimeout(() => {
+
+    try {
+      // A saved card is its own terminal-trade record. Removing it only from
+      // localStorage leaves that record (and its statistics) behind.
+      if (card.dbId) {
+        const response = await fetch(`${API_BASE}/api/logs/${encodeURIComponent(card.dbId)}`, {
+          method: 'DELETE',
+          headers: getAuthHeaders(),
+        });
+        if (!response.ok) throw new Error(`Trade delete failed (${response.status})`);
+      }
       onRemove();
-    }, 420);
+    } catch {
+      setSaveError('Could not delete this trade. Please try again.');
+      setDeletingCard(false);
+    }
   };
 
   const handleConfigChange = (key: string, val: number) => {

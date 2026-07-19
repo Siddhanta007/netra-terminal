@@ -3,6 +3,7 @@ import { useNetra } from '@/context/NetraContext';
 import { useReduceFlag } from '@/hooks/useReduceFlag';
 import { StrikeSelections, InterSelections } from '@/types';
 import { API_BASE } from '@/utils/constants';
+import ForkButton from '@/components/UI/ForkButton';
 
 // ─── Component 1: Command Marking (Tier 3 — 5M chart) ─────────────────────────
 
@@ -144,6 +145,7 @@ function CommandEventRow({
           return (
             <button
               key={opt}
+              type="button"
               onClick={() => toggleOption(opt)}
               disabled={isLocked}
               className={`precision-opt ${isSelected ? 'selected' : ''} ${isLocked && !isSelected ? 'opacity-30 cursor-not-allowed' : ''}`}
@@ -208,7 +210,7 @@ function CommandMarkingInfo({ items }: { items: string[] }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function Phase6Command() {
+export default function Phase6Command({ onFork }: { onFork?: (point: 'command_dimensions' | 'command_events', clearSelectionKeys: string[]) => void }) {
   const {
     SYSTEM_DATA,
     notes, setNotes,
@@ -218,13 +220,14 @@ export default function Phase6Command() {
     interSelections, setInterSelections,
     saturationSelections, setSaturationSelections,
     confirmStep, editStep,
-    stepTimestamps,
+    stepTimestamps, highestStep, saveSession, showToast,
   } = useNetra();
 
   const executionMarks = SYSTEM_DATA.executionMarks || [];
   const [emChecked, setEmChecked] = useState<Record<string, boolean>>({});
   const toggleEm = (id: string) => setEmChecked(c => ({ ...c, [id]: !c[id] }));
   const [stateDefinition, setStateDefinition] = useState<any | null>(null);
+  const isCommandPhaseLocked = commandLocked && highestStep > 4;
 
   // P7 follows the state chosen in P6. It never reads P5 AI text.
   const stateSelection = (selectedNetraState || {}) as Record<string, unknown>;
@@ -237,10 +240,11 @@ export default function Phase6Command() {
   );
 
   useEffect(() => {
-    if (!commandLocked && commandFromP6 && commandFromP6 !== finalCommand) {
+    if (isCommandPhaseLocked) return;
+    if (commandFromP6 && finalCommand !== commandFromP6) {
       setFinalCommand(commandFromP6);
     }
-  }, [commandFromP6, commandLocked, finalCommand, setFinalCommand]);
+  }, [commandFromP6, isCommandPhaseLocked, finalCommand, setFinalCommand]);
 
   // Derive active command state's events
   const activeState = stateDefinition || recognizedState;
@@ -273,7 +277,7 @@ export default function Phase6Command() {
   }, [stateId, recognizedState?.dimensions, recognizedState?.events]);
 
   const handleStateFieldChange = (eventId: string, newVals: string[]) => {
-    if (commandLocked) return;
+    if (isCommandPhaseLocked) return;
     const valString = newVals.join(', ');
     if (finalCommand === 'STRIKE') {
       setStrikeSelections({ ...strikeSelections, [eventId]: valString } as StrikeSelections);
@@ -296,32 +300,39 @@ export default function Phase6Command() {
     return str ? str.split(', ') : [];
   };
 
+  const resetCommandPhase = () => {
+    setCommandLocked(false);
+    editStep(4);
+    setNotes({ ...notes, command: '' });
+    setEmChecked({});
+    setInterSelections({ pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' });
+    setStrikeSelections({
+      impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '',
+      zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '',
+      postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '',
+    });
+    setSaturationSelections({});
+  };
+
+  const editCommandPhase = () => {
+    if (!isCommandPhaseLocked) return;
+    setCommandLocked(false);
+    editStep(4);
+    void saveSession({ silent: true, highestStep: 4, clearAfter: 'command' }).then(saved => {
+      if (!saved) showToast('Command edit is local but downstream Mongo data was not cleared', 'error');
+    });
+  };
+
+  const confirmCommandPhase = async () => {
+    if (isCommandPhaseLocked || !finalCommand) return;
+    setCommandLocked(true);
+    confirmStep(4);
+    const saved = await saveSession({ highestStep: 5 });
+    if (saved) showToast('Command confirmed and saved', 'success');
+  };
+
   return (
     <div className="flex flex-col fade-up phase-theme-2">
-
-      {/* ── Active Command Badge (read-only — command is set in P6) ── */}
-      <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '9px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.2em', textTransform: 'uppercase', flexShrink: 0 }}>
-          Active Command
-        </span>
-        {finalCommand ? (
-          <span style={{
-            fontFamily: 'JetBrains Mono, monospace', fontSize: '10px', fontWeight: 800,
-            letterSpacing: '0.2em', textTransform: 'uppercase',
-            color: finalCommand === 'NO ENGAGEMENT' ? '#ef4444'
-                 : finalCommand === 'STRIKE'        ? '#ffd700'
-                 : finalCommand === 'INTERCEPTION'  ? '#38bdf8'
-                 : '#f97316',
-            border: '1px solid currentColor', padding: '4px 14px',
-          }}>
-            {finalCommand}
-          </span>
-        ) : (
-          <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', color: 'var(--text-4)', fontStyle: 'italic' }}>
-            Select a state in P6 first
-          </span>
-        )}
-      </div>
 
       {/* ── Component 1: Command Marking ── */}
       {finalCommand && (
@@ -346,6 +357,7 @@ export default function Phase6Command() {
               Component 2 — Command Dimensions
             </span>
             <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
+            {onFork && <ForkButton onClick={() => onFork('command_dimensions', [...dimensions, ...events].map(item => item.id))} size="sm" />}
           </div>
           {dimensions.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -355,7 +367,7 @@ export default function Phase6Command() {
                   event={dim}
                   selectedValues={getSelectedStateFieldValues(dim.id)}
                   onChange={newVals => handleStateFieldChange(dim.id, newVals)}
-                  isLocked={commandLocked}
+                  isLocked={isCommandPhaseLocked}
                 />
               ))}
             </div>
@@ -378,6 +390,7 @@ export default function Phase6Command() {
               Component 3 — Command Events
             </span>
             <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
+            {onFork && <ForkButton onClick={() => onFork('command_events', events.map(event => event.id))} size="sm" />}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {events.map(ev => (
@@ -386,7 +399,7 @@ export default function Phase6Command() {
                 event={ev}
                 selectedValues={getSelectedStateFieldValues(ev.id)}
                 onChange={newVals => handleStateFieldChange(ev.id, newVals)}
-                isLocked={commandLocked}
+                isLocked={isCommandPhaseLocked}
               />
             ))}
           </div>
@@ -399,17 +412,18 @@ export default function Phase6Command() {
           value={notes.command || ''}
           onChange={e => setNotes({ ...notes, command: e.target.value })}
           placeholder="Record strategic reasoning for protocol selection and matrix alignment..."
-          disabled={commandLocked}
+          disabled={isCommandPhaseLocked}
           className="flex-1 bg-transparent outline-none resize-none text-[12px] text-[var(--text-2)] placeholder:text-[var(--text-4)] leading-relaxed min-h-[56px]"
         />
         <div className="flex gap-2 shrink-0">
-          <button onClick={() => { setCommandLocked(false); editStep(4); }} className="btn-edit w-20" disabled={!commandLocked}>Edit</button>
+          <button onClick={editCommandPhase} className="btn-edit w-20" disabled={!isCommandPhaseLocked}>Edit</button>
+          <button onClick={resetCommandPhase} className="btn-reset w-20" disabled={isCommandPhaseLocked || !finalCommand}>Reset</button>
           <button
-            onClick={() => { setCommandLocked(true); confirmStep(4); }}
-            className={`${commandLocked ? 'btn-confirmed' : 'btn-confirm'} w-40`}
-            disabled={commandLocked}
+            onClick={confirmCommandPhase}
+            className={`${isCommandPhaseLocked ? 'btn-confirmed' : 'btn-confirm'} w-40`}
+            disabled={isCommandPhaseLocked || !finalCommand}
           >
-            {commandLocked ? '✓ Command Locked' : 'Confirm Command'}
+            {isCommandPhaseLocked ? '✓ Command Locked' : 'Confirm Command'}
           </button>
         </div>
       </div>

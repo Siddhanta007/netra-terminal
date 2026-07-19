@@ -4,7 +4,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { loadState } from '../../utils/storage';
 import {
   Selections, Notes, InterSelections, StrikeSelections,
-  NetraOutput, WeaponPrediction,
+  NetraOutput, WeaponPrediction, WaitSelections, RecognitionCheckpoint,
 } from '../../types';
 
 interface AnalysisState {
@@ -20,6 +20,8 @@ interface AnalysisState {
   interSelections: InterSelections;
   strikeSelections: StrikeSelections;
   saturationSelections: Record<string, string>;
+  waitSelections: WaitSelections;
+  recognitionCheckpoints: RecognitionCheckpoint[];
   selectedWeaponId: string | null;
   isEvaluating: boolean;
   isPredictingWeapon: boolean;
@@ -30,6 +32,7 @@ interface AnalysisState {
   stepTimestamps: Record<string, string>;
   weaponStageLog: Array<{ stage: string; ts: string }>;
   stateTimeline: Array<{ state_id: string; ts: string }>;
+  liveMarketContext: Record<string, unknown>;
   // Mission Control Data
   rAmount: string;
   dailyLossLimit: string;
@@ -62,8 +65,17 @@ const initialState: AnalysisState = {
   interSelections: loadState('interSelections', { pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }),
   strikeSelections: loadState('strikeSelections', { impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' }),
   saturationSelections: loadState('saturationSelections', { expansionQuality: '', pullbackQuality: '', followThrough: '', structuralFatigue: '', liquidityConsumption: '', emotionalParticipation: '' }),
+  waitSelections: {
+    waitingFor: '', referenceLocation: '', requiredResolution: '', developmentStage: '',
+    institutionalSignature: '', validityHorizon: '', resolutionStatus: 'OPEN',
+    waitNote: '', resolutionEvent: '', resolutionNote: '', openedAt: '', resolvedAt: '',
+  },
+  // P5 belongs to the active Mongo session. Never hydrate another session's
+  // recognition path from a single global browser key.
+  recognitionCheckpoints: [],
   weaponStageLog: loadState('weaponStageLog', [] as Array<{ stage: string; ts: string }>),
   stateTimeline: loadState('stateTimeline', [] as Array<{ state_id: string; ts: string }>),
+  liveMarketContext: {},
   selectedWeaponId: loadState('selectedWeaponId', null),
   isEvaluating: false,
   isPredictingWeapon: false,
@@ -125,6 +137,26 @@ export const analysisSlice = createSlice({
     setSaturationSelections: (state, action: PayloadAction<Record<string, string>>) => {
       state.saturationSelections = action.payload;
     },
+    setWaitSelections: (state, action: PayloadAction<WaitSelections>) => {
+      state.waitSelections = action.payload;
+    },
+    setRecognitionCheckpoints: (state, action: PayloadAction<RecognitionCheckpoint[]>) => {
+      state.recognitionCheckpoints = action.payload;
+    },
+    appendRecognitionCheckpoint: (state, action: PayloadAction<Omit<RecognitionCheckpoint, 'id' | 'sequence' | 'createdAt'>>) => {
+      const sequence = state.recognitionCheckpoints.length + 1;
+      state.recognitionCheckpoints = [...state.recognitionCheckpoints, {
+        ...action.payload,
+        id: `recognition-${Date.now()}-${sequence}`,
+        sequence,
+        createdAt: new Date().toISOString(),
+      }];
+    },
+    updateLatestRecognitionCheckpoint: (state, action: PayloadAction<Partial<RecognitionCheckpoint>>) => {
+      const index = state.recognitionCheckpoints.length - 1;
+      if (index < 0) return;
+      state.recognitionCheckpoints[index] = { ...state.recognitionCheckpoints[index], ...action.payload };
+    },
     setSelectedWeaponId: (state, action: PayloadAction<string | null>) => {
       state.selectedWeaponId = action.payload;
     },
@@ -162,6 +194,7 @@ export const analysisSlice = createSlice({
     setWeaponStageLog: (state, action: PayloadAction<Array<{ stage: string; ts: string }>>) => { state.weaponStageLog = action.payload; },
     appendWeaponStage: (state, action: PayloadAction<{ stage: string; ts: string }>) => { state.weaponStageLog = [...state.weaponStageLog, action.payload]; },
     setStateTimeline: (state, action: PayloadAction<Array<{ state_id: string; ts: string }>>) => { state.stateTimeline = action.payload; },
+    setLiveMarketContext: (state, action: PayloadAction<Record<string, unknown>>) => { state.liveMarketContext = action.payload; },
     appendStateRecognition: (state, action: PayloadAction<string>) => {
       // Append only when the recognised state actually changed (collapse repeats)
       const last = state.stateTimeline[state.stateTimeline.length - 1];
@@ -185,6 +218,10 @@ export const {
   setInterSelections,
   setStrikeSelections,
   setSaturationSelections,
+  setWaitSelections,
+  setRecognitionCheckpoints,
+  appendRecognitionCheckpoint,
+  updateLatestRecognitionCheckpoint,
   setSelectedWeaponId,
   setIsEvaluating,
   setIsPredictingWeapon,
@@ -194,6 +231,7 @@ export const {
   setAnalyticsData,
   setStepTimestamps,
   setStateTimeline,
+  setLiveMarketContext,
   appendStateRecognition,
   setRAmount,
   setDailyLossLimit,

@@ -1,7 +1,7 @@
 // NetraContext — the single hub the whole terminal reads from. Composes Redux state with the
 // analysis / chat / session / vision / audit hooks and exposes them as one `useNetra()` API.
 
-import { createContext, useContext, useEffect, useCallback, useRef } from 'react';
+import { createContext, useContext, useEffect, useCallback, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '../store';
 import {
@@ -17,6 +17,8 @@ import {
   setInterSelections as setInterSelectionsAction,
   setStrikeSelections as setStrikeSelectionsAction,
   setSaturationSelections as setSaturationSelectionsAction,
+  setWaitSelections as setWaitSelectionsAction,
+  setRecognitionCheckpoints as setRecognitionCheckpointsAction,
   setSelectedWeaponId as setSelectedWeaponIdAction,
   setStepTimestamps as setStepTimestampsAction,
   setAnalyticsData as setAnalyticsDataAction,
@@ -74,11 +76,12 @@ import { useTradeLogsCrud } from '../hooks/useTradeLogsCrud';
 import { useChatPanel } from '../hooks/useChatPanel';
 import { useVisionAnalysis } from '../hooks/useVisionAnalysis';
 import { useAudit } from '../hooks/useAudit';
+import { tradeCardsStorageKey } from '../features/terminal/phases/phase-10-mission-control/missionControl/helpers';
 import {
   Selections, Notes, InterSelections, StrikeSelections, SysData,
   AvailableModel, ModelConfig, TradeLog, EditFormData, Toast,
   ConfirmModal, ChatMessage, SessionInput, Session, ActiveView, AuditData,
-  NetraOutput, WeaponPrediction,
+  NetraOutput, WeaponPrediction, RecognitionCheckpoint,
 } from '../types';
 
 // ─── Context Value Type ───────────────────────────────────────────────────────
@@ -119,6 +122,10 @@ export interface NetraContextValue {
   setStrikeSelections: (v: StrikeSelections) => void;
   saturationSelections: Record<string, string>;
   setSaturationSelections: (v: Record<string, string>) => void;
+  waitSelections: import('../types').WaitSelections;
+  setWaitSelections: (v: import('../types').WaitSelections) => void;
+  recognitionCheckpoints: RecognitionCheckpoint[];
+  setRecognitionCheckpoints: (v: RecognitionCheckpoint[]) => void;
   // Command flow
   finalCommand: string | null;
   setFinalCommand: (v: string | null) => void;
@@ -152,11 +159,12 @@ export interface NetraContextValue {
   setTradeName: (v: string) => void;
   handleAuth: () => void;
   initializeMission: () => void;
+  isInitializingMission: boolean;
   resumeSession: (log: TradeLog) => void;
-  forkSession: (log: TradeLog, newName: string) => void;
-  forkCurrentSession: (phaseNum: number, newName: string) => void;
+  forkSession: (log: TradeLog, newName: string) => Promise<boolean>;
+  forkCurrentSession: (phaseNum: number, newName: string, fork?: { recordKey: string; label: string; clearSelectionKeys?: string[] }) => Promise<boolean>;
   loadSessionById: (id: string) => Promise<void>;
-  saveSession: () => void;
+  saveSession: (options?: { silent?: boolean; recognitionCheckpoints?: RecognitionCheckpoint[]; highestStep?: number; clearDownstream?: boolean; clearAfter?: 'pre_session' | 'htf' | 'market_pulse' | 'decision_path' | 'pinaka_state' | 'command'; selectedNetraState?: Record<string, unknown> | null; liveMarketContext?: Record<string, unknown> }) => Promise<boolean>;
   resetTerminalState: () => void;
   logout: () => void;
   // Logs
@@ -301,6 +309,8 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
   const interSelections = useSelector((s: RootState) => s.analysis.interSelections);
   const strikeSelections = useSelector((s: RootState) => s.analysis.strikeSelections);
   const saturationSelections = useSelector((s: RootState) => s.analysis.saturationSelections);
+  const waitSelections = useSelector((s: RootState) => s.analysis.waitSelections);
+  const recognitionCheckpoints = useSelector((s: RootState) => s.analysis.recognitionCheckpoints);
   const selectedWeaponId = useSelector((s: RootState) => s.analysis.selectedWeaponId);
   const selectedNetraState = useSelector((s: RootState) => s.analysis.selectedNetraState);
   const weaponStageLog = useSelector((s: RootState) => s.analysis.weaponStageLog);
@@ -340,18 +350,22 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.classList.toggle('dark', darkMode);
   }, [darkMode]);
 
-  // ─── Session auto-save ──────────────────────��──────────────────────
-  // Deps are explicit so the closure always captures fresh values.
+  // ─── Session workflow persistence ─────────────────────────────────
   const activeSessionId = useSelector((s: RootState) => s.session.activeSessionId);
   const netraOutput = useSelector((s: RootState) => s.analysis.netraOutput);
+  const [persistenceRevision, setPersistenceRevision] = useState(0);
+  const persistenceClearAfterRef = useRef<null | 'pre_session' | 'htf' | 'market_pulse'>(null);
 
   useEffect(() => {
-    if (activeSessionId && highestStep > 1) {
-      session_.saveSession();
+    if (activeSessionId && persistenceRevision > 0) {
+      const clearAfter = persistenceClearAfterRef.current;
+      persistenceClearAfterRef.current = null;
+      void session_.saveSession({ silent: true, ...(clearAfter ? { clearAfter } : {}) });
     }
-  // saveSession reads fresh state via internal ref — no stale closure risk.
+  // The revision changes only after Confirm/Edit dispatches. The effect runs
+  // after Redux has re-rendered, so saveSession's snapshot ref is current.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [highestStep, activeSessionId]);
+  }, [persistenceRevision, activeSessionId]);
 
   // ─── Boot: load models (always) + system data (auth only) ──────────
 
@@ -513,9 +527,11 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
 
   const confirmStep = useCallback((stepLevel: number) => {
     if (highestStepRef.current === stepLevel) {
+      persistenceClearAfterRef.current = null;
       dispatch(setHighestStepAction(stepLevel + 1));
       const timestampKey = stepLevel === 4 ? 'command' : STEP_NAMES[stepLevel];
       dispatch(setStepTimestampsAction({ ...stepTimestamps, [timestampKey]: new Date().toLocaleTimeString('en-IN') }));
+      setPersistenceRevision(revision => revision + 1);
       showToast(`Step ${stepLevel} confirmed`);
     }
   }, [dispatch, stepTimestamps, showToast]);
@@ -523,12 +539,48 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
   const editStep = useCallback((stepLevel: number) => {
     dispatch(setHighestStepAction(stepLevel));
     if (stepLevel < 4) {
+      const nextSelections = { ...selections };
+      const nextNotes = { ...notes };
+      if (stepLevel <= 1) {
+        nextSelections.htfStructure = {};
+        nextNotes.htfStructure = '';
+      }
+      if (stepLevel <= 2) {
+        nextSelections.marketPulse = {};
+        nextSelections.liquidityContext = {};
+        nextNotes.marketPulse = '';
+        nextNotes.liquidityContext = '';
+      }
+      dispatch(setSelectionsAction(nextSelections));
+      dispatch(setNotesAction(nextNotes));
       dispatch(setFinalCommandAction(null));
       dispatch(setNetraOutputAction(null));
       dispatch(setSelectedNetraStateAction(null));
       dispatch(setSysRecommendationAction(null));
       dispatch(setSelectedWeaponIdAction(null));
       dispatch(setCommandLockedAction(false));
+      dispatch(setWeaponPredictionAction(null));
+      dispatch(setRecognitionCheckpointsAction([]));
+      dispatch(setWaitSelectionsAction({
+        waitingFor: '', referenceLocation: '', requiredResolution: '', developmentStage: '',
+        institutionalSignature: '', validityHorizon: '', waitNote: '', resolutionStatus: 'OPEN',
+        resolutionEvent: '', resolutionNote: '', openedAt: '', resolvedAt: '',
+      }));
+      dispatch(setInterSelectionsAction({ pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }));
+      dispatch(setStrikeSelectionsAction({
+        impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '',
+        zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '',
+        postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '',
+      }));
+      dispatch(setSaturationSelectionsAction({}));
+      dispatch(setWeaponStageLogAction([]));
+      if (activeSessionId) localStorage.removeItem(tradeCardsStorageKey(activeSessionId));
+      const timestampKeys = stepLevel === 1
+        ? ['preSessionContext', 'htfStructure', 'marketPulse', 'liquidityContext', 'evaluation', 'command', 'matrix', 'armory', 'control']
+        : stepLevel === 2
+          ? ['htfStructure', 'marketPulse', 'liquidityContext', 'evaluation', 'command', 'matrix', 'armory', 'control']
+          : ['marketPulse', 'liquidityContext', 'evaluation', 'command', 'matrix', 'armory', 'control'];
+      dispatch(setStepTimestampsAction(Object.fromEntries(Object.entries(stepTimestamps).filter(([key]) => !timestampKeys.includes(key)))));
     } else if (stepLevel === 4) {
       // P7 command edit should preserve expensive P5/P6 recognition output.
       // Only invalidate downstream weapon/trade guidance that depends on the command matrix.
@@ -542,7 +594,11 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     }
     // Always unlock weapon; only clear selectedWeaponId when going back past the weapon step
     dispatch(setWeaponLockedAction(false));
-  }, [dispatch, stepTimestamps]);
+    if (stepLevel < 4) {
+      persistenceClearAfterRef.current = ({ 1: 'pre_session', 2: 'htf', 3: 'market_pulse' } as const)[stepLevel as 1 | 2 | 3];
+      setPersistenceRevision(revision => revision + 1);
+    }
+  }, [dispatch, stepTimestamps, selections, notes, activeSessionId]);
 
   const doResetStep = useCallback((stepLevel: number) => {
     const stepKeys = ['preSessionContext', 'htfStructure', 'marketPulse', 'liquidityContext'] as const;
@@ -561,10 +617,17 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     }
     if (stepLevel <= 5) { dispatch(setFinalCommandAction(null)); dispatch(setCommandLockedAction(false)); }
     dispatch(setConfirmModalAction(null));
+    if (stepLevel < 4) {
+      persistenceClearAfterRef.current = ({ 1: 'pre_session', 2: 'htf', 3: 'market_pulse' } as const)[stepLevel as 1 | 2 | 3];
+    } else {
+      persistenceClearAfterRef.current = null;
+    }
+    setPersistenceRevision(revision => revision + 1);
     showToast('Step reset');
   }, [dispatch, selections, notes, showToast]);
 
   const confirmMarketPulse = useCallback(() => {
+    persistenceClearAfterRef.current = null;
     const time = new Date().toLocaleTimeString('en-IN');
     dispatch(setHighestStepAction(4));
     dispatch(setStepTimestampsAction({
@@ -572,10 +635,12 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
       marketPulse: time,
       liquidityContext: time,
     }));
+    setPersistenceRevision(revision => revision + 1);
     showToast('Market Pulse confirmed');
   }, [dispatch, stepTimestamps, showToast]);
 
   const editMarketPulse = useCallback(() => {
+    persistenceClearAfterRef.current = 'market_pulse';
     dispatch(setHighestStepAction(3));
     dispatch(setSelectionsAction({ ...selections, marketPulse: {}, liquidityContext: {} }));
     dispatch(setNotesAction({ ...notes, marketPulse: '', liquidityContext: '' }));
@@ -586,6 +651,7 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     dispatch(setSelectedWeaponIdAction(null));
     dispatch(setCommandLockedAction(false));
     dispatch(setWeaponLockedAction(false));
+    setPersistenceRevision(revision => revision + 1);
     showToast('Market Pulse reset');
   }, [dispatch, selections, notes, showToast]);
 
@@ -611,6 +677,10 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     setStrikeSelections: (v) => dispatch(setStrikeSelectionsAction(v)),
     saturationSelections,
     setSaturationSelections: (v) => dispatch(setSaturationSelectionsAction(v)),
+    waitSelections,
+    setWaitSelections: (v) => dispatch(setWaitSelectionsAction(v)),
+    recognitionCheckpoints,
+    setRecognitionCheckpoints: (v) => dispatch(setRecognitionCheckpointsAction(v)),
     // Command
     finalCommand,
     setFinalCommand: (v) => dispatch(setFinalCommandAction(v)),
@@ -644,6 +714,7 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     setTradeName: (v) => dispatch(setTradeNameAction(v)),
     handleAuth: session_.handleAuth,
     initializeMission: session_.initializeMission,
+    isInitializingMission: session_.isInitializingMission,
     resumeSession: session_.resumeSession,
     forkSession: session_.forkSession,
     forkCurrentSession: session_.forkCurrentSession,

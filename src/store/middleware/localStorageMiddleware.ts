@@ -10,7 +10,7 @@ interface RegistrySlice {
 }
 type StateWithRegistry = { sessionRegistry: RegistrySlice };
 type StateWithChat = { chat: { sources: string[] } };
-type StateWithAnalysis = { analysis: { stateTimeline: unknown } };
+type StateWithAnalysis = { analysis: { stateTimeline: unknown; recognitionCheckpoints: unknown } };
 
 // Maps action type → localStorage key. Only listed keys are persisted.
 const PERSIST_MAP: Record<string, string> = {
@@ -26,6 +26,7 @@ const PERSIST_MAP: Record<string, string> = {
   'analysis/setWeaponLocked': 'weaponLocked',
   'analysis/setInterSelections': 'interSelections',
   'analysis/setStrikeSelections': 'strikeSelections',
+  'analysis/setSaturationSelections': 'saturationSelections',
   'analysis/setSelectedWeaponId': 'selectedWeaponId',
   'analysis/setImageDescription': 'imageDescription',
   'analysis/setStepTimestamps': 'stepTimestamps',
@@ -71,7 +72,6 @@ export const localStorageMiddleware: Middleware = (storeAPI) => (next) => (actio
     saveState('stateTimeline', state.analysis.stateTimeline);
     return result;
   }
-
   const key = PERSIST_MAP[actionType];
   if (key) {
     const payload = (action as { type: string; payload: unknown }).payload;

@@ -360,27 +360,13 @@ function RecognitionSummary({ output }: { output: Record<string, unknown> }) {
 export function TraceDisplay({ trace, hideContent }: { trace: Array<{ agent: string; content: string }>; hideContent?: string }) {
   if (!trace || trace.length === 0) return null;
   const normalizedHide = normalizeForCompare(hideContent || '');
-  const visibleTrace = normalizedHide
-    ? trace.filter(step => normalizeForCompare(contentToText(step.content)) !== normalizedHide)
-    : trace;
+  const visibleTrace = trace.filter(step => {
+    const content = normalizeForCompare(contentToText(step.content));
+    return Boolean(content) && (!normalizedHide || content !== normalizedHide);
+  });
   if (visibleTrace.length === 0) return null;
   return (
-    <div style={{ border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(0,0,0,0.12)' }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '10px 12px',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        background: 'rgba(255,255,255,0.02)',
-      }}>
-        <span style={{ ...MONO, fontSize: '8.5px', fontWeight: 900, letterSpacing: '0.25em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.52)' }}>
-          Agent Trace
-        </span>
-        <span style={{ ...MONO, fontSize: '8px', fontWeight: 900, letterSpacing: '0.15em', color: 'rgba(255,255,255,0.42)' }}>
-          {visibleTrace.length} STEPS
-        </span>
-      </div>
+    <AccordionShell header="AGENT TRACE" badge={`${visibleTrace.length} STEPS`} badgeColor="rgba(255,255,255,0.42)">
       <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
         {visibleTrace.map((step, idx) => (
           <div key={idx} style={{ borderLeft: '2px solid rgba(255,255,255,0.12)', paddingLeft: '12px' }}>
@@ -398,7 +384,7 @@ export function TraceDisplay({ trace, hideContent }: { trace: Array<{ agent: str
           </div>
         ))}
       </div>
-    </div>
+    </AccordionShell>
   );
 }
 
@@ -437,6 +423,7 @@ export function OutputDisplay({ output: rawOutput }: { output: unknown }) {
   const thinking   = (output.thinking || '') as string;
   const riskAudit  = output.risk_audit as AIOutput['risk_audit'] | null;
   const agentTrace = output.agent_trace || null;
+  const criticReview = output.critic_review || null;
   const hasStructuredRecognition = !!(output as Record<string, unknown>).recognized_state;
   const mainText = hasStructuredRecognition ? '' : baseMainText;
   const hasVisibleContent = Boolean(command || conviction || riskLevel || plan || mainText || errorText || thinking || riskAudit || hasStructuredRecognition || (agentTrace && agentTrace.length));
@@ -447,9 +434,34 @@ export function OutputDisplay({ output: rawOutput }: { output: unknown }) {
   );
 
   if (plainAiText) {
-    const text = mainText || rawModelText || returnedText;
+    const eligibility = String((output as Record<string, unknown>).eligibility_recommendation || 'INSUFFICIENT').toUpperCase();
+    const tracedSuggestion = [...(agentTrace || [])]
+      .reverse()
+      .find(step => step.agent?.toLowerCase() === 'suggestion' && contentToText(step.content).trim());
+    const text = mainText || rawModelText || collapseRepeatedText(contentToText(tracedSuggestion?.content));
+    const firstLine = text.split(/\r?\n/)[0]?.trim().toUpperCase().replace(/\s+/g, '_') || '';
+    const candidate = String((output as Record<string, unknown>).candidate_command || (
+      ['STRIKE', 'INTERCEPTION', 'SATURATION', 'NO_ENGAGEMENT'].includes(firstLine) ? firstLine : ''
+    ));
+    const isDeveloping = eligibility === 'DEVELOPING';
+    const isActive = eligibility === 'ACTIVE';
+    const bannerLabel = isDeveloping ? 'Wait Recommended' : isActive ? 'Command Candidate' : 'Manual Selection Required';
+    const bannerValue = isDeveloping && candidate
+      ? `WAIT → ${candidate.replace(/_/g, ' ')}`
+      : candidate
+        ? `${candidate.replace(/_/g, ' ')} · ${eligibility}`
+        : `${eligibility.replace(/_/g, ' ')} EVIDENCE`;
+    const bannerColor = isActive ? '#22c55e' : '#d8a15f';
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ borderLeft: `3px solid ${bannerColor}`, background: `${bannerColor}14`, padding: '12px 14px' }}>
+          <div style={{ ...MONO, fontSize: '8px', fontWeight: 900, letterSpacing: '0.22em', color: bannerColor, textTransform: 'uppercase', marginBottom: '7px' }}>
+            {bannerLabel}
+          </div>
+          <div style={{ ...MONO, fontSize: '16px', fontWeight: 900, color: '#f4efe6', letterSpacing: '0.08em' }}>
+            {bannerValue}
+          </div>
+        </div>
         {errorText && (
           <div style={{ borderLeft: '3px solid #ef4444', background: 'rgba(239,68,68,0.09)', padding: '12px 14px' }}>
             <div style={{ ...MONO, fontSize: '8px', fontWeight: 900, letterSpacing: '0.22em', color: '#f87171', textTransform: 'uppercase', marginBottom: '8px' }}>
@@ -460,12 +472,17 @@ export function OutputDisplay({ output: rawOutput }: { output: unknown }) {
             </p>
           </div>
         )}
-        {text && (
+        {text ? (
           <p style={{ ...MONO, fontSize: '12px', color: '#e8eaed', lineHeight: 1.9, margin: 0, whiteSpace: 'pre-wrap' }}>
             {text}
           </p>
+        ) : (
+          <p style={{ ...MONO, fontSize: '12px', color: '#e8eaed', lineHeight: 1.9, margin: 0 }}>
+            Maya could not identify a doctrine state from the available evidence. Complete the missing market context or select the state manually.
+          </p>
         )}
         <ThinkingAccordion thinking={thinking} />
+        <AuditAccordion review={criticReview} label="Verification" />
         <TraceDisplay trace={agentTrace || []} hideContent={text} />
       </div>
     );

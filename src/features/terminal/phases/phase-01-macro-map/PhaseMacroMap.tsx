@@ -80,7 +80,9 @@ export function StrategicMarkingChecklist({
 export function BiasDimensions() {
   const { SYSTEM_DATA, selections, setSelections, highestStep } = useNetra();
 
-  const dims     = SYSTEM_DATA.preSessionContext?.dimensions || [];
+  const dims     = (SYSTEM_DATA.preSessionContext?.dimensions || []).filter(dim => ![
+    'correlatedMarketAlignment', 'preSessionDisplacement', 'displacementSize',
+  ].includes(dim.id));
   const rb       = (selections.preSessionContext || {}) as Record<string, string>;
   const isLocked = highestStep > 1;
 

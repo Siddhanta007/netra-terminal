@@ -2,9 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/store';
 import { useNetra } from '@/context/NetraContext';
-import { useNetraUtils } from '@/hooks/useNetraUtils';
-import { API_BASE } from '@/utils/constants';
 import ForkButton from '@/components/UI/ForkButton';
+import { buildForkName } from '@/utils/forkNaming';
 
 // ─── Operational Marking checklist ───────────────────────────────────────────
 
@@ -91,12 +90,17 @@ function OperationalMarkingChecklist({
   );
 }
 
-export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: number, defaultName: string) => void }) {
+type MarketPulseForkRecord = {
+  recordKey: 'auction_state' | 'price_behaviour' | 'liquidity_context' | 'auction_state_events';
+  label: string;
+};
+
+export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: number, defaultName: string, forkRecord: MarketPulseForkRecord) => void }) {
   const {
     SYSTEM_DATA, selections, setSelections,
     notes, setNotes,
     highestStep, stepTimestamps,
-    confirmMarketPulse,
+    confirmMarketPulse, editStep,
   } = useNetra();
 
   const tradeName = useSelector((s: RootState) => s.logs.tradeName);
@@ -146,8 +150,6 @@ export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: numb
   const showSubAuction = auctionState === 'Balance';
   const showActiveLeg  = !!auctionState;
 
-  const isCompressionTrap = subAuctionState === 'Contracting Balance';
-
   // ── B: Liquidity Context (SYSTEM_DATA-driven) ─────────────────────────────
   const liq = (selections.liquidityContext || {}) as Record<string, string>;
   const liqDims = SYSTEM_DATA.liquidityContext?.dimensions || [];
@@ -155,13 +157,6 @@ export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: numb
     if (isLocked) return;
     setSelections({ ...selections, liquidityContext: { ...liq, [key]: val } });
   };
-  const allLiqSelected = liqDims.every(d => !!liq[d.id]);
-
-  const objectiveCondition  = liq.auctionObjectiveCondition || liq.objectiveCondition || '';
-  const objectiveFreshness  = liq.auctionObjectiveFreshness || liq.objectiveFreshness || '';
-  const { getAuthHeaders } = useNetraUtils();
-  const [liqGate, setLiqGate] = useState<{ gate: string; reason: string }>({ gate: 'PROCEED', reason: '' });
-
   const [opChecked, setOpChecked] = useState<Record<string, boolean>>({});
   useEffect(() => {
     setOpChecked(Object.fromEntries(selectedOperationalMarkIds.map(id => [id, true])));
@@ -182,24 +177,6 @@ export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: numb
       return next;
     });
   };
-
-  useEffect(() => {
-    if (!objectiveCondition) return;
-    fetch(`${API_BASE}/api/decision/liquidity-gate`, {
-      method: 'POST',
-      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ tier: objectiveCondition, maturity: objectiveFreshness }),
-    })
-      .then(r => r.json())
-      .then(setLiqGate)
-      .catch(() => {});
-  }, [objectiveCondition, objectiveFreshness]);
-
-  const isNoEngagement = liqGate.gate === 'NO_ENGAGEMENT';
-  const noEngagementReason = liqGate.reason;
-
-  // ── Gate ──────────────────────────────────────────────────────────────────
-  const mpOk = !!auctionState && !!activeLeg && !!momentum && !!resistance;
 
   const canConfirm = !isLocked;
 
@@ -223,7 +200,11 @@ export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: numb
       <OperationalMarkingChecklist checked={opChecked} toggle={toggleOp} marks={OPERATIONAL_MARKS} />
 
       {/* ── COMPONENT 2: AUCTION STATE ── */}
-      {subLabel('Component 2 — Auction State')}
+      {subLabel('Component 2 — Auction State', false, onFork ? () => onFork(
+        3,
+        buildForkName(tradeName, 'Auction State'),
+        { recordKey: 'auction_state', label: 'Auction State' },
+      ) : undefined)}
 
       <div className="precision-row">
         <div className="precision-label">Auction State</div>
@@ -272,7 +253,11 @@ export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: numb
       )}
 
       {/* ── COMPONENT 3: PRICE BEHAVIOUR ── */}
-      {subLabel('Component 3 — Price Behaviour')}
+      {subLabel('Component 3 — Price Behaviour', false, onFork ? () => onFork(
+        3,
+        buildForkName(tradeName, 'Price Behaviour'),
+        { recordKey: 'price_behaviour', label: 'Price Behaviour' },
+      ) : undefined)}
       <div className="precision-row">
         <div className="precision-label">Momentum</div>
         <div className="precision-selector">
@@ -294,16 +279,14 @@ export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: numb
         </div>
       </div>
 
-      {isCompressionTrap && (
-        <div className="flex items-center gap-2 mt-3 px-4 py-3" style={{ background: 'var(--red-bg)', border: '1px solid var(--red)' }}>
-          <span style={{ fontSize: '9px', fontWeight: 900, color: 'var(--red)', letterSpacing: '0.2em', textTransform: 'uppercase' }}>⛔ COMPRESSION TRAP — NO TRADE ZONE</span>
-        </div>
-      )}
-
       {/* ── COMPONENT 4: LIQUIDITY CONTEXT & COMPONENT 5: AUCTION EVENT ── */}
       {liqDims.length > 0 && (
         <>
-          {subLabel('Component 4 — Liquidity Context', false, onFork ? () => onFork(3, `FORK_${tradeName || 'Trade'}_P3_LIQ`) : undefined)}
+          {subLabel('Component 4 — Liquidity Context', false, onFork ? () => onFork(
+            3,
+            buildForkName(tradeName, 'Liquidity Context'),
+            { recordKey: 'liquidity_context', label: 'Liquidity Context' },
+          ) : undefined)}
 
           {liqDims.filter(dim => dim.id !== 'auctionEvent').map((dim) => (
             <div key={dim.id} className="precision-row">
@@ -321,7 +304,11 @@ export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: numb
             </div>
           ))}
 
-          {subLabel('Component 5 — Auction Event', false, onFork ? () => onFork(3, `FORK_${tradeName || 'Trade'}_P3_EVENT`) : undefined)}
+          {subLabel('Component 5 — Auction Event', false, onFork ? () => onFork(
+            3,
+            buildForkName(tradeName, 'Auction Event'),
+            { recordKey: 'auction_state_events', label: 'Auction Event' },
+          ) : undefined)}
 
           {liqDims.filter(dim => dim.id === 'auctionEvent').map((dim) => (
             <div key={dim.id} className="precision-row">
@@ -339,12 +326,6 @@ export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: numb
             </div>
           ))}
 
-          {isNoEngagement && !isLocked && (
-            <div className="flex flex-col gap-1.5 px-4 py-3 mt-3" style={{ background: 'var(--red-bg)', border: '1px solid var(--red)' }}>
-              <span style={{ fontSize: '9px', fontWeight: 900, color: 'var(--red)', letterSpacing: '0.2em', textTransform: 'uppercase' }}>⛔ NO ENGAGEMENT — Liquidity Context Invalid</span>
-              <span style={{ fontSize: '10px', color: 'var(--red)', lineHeight: 1.5 }}>{noEngagementReason}</span>
-            </div>
-          )}
         </>
       )}
 
@@ -358,10 +339,13 @@ export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: numb
           className="flex-1 bg-transparent outline-none resize-none text-[12px] text-[var(--text-2)] placeholder:text-[var(--text-4)] leading-relaxed min-h-[52px]"
         />
         <div className="flex gap-2 shrink-0">
-          <button onClick={() => setEditing(true)} className="btn-edit w-20" disabled={!isLocked}>Edit</button>
+          <button onClick={() => { setEditing(true); editStep(3); }} className="btn-edit w-20" disabled={!isLocked}>Edit</button>
           <button onClick={() => { if (!isLocked) { setOpChecked({}); setSelections({ ...selections, marketPulse: {} }); } }} className="btn-reset w-20" disabled={isLocked || Object.keys(mp).length === 0}>Reset</button>
           <button
-            onClick={() => { if (editing) { setEditing(false); } else { confirmMarketPulse(); } }}
+            onClick={() => {
+              if (editing) setEditing(false);
+              confirmMarketPulse();
+            }}
             className={`${isLocked ? 'btn-confirmed' : 'btn-confirm'} w-40`}
             disabled={!canConfirm}
           >

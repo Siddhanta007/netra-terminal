@@ -1,6 +1,6 @@
 // Hook — CRUD for saved trade logs (list, edit, delete) against the backend.
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '../store';
 import { setTradeLogs, setActiveEditLog, setEditFormData, setTradeName } from '../store/slices/logsSlice';
@@ -28,13 +28,25 @@ export function useTradeLogsCrud() {
   const netraOutput = useSelector((s: RootState) => s.analysis.netraOutput);
   const imageDescription = useSelector((s: RootState) => s.analysis.imageDescription);
   const auditData = useSelector((s: RootState) => s.logs.auditData);
+  const logsRequestRef = useRef(0);
 
-  const fetchLogs = useCallback((modelId = 'pinaka') => {
-    fetch(`${API_BASE}/api/logs?model_id=${modelId}`, { headers: getAuthHeaders() })
-      .then((res) => res.json())
-      .then((data: TradeLog[]) => dispatch(setTradeLogs(data)))
-      .catch(() => { if (import.meta.env.DEV) console.error('Logger offline'); });
-  }, [dispatch, getAuthHeaders]);
+  const fetchLogs = useCallback(async (modelId = currentModel || 'pinaka') => {
+    const requestedModel = String(modelId || 'pinaka').toLowerCase();
+    const requestId = ++logsRequestRef.current;
+    try {
+      const res = await fetch(`${API_BASE}/api/logs?model_id=${encodeURIComponent(requestedModel)}`, { headers: getAuthHeaders() });
+      if (!res.ok) throw new Error(`Could not load logs (${res.status})`);
+      const data: TradeLog[] = await res.json();
+      if (requestId !== logsRequestRef.current) return;
+      // Keep the client boundary strict even if an older server returns an
+      // unexpectedly mixed response. Legacy records without model_id belong
+      // to Pinaka, which was the original/default terminal model.
+      const scoped = data.filter(log => String(log.model_id || 'pinaka').toLowerCase() === requestedModel);
+      dispatch(setTradeLogs(scoped));
+    } catch {
+      if (import.meta.env.DEV) console.error('Logger offline');
+    }
+  }, [currentModel, dispatch, getAuthHeaders]);
 
   const commitTradeLog = useCallback((weapon?: string) => {
     const selNotes = [
@@ -202,17 +214,19 @@ export function useTradeLogsCrud() {
     dispatch(setConfirmModal({
       title: 'Delete Trade?',
       desc: 'This trade will be permanently removed from the ledger. This cannot be undone.',
-      onConfirm: () => {
-        fetch(`${API_BASE}/api/logs/${encodeURIComponent(tradeId)}`, {
+      loadingText: 'Deleting trade…',
+      onConfirm: async () => {
+        const res = await fetch(`${API_BASE}/api/logs/${encodeURIComponent(tradeId)}`, {
           method: 'DELETE',
           headers: getAuthHeaders(),
-        })
-          .then(() => {
-            fetchLogs();
-            dispatch(setActiveEditLog(null));
-            dispatch(setConfirmModal(null));
-            showToast('Trade deleted');
-          });
+        });
+        if (!res.ok) {
+          showToast('Could not delete trade. Please try again.', 'error');
+          throw new Error(`Could not delete trade (${res.status})`);
+        }
+        await fetchLogs();
+        dispatch(setActiveEditLog(null));
+        showToast('Trade deleted');
       },
     }));
   }, [dispatch, getAuthHeaders, fetchLogs, showToast]);
