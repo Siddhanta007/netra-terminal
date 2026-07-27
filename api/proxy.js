@@ -19,7 +19,14 @@ export default async function handler(req, res) {
     }
   }
 
-  const target = `${hfSpaceUrl}/${path}${query.size ? `?${query}` : ''}`;
+  // `path` is decoded by the Vercel rewrite before it reaches this handler.
+  // Trade IDs start with "#", so string concatenation would turn that ID into
+  // a URL fragment and silently send only `/api/logs/` to FastAPI. Assigning
+  // through URL.pathname safely restores `%23` while preserving path slashes.
+  const target = new URL(hfSpaceUrl);
+  const basePath = target.pathname.replace(/\/+$/, '');
+  target.pathname = `${basePath}/${String(path).replace(/^\/+/, '')}`;
+  target.search = query.toString();
   const headers = new Headers();
   for (const [key, value] of Object.entries(req.headers)) {
     if (value == null) continue;
@@ -60,4 +67,3 @@ export default async function handler(req, res) {
     });
   }
 }
-

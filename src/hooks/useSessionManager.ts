@@ -124,7 +124,7 @@ export function useSessionManager() {
     selectedWeaponId: null as string | null,
     stepTimestamps: {} as Record<string, string>,
     tradeName: '',
-    activeSessionId: null as number | null,
+    activeSessionId: null as string | null,
     assetName: '',
     imageDescription: null as string | null,
     auditData: null as RootState['logs']['auditData'],
@@ -656,7 +656,8 @@ export function useSessionManager() {
 
   const saveSession = useCallback(async (options: { silent?: boolean; recognitionCheckpoints?: RecognitionCheckpoint[]; highestStep?: number; clearDownstream?: boolean; clearAfter?: 'pre_session' | 'htf' | 'market_pulse' | 'decision_path' | 'pinaka_state' | 'command'; selectedNetraState?: Record<string, unknown> | null; liveMarketContext?: Record<string, unknown> } = {}): Promise<boolean> => {
     const snap = analysisRef.current;
-    if (!snap.activeSessionId) {
+    const sessionId = String(snap.activeSessionId || '').trim();
+    if (!sessionId) {
       if (!options.silent) showToast('No active session to save', 'error');
       return false;
     }
@@ -664,7 +665,7 @@ export function useSessionManager() {
     // Read live trade cards from localStorage for phase9
     const phase9 = (() => {
       try {
-        const raw = localStorage.getItem(tradeCardsStorageKey(snap.activeSessionId));
+        const raw = localStorage.getItem(tradeCardsStorageKey(sessionId));
         if (!raw) return null;
         const cards = JSON.parse(raw) as Array<Record<string, unknown>>;
         const active = cards.filter(c => c.entry);
@@ -925,7 +926,7 @@ export function useSessionManager() {
 
     const persist = async (): Promise<boolean> => {
       try {
-        const res = await fetch(`${API_BASE}/api/logs/${encodeURIComponent(snap.activeSessionId)}/state`, {
+        const res = await fetch(`${API_BASE}/api/logs/${encodeURIComponent(sessionId)}/state`, {
           method: 'PUT',
           headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify(payload),

@@ -21,7 +21,7 @@ interface Props {
   forkSession: (log: TradeLog, name: string) => Promise<boolean>;
   onView?: (log: TradeLog) => void;
   initializeMission?: () => void;
-  deleteTradeLog?: (id: number) => void;
+  deleteTradeLog?: (id: string) => void;
   downloadCSV?: (modelId: string) => void;
   isDownloading?: boolean;
 }
@@ -31,7 +31,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
   const [search, setSearch] = useState('');
   const [sortCol, setSortCol] = useState('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterCommand, setFilterCommand] = useState('all');
   const [nameColumnWidth, setNameColumnWidth] = useState(180);

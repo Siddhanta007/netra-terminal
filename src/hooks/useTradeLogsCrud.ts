@@ -9,6 +9,12 @@ import { API_BASE } from '../utils/constants';
 import { useNetraUtils } from './useNetraUtils';
 import { TradeLog } from '../types';
 
+async function apiError(response: Response, fallback: string): Promise<Error> {
+  const body = await response.json().catch(() => ({}));
+  const detail = typeof body?.detail === 'string' ? body.detail : fallback;
+  return new Error(`${detail} (${response.status})`);
+}
+
 export function useTradeLogsCrud() {
   const dispatch = useDispatch<AppDispatch>();
   const { getAuthHeaders, showToast } = useNetraUtils();
@@ -113,7 +119,12 @@ export function useTradeLogsCrud() {
       headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(payload),
     })
-      .then((res) => res.json())
+      .then(async (res) => {
+        if (!res.ok) throw await apiError(res, 'Could not create trade log');
+        const data: TradeLog = await res.json();
+        if (!data?.id) throw new Error('Server did not return a trade ID');
+        return data;
+      })
       .then((data: TradeLog) => {
         fetchLogs();
         dispatch(setActiveEditLog(data));
@@ -142,11 +153,18 @@ export function useTradeLogsCrud() {
         })
         .catch(e => console.error('Vectorize failure', e));
       })
-      .catch(() => showToast('Firing Sequence Failure', 'error'));
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Unknown save error';
+        showToast(`Firing Sequence Failure: ${message}`, 'error');
+      });
   }, [dispatch, getAuthHeaders, fetchLogs, selections, notes, finalCommand, interSelections, strikeSelections, editFormData, selectedWeaponId, currentModel, session, imageDescription, netraOutput, showToast]);
 
-  const updateTradeLog = useCallback(async (tradeId: number) => {
-    if (!tradeId) return;
+  const updateTradeLog = useCallback(async (tradeId: string) => {
+    const normalizedTradeId = String(tradeId || '').trim();
+    if (!normalizedTradeId) {
+      showToast('Cannot update trade: missing trade ID', 'error');
+      return;
+    }
     const entry = parseFloat(String(editFormData.entry_price)) || 0;
     const cost = parseFloat(String(editFormData.additional_cost)) || 0;
     const exit = parseFloat(String(editFormData.exit_price)) || 0;
@@ -190,33 +208,40 @@ export function useTradeLogsCrud() {
       vision_data: imageDescription,
       time_spent: calculatedTimeSpent || editFormData.time_spent
     };
-    fetch(`${API_BASE}/api/logs/${encodeURIComponent(tradeId)}`, {
-      method: 'PUT',
-      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(updatedData),
-    })
-      .then((res) => res.json())
-      .then((data: TradeLog) => {
-        fetchLogs();
-        dispatch(setActiveEditLog(data));
-        dispatch(setEditFormData({
-          ...(data.phase2 || {}),
-          ...(data.phase3 || {}),
-          ...(data.phase4 || {}),
-          trade_name: data.name,
-        }));
-        showToast('Mission Protocol Updated Successfully');
+    try {
+      const res = await fetch(`${API_BASE}/api/logs/${encodeURIComponent(normalizedTradeId)}`, {
+        method: 'PUT',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(updatedData),
       });
+      if (!res.ok) throw await apiError(res, 'Could not update trade log');
+      const data: TradeLog = await res.json();
+      if (!data?.id) throw new Error('Server returned an invalid trade log');
+
+      await fetchLogs();
+      dispatch(setActiveEditLog(data));
+      dispatch(setEditFormData({
+        ...(data.phase2 || {}),
+        ...(data.phase3 || {}),
+        ...(data.phase4 || {}),
+        trade_name: data.name,
+      }));
+      showToast('Mission Protocol Updated Successfully');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown save error';
+      showToast(`Trade save failed: ${message}`, 'error');
+    }
   }, [dispatch, getAuthHeaders, fetchLogs, editFormData, auditData, imageDescription, showToast]);
 
-  const deleteTradeLog = useCallback((tradeId: number) => {
-    if (!tradeId) return;
+  const deleteTradeLog = useCallback((tradeId: string) => {
+    const normalizedTradeId = String(tradeId || '').trim();
+    if (!normalizedTradeId) return;
     dispatch(setConfirmModal({
       title: 'Delete Trade?',
       desc: 'This trade will be permanently removed from the ledger. This cannot be undone.',
       loadingText: 'Deleting trade…',
       onConfirm: async () => {
-        const res = await fetch(`${API_BASE}/api/logs/${encodeURIComponent(tradeId)}`, {
+        const res = await fetch(`${API_BASE}/api/logs/${encodeURIComponent(normalizedTradeId)}`, {
           method: 'DELETE',
           headers: getAuthHeaders(),
         });
@@ -232,7 +257,7 @@ export function useTradeLogsCrud() {
   }, [dispatch, getAuthHeaders, fetchLogs, showToast]);
 
   const handleGlobalSave = useCallback(() => {
-    if (activeEditLog) { updateTradeLog(activeEditLog.id); return; }
+    if (activeEditLog?.id) { void updateTradeLog(activeEditLog.id); return; }
     showToast('No active session to save', 'error');
   }, [activeEditLog, updateTradeLog, showToast]);
 

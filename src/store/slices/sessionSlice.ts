@@ -15,7 +15,7 @@ interface TokenClaims {
 
 interface SessionState {
   session: Session | null;
-  activeSessionId: number | null;
+  activeSessionId: string | null;
   isLoggingIn: boolean;
   sessionInput: SessionInput;
 }
@@ -69,10 +69,11 @@ const normalizeSession = (next: Session | null, previous?: Session | null): Sess
 };
 
 const persistedSession = loadState<Session | null>('session', null);
+const persistedActiveSessionId = loadState<string | number | null>('activeSessionId', null);
 
 const initialState: SessionState = {
   session: normalizeSession(persistedSession),
-  activeSessionId: loadState('activeSessionId', null),
+  activeSessionId: persistedActiveSessionId == null ? null : String(persistedActiveSessionId),
   isLoggingIn: false,
   sessionInput: {
     userName: '',
@@ -92,7 +93,7 @@ export const sessionSlice = createSlice({
     setSession: (state, action: PayloadAction<Session | null>) => {
       state.session = normalizeSession(action.payload, state.session);
     },
-    setActiveSessionId: (state, action: PayloadAction<number | null>) => {
+    setActiveSessionId: (state, action: PayloadAction<string | null>) => {
       state.activeSessionId = action.payload;
     },
     setIsLoggingIn: (state, action: PayloadAction<boolean>) => {

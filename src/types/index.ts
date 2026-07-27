@@ -254,7 +254,7 @@ export interface TradePhase9Card {
 export interface TradePhase10 extends AuditData { execution_rating?: number; lessons?: string }
 
 export interface TradeLog {
-  id: number;
+  id: string;
   name: string;
   username?: string;
   created_by?: string;

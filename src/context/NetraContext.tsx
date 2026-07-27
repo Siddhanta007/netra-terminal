@@ -149,8 +149,8 @@ export interface NetraContextValue {
   setSessionInput: (v: SessionInput) => void;
   prepStep: number;
   setPrepStep: (v: number) => void;
-  activeSessionId: number | null;
-  setActiveSessionId: (v: number | null) => void;
+  activeSessionId: string | null;
+  setActiveSessionId: (v: string | null) => void;
   activeView: ActiveView;
   setActiveView: (v: ActiveView) => void;
   currentModel: string;
@@ -181,8 +181,8 @@ export interface NetraContextValue {
   logSortOrder: 'ASC' | 'DESC';
   setLogSortOrder: (v: 'ASC' | 'DESC') => void;
   commitTradeLog: (weapon?: string) => void;
-  updateTradeLog: (tradeId: number) => void;
-  deleteTradeLog: (tradeId: number) => void;
+  updateTradeLog: (tradeId: string) => void;
+  deleteTradeLog: (tradeId: string) => void;
   handleGlobalSave: () => void;
   // AI Chat
   chatHistory: ChatMessage[];
@@ -462,9 +462,18 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(editFormData),
       })
-        .then((res) => res.json())
+        .then(async (res) => {
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(typeof body?.detail === 'string' ? body.detail : `HTTP ${res.status}`);
+          }
+          return res.json();
+        })
         .then((data: TradeLog) => dispatch({ type: 'logs/setActiveEditLog', payload: data }))
-        .catch(() => { });
+        .catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : 'Unknown save error';
+          showToast(`Auto-save failed: ${message}`, 'error');
+        });
     }, DEBOUNCE_MS);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
