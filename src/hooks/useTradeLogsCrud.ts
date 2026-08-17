@@ -56,7 +56,7 @@ export function useTradeLogsCrud() {
 
   const commitTradeLog = useCallback((weapon?: string) => {
     const selNotes = [
-      Object.keys(selections.preSessionContext || {}).length > 0 && `Pre-Session Context: ${Object.values(selections.preSessionContext).join(', ')}${notes.preSessionContext ? ' — ' + notes.preSessionContext : ''}`,
+      Object.keys(selections.preSessionContext || {}).length > 0 && `Super HTF Structure: ${Object.values(selections.preSessionContext).join(', ')}${notes.preSessionContext ? ' — ' + notes.preSessionContext : ''}`,
       Object.keys(selections.htfStructure || {}).length > 0 && `HTF Structure: ${Object.values(selections.htfStructure).join(', ')}${notes.htfStructure ? ' — ' + notes.htfStructure : ''}`,
       Object.keys(selections.marketPulse || {}).length > 0 && `Market Pulse: ${Object.values(selections.marketPulse).join(', ')}${notes.marketPulse ? ' — ' + notes.marketPulse : ''}`,
       Object.keys(selections.liquidityContext || {}).length > 0 && `Liquidity Context: ${Object.values(selections.liquidityContext).join(', ')}${notes.liquidityContext ? ' — ' + notes.liquidityContext : ''}`,

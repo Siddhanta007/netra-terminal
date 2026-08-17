@@ -6,8 +6,7 @@ import type { TradeCard } from './types';
 import { mkCard, computeCardStats, autoTimeSeconds, localDateStr, MONO, StatCell, Field, sep, SEP6, bare, SAVE_TRADE_CARDS_EVENT, type SaveTradeCardsRequest } from './helpers';
 import { RecognizedState, TransitionBranch } from '@/components/Templates/StateGraph';
 import { API_BASE } from '@/utils/constants';
-import { SliderRow } from '@/components/Templates/aiLabs/SliderRow';
-import { tempColor } from '@/components/Templates/aiLabs/helpers';
+import NetraAILabs from '@/components/Templates/NetraAILabs';
 import { LuxuryShapeSpinner } from '@/components/UI/LuxuryShapeSpinner';
 import { buildPhase9TradeBlock, buildTradeMetadata } from '@/types/tradeStorageSchema';
 
@@ -475,7 +474,7 @@ export default function UnifiedTradeCard({
   }, []);
   const {
     SYSTEM_DATA, triggerWeaponPrediction, stopWeaponPrediction, finalCommand, netraOutput, selectedNetraState,
-    AVAILABLE_MODELS, selectedModel, setSelectedModel, modelConfig, setModelConfig, session,
+    selectedModel, session,
     selections, notes, sysRecommendation, selectedWeaponId,
     strikeSelections, interSelections, saturationSelections
   } = useNetra();
@@ -1127,14 +1126,6 @@ export default function UnifiedTradeCard({
     }
   };
 
-  const handleConfigChange = (key: string, val: number) => {
-    if (isLocked) return;
-    setModelConfig({
-      ...modelConfig,
-      [key]: val
-    });
-  };
-
   const catHeaderStyle = (title: string): CSSProperties => ({
     position: 'relative',
     fontFamily: MONO,
@@ -1327,6 +1318,7 @@ export default function UnifiedTradeCard({
           <button
             onClick={handleDeleteCard}
             disabled={deletingCard}
+            data-loading-owner="local"
             style={{ background: 'none', border: 'none', cursor: deletingCard ? 'wait' : 'pointer', color: MATTE.danger, fontSize: '18px', padding: '0 4px', marginLeft: 'auto', outline: 'none', opacity: deletingCard ? 0.5 : 1 }}
             title={deletingCard ? 'Deleting trade...' : 'Delete this Trade Card'}
           >
@@ -1339,181 +1331,77 @@ export default function UnifiedTradeCard({
       <div style={dossierSectionStyle}>
         <DossierNode />
         <div style={catHeaderStyle('Phase - 1 MAYA Suggestion')}>Phase - 1 MAYA Suggestion</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 7fr) minmax(320px, 5fr)', gap: '18px', alignItems: 'stretch', height: '520px', minHeight: 0 }}>
-          <div style={{ ...dossierPanelStyle, background: `linear-gradient(135deg, ${MATTE.phase1Left}, rgba(13,17,22,0.86))`, border: `1px solid ${MATTE.lineStrong}`, height: '520px', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div style={{
-              borderLeft: 'none',
-              background: 'transparent',
-              padding: '14px 16px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '10px',
-              flex: 1,
-              minHeight: 0,
-              overflowY: 'auto'
-            }}>
-                  {predicting ? (
-                    <div className="netra-ai-spinner-shell" style={{ minHeight: '320px' }}>
-                      <LuxuryShapeSpinner compact className="netra-lux-inline" label="Weapon AI" />
+        <NetraAILabs
+          phaseId={`trade-${tradeIndex + 1}-maya`}
+          title="Maya Trade Suggestion"
+          subheading="MAYA — Execution Model Proposal"
+          isEvaluating={predicting}
+          output={hasPred ? wp : null}
+          onAnalyse={() => { void askMaya(); }}
+          onStop={stopWeaponPrediction}
+          analyseDisabled={isLocked}
+          analyseDisabledReason={isLocked ? 'Unlock the trade card to run Maya.' : undefined}
+          controlPanelTop={(
+            <div className="trade-maya-request">
+              <div className="trade-maya-request-label">
+                <span>Your Request to Maya</span>
+                <small>Optional instruction for this trade</small>
+              </div>
+              <textarea
+                value={card.weaponThought}
+                onChange={event => onChange({ weaponThought: event.target.value })}
+                placeholder="Tell Maya what you need: validate an entry model, challenge your setup, compare weapons, or inspect a specific risk…"
+                disabled={isLocked}
+                rows={4}
+              />
+            </div>
+          )}
+          customStatus={hasPred ? (
+            <div className="trade-maya-output">
+              <div className="trade-maya-output-heading">
+                <div>
+                  <span>Maya Proposal</span>
+                  <strong>{aiPick || 'MAYA RESPONSE'}</strong>
+                </div>
+                {!isLocked && canApplyAiPick && (
+                  <button type="button" onClick={applyPick} className="btn-confirm">Apply</button>
+                )}
+              </div>
+
+              {aiNarrative && <p className="trade-maya-narrative">{aiNarrative}</p>}
+
+              {wp.thinking && (
+                <section className="trade-maya-disclosure">
+                  <button type="button" onClick={() => setThinkOpen(value => !value)} aria-expanded={thinkOpen}>
+                    <span>Deep Reasoning</span>
+                    <span>{thinkOpen ? '−' : '+'}</span>
+                  </button>
+                  {thinkOpen && <p>{stepText(wp.thinking)}</p>}
+                </section>
+              )}
+
+              {trace.length > 0 && (
+                <section className="trade-maya-disclosure">
+                  <button type="button" onClick={() => setTraceOpen(value => !value)} aria-expanded={traceOpen}>
+                    <span>Agent Trace</span>
+                    <em>{trace.length}</em>
+                    <span>{traceOpen ? '−' : '+'}</span>
+                  </button>
+                  {traceOpen && (
+                    <div className="trade-maya-trace">
+                      {trace.map((step, index) => (
+                        <article key={`${step.agent}-${index}`}>
+                          <strong>{step.agent}</strong>
+                          <p>{stepText(step.content)}</p>
+                        </article>
+                      ))}
                     </div>
-                  ) : !hasPred ? (
-                    <div style={{ display: 'flex', flex: 1, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', height: '100%', padding: '20px 0' }}>
-                      <span style={{ fontFamily: MONO, fontSize: '10.5px', fontWeight: 800, color: MATTE.muted, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Maya Answer Box</span>
-                      <span style={{ fontFamily: MONO, fontSize: '9.5px', color: 'rgba(217,208,190,0.42)', textAlign: 'center', maxWidth: '280px' }}>Awaiting operator context. Click Execute to select an entry model.</span>
-                    </div>
-                  ) : (
-                    <>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        <span style={{ fontFamily: MONO, fontSize: '13px', fontWeight: 900, color: MATTE.accent }}>{aiPick || 'MAYA RESPONSE'}</span>
-                        <div style={{ flex: 1 }} />
-                        {!isLocked && canApplyAiPick && (
-                          <button onClick={applyPick} style={{ fontFamily: MONO, fontSize: '9px', fontWeight: 900, color: MATTE.shell, background: MATTE.accent, border: 'none', borderRadius: '0px', padding: '3px 8px', cursor: 'pointer' }}>
-                            APPLY
-                          </button>
-                        )}
-                      </div>
-                      {aiNarrative && (
-                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px' }}>
-                          <p style={{ fontFamily: MONO, fontSize: '12px', color: 'rgba(255,255,255,0.84)', lineHeight: 1.72, margin: 0, whiteSpace: 'pre-wrap' }}>{aiNarrative}</p>
-                        </div>
-                      )}
-                      {wp.thinking && (
-                        <div>
-                          <button onClick={() => setThinkOpen(v => !v)} style={{ fontFamily: MONO, fontSize: '8px', fontWeight: 700, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                            {thinkOpen ? '▾' : '▸'} Deep Reasoning Block
-                          </button>
-                          {thinkOpen && <p style={{ fontFamily: MONO, fontSize: '10.5px', color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, margin: '4px 0 0', whiteSpace: 'pre-wrap' }}>{wp.thinking}</p>}
-                        </div>
-                      )}
-                      {trace.length > 0 && (
-                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '6px' }}>
-                          <button onClick={() => setTraceOpen(v => !v)} style={{ fontFamily: MONO, fontSize: '8px', fontWeight: 700, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                            {traceOpen ? '▾' : '▸'} Full Agent Trace ({trace.length})
-                          </button>
-                          {traceOpen && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
-                              {trace.map((s, i) => (
-                                <div key={i} style={{ borderLeft: '1.5px solid rgba(255,255,255,0.1)', paddingLeft: '8px' }}>
-                                  <div style={{ fontFamily: MONO, fontSize: '9px', fontWeight: 900, color: 'rgba(255,255,255,0.78)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s.agent}</div>
-                                  <p style={{ fontFamily: MONO, fontSize: '10.5px', color: 'rgba(255,255,255,0.62)', lineHeight: 1.6, margin: '4px 0 0', whiteSpace: 'pre-wrap' }}>{stepText(s.content)}</p>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </>
                   )}
+                </section>
+              )}
             </div>
-          </div>
-
-          <div style={{ ...dossierPanelStyle, background: `linear-gradient(135deg, ${MATTE.phase1Right}, rgba(13,17,22,0.9))`, border: `1px solid ${MATTE.lineStrong}`, height: '520px', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div style={{ padding: '12px 16px', borderBottom: `1px solid rgba(244,246,248,0.08)`, display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-              <span style={{ fontFamily: MONO, fontSize: '13px', fontWeight: 900, letterSpacing: '0.3em', color: MATTE.ink, textTransform: 'uppercase' }}>MAYA</span>
-              <div style={{ flex: 1, height: '1px', background: MATTE.line }} />
-            </div>
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-              <div style={{ padding: '12px 16px', borderBottom: `1px solid ${MATTE.line}` }}>
-                <div style={{ fontFamily: MONO, fontSize: '8px', fontWeight: 700, letterSpacing: '0.2em', color: MATTE.inkSoft, textTransform: 'uppercase', marginBottom: '10px' }}>User Input</div>
-                <textarea
-                  value={card.weaponThought}
-                  onChange={e => onChange({ weaponThought: e.target.value })}
-                  placeholder="State your analysis or findings on the current chart setup..."
-                  disabled={isLocked}
-                  style={{
-                    fontFamily: MONO, width: '100%', minHeight: '122px', fontSize: '11px',
-                    color: MATTE.ink, background: MATTE.field,
-                    border: `1px solid ${MATTE.lineStrong}`, padding: '10px 12px',
-                    resize: 'vertical', lineHeight: 1.55, outline: 'none', boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-
-              <div style={{ padding: '12px 16px', borderBottom: `1px solid ${MATTE.line}` }}>
-                <div style={{ fontFamily: MONO, fontSize: '8px', fontWeight: 700, letterSpacing: '0.2em', color: MATTE.inkSoft, textTransform: 'uppercase', marginBottom: '8px' }}>Model Selection</div>
-                <select
-                  value={selectedModel}
-                  onChange={e => setSelectedModel(e.target.value)}
-                  disabled={isLocked}
-                  style={{
-                    fontFamily: MONO, fontSize: '10px', fontWeight: 700, color: MATTE.ink,
-                    background: 'transparent', border: 'none', borderBottom: `1px solid ${MATTE.lineStrong}`,
-                    padding: '4px 0', outline: 'none', width: '100%', cursor: isLocked ? 'default' : 'pointer'
-                  }}
-                >
-                  {(() => {
-                    const allowedModels = session?.allowedModels || [];
-                    let filtered = AVAILABLE_MODELS.filter(m => {
-                      if (allowedModels.includes('*')) return true;
-                      return allowedModels.some(am => m.id.toLowerCase().includes(am.toLowerCase()));
-                    });
-                    if (filtered.length === 0) {
-                      filtered = AVAILABLE_MODELS;
-                    }
-                    return filtered.map(m => (
-                      <option key={m.id} value={m.id} style={{ background: '#05070c', color: '#fff' }}>
-                        {m.name}
-                      </option>
-                    ));
-                  })()}
-                </select>
-              </div>
-
-              <div style={{ padding: '12px 16px', borderBottom: `1px solid ${MATTE.line}`, display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                <SliderRow
-                  label="Inference Temp"
-                  value={modelConfig.temperature}
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  pct={modelConfig.temperature * 100}
-                  trackColor={tempColor(modelConfig.temperature)}
-                  onChange={v => handleConfigChange('temperature', v)}
-                />
-                <SliderRow
-                  label="Freq Penalty"
-                  value={modelConfig.frequency_penalty || 0}
-                  min={0}
-                  max={2}
-                  step={0.1}
-                  pct={((modelConfig.frequency_penalty || 0) / 2) * 100}
-                  trackColor={MATTE.accent}
-                  onChange={v => handleConfigChange('frequency_penalty', v)}
-                />
-              </div>
-            </div>
-
-            <div style={{ padding: '12px 16px', borderTop: `1px solid ${MATTE.line}`, display: 'flex', gap: '8px', flexShrink: 0 }}>
-                <button
-                  onClick={() => stopWeaponPrediction()}
-                  disabled={isLocked || !predicting}
-                  style={{
-                    flex: 1, height: '36px', fontFamily: MONO, fontSize: '9px', fontWeight: 900,
-                    textTransform: 'uppercase', letterSpacing: '0.22em',
-                    color: MATTE.ink, background: predicting ? 'rgba(200,143,135,0.14)' : MATTE.paper2,
-                    border: predicting ? `1px solid ${MATTE.danger}` : `1px solid ${MATTE.lineStrong}`,
-                    cursor: predicting && !isLocked ? 'pointer' : 'default',
-                    outline: 'none', transition: 'all 120ms'
-                  }}
-                >
-                  Abort
-                </button>
-                <button
-                  onClick={() => askMaya()}
-                  disabled={isLocked || predicting}
-                  style={{
-                    flex: 1, height: '36px', fontFamily: MONO, fontSize: '9px', fontWeight: 900,
-                    textTransform: 'uppercase', letterSpacing: '0.22em',
-                    color: MATTE.shell, background: MATTE.accent, border: 'none',
-                    cursor: isLocked || predicting ? 'default' : 'pointer',
-                    outline: 'none', transition: 'all 120ms'
-                  }}
-                >
-                  {predicting ? 'Running…' : 'Execute'}
-                </button>
-            </div>
-          </div>
-        </div>
+          ) : undefined}
+        />
       </div>
 
       {/* ── PHASE 2: WEAPON SELECTION & DOSSIER ── */}
@@ -1522,13 +1410,14 @@ export default function UnifiedTradeCard({
         <div style={catHeaderStyle('Phase - 2 Weapon Selection & Dossier')}>Phase - 2 Weapon Selection & Dossier</div>
         <div style={{ ...dossierPanelStyle, background: MATTE.paper, padding: '0 0 4px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '6px', scrollbarWidth: 'thin' }}>
+            <div className="trade-weapon-choice-strip" style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '6px', scrollbarWidth: 'thin' }}>
               {allChoices.map(w => {
                 const active = card.weapon === w.id;
                 const isRec = !!aiPick && (w.id === aiPick || w.displayName === aiPick || w.originalName === aiPick);
                 return (
                   <button
                     key={w.id}
+                    className="trade-weapon-choice"
                     onClick={() => !isLocked && onChange({ weapon: w.id })}
                     title={`${w.displayName} (${w.originalName})`}
                     style={{
@@ -1572,22 +1461,22 @@ export default function UnifiedTradeCard({
                 />
               </div>
             ) : selected ? (
-              <div style={{
+              <div className={`trade-weapon-dossier-layout ${((selected.dimensions && selected.dimensions.length > 0) || (selected.events && selected.events.length > 0)) ? '' : 'is-single'}`} style={{
                 position: 'relative',
                 display: 'grid',
-                gridTemplateColumns: 'minmax(320px, 0.9fr) minmax(0, 1.1fr)',
                 gap: '18px',
                 alignItems: 'stretch',
                 border: 'none',
                 background: 'transparent',
+                width: '100%',
+                minWidth: 0,
               }}>
-                <div style={{
-                  gridColumn: '1',
-                  gridRow: '1',
+                <div className="trade-weapon-dossier-overview" style={{
                   padding: '16px',
                   border: `1px solid ${MATTE.lineStrong}`,
                   height: '100%',
                   boxSizing: 'border-box',
+                  minWidth: 0,
                   background: `
                     repeating-linear-gradient(to bottom, transparent 0, transparent 63px, rgba(244,246,248,0.055) 64px),
                     linear-gradient(135deg, ${MATTE.phase2Left}, rgba(17,24,32,0.86))
@@ -1642,13 +1531,12 @@ export default function UnifiedTradeCard({
                 </div>
 
                 {((selected.dimensions && selected.dimensions.length > 0) || (selected.events && selected.events.length > 0)) && (
-                  <div style={{
-                    gridColumn: '2',
-                    gridRow: '1',
+                  <div className="trade-weapon-identification-panel" style={{
                     border: `1px solid ${MATTE.lineStrong}`,
                     padding: '16px',
                     height: '100%',
                     boxSizing: 'border-box',
+                    minWidth: 0,
                     background: `
                       repeating-linear-gradient(to bottom, transparent 0, transparent 63px, rgba(244,246,248,0.055) 64px),
                       linear-gradient(135deg, ${MATTE.phase2Right}, rgba(17,24,32,0.88))
@@ -1656,7 +1544,7 @@ export default function UnifiedTradeCard({
                   }}>
                     {selected.dimensions && selected.dimensions.length > 0 && (
                       <>
-                        <div style={{
+                        <div className="trade-weapon-identification-header" style={{
                           display: 'flex',
                           alignItems: 'center',
                           gap: '10px',
@@ -1676,7 +1564,7 @@ export default function UnifiedTradeCard({
                           const curVal = weaponSelections[d.id] || '';
                           const options = d.outputs || d.options || [];
                           return (
-                            <div key={d.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 0.36fr) minmax(0, 1fr)', gap: '16px', minHeight: '64px', padding: '9px 0', alignItems: 'center' }}>
+                            <div key={d.id} className="trade-weapon-identification-row" style={{ display: 'grid', gap: '16px', minHeight: '64px', padding: '9px 0', alignItems: 'center' }}>
                               <div>
                                 <div style={{ fontFamily: MONO, fontSize: '13px', fontWeight: 900, color: MATTE.ink, lineHeight: 1.35 }}>{d.name}</div>
                               </div>
@@ -1699,7 +1587,7 @@ export default function UnifiedTradeCard({
 
                     {selected.events && selected.events.length > 0 && (
                       <>
-                        <div style={{
+                        <div className="trade-weapon-identification-header" style={{
                           display: 'flex',
                           alignItems: 'center',
                           gap: '10px',
@@ -1714,7 +1602,7 @@ export default function UnifiedTradeCard({
                           const curVal = weaponSelections[e.id] || '';
                           const options = e.outputs || e.options || [];
                           return (
-                            <div key={e.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 0.36fr) minmax(0, 1fr)', gap: '16px', minHeight: '64px', padding: '9px 0', alignItems: 'center' }}>
+                            <div key={e.id} className="trade-weapon-identification-row" style={{ display: 'grid', gap: '16px', minHeight: '64px', padding: '9px 0', alignItems: 'center' }}>
                               <div>
                                 <div style={{ fontFamily: MONO, fontSize: '13px', fontWeight: 900, color: MATTE.ink, lineHeight: 1.35 }}>{e.name}</div>
                               </div>

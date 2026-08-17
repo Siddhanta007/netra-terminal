@@ -20,16 +20,11 @@ import MayaChatPanel from './components/Layout/MayaChatPanel';
 import {
   MarketTypeSelector,
   Phase0Vision,
-  StrategicMarkingChecklist,
-  STRATEGIC_MARKS_TOTAL,
-  BiasDimensions,
-  HTFDimensions,
-  HTFEvents,
-  MacroMappingActions,
-  PreSessionActions,
+  HypothesisH1Components,
+  HypothesisH1Actions,
+  PhaseMayaH1,
   Phase3MarketPulse,
   Phase5Synthesis,
-  PhaseNetraState,
   Phase6Command,
   Phase10MissionControl,
   Phase11MayaAudit,
@@ -37,17 +32,39 @@ import {
 import ProfilePage from './pages/ProfilePage';
 import AboutPage from './pages/AboutPage';
 import PortfolioPage from './pages/PortfolioPage';
-import ForkButton from './components/UI/ForkButton';
 import { buildForkName } from './utils/forkNaming';
-import { LuxuryShapeSpinner } from './components/UI/LuxuryShapeSpinner';
+import { TerminalActivityDock } from './components/UI/TerminalActivityDock';
+import { TerminalPhaseCard } from './components/UI/TerminalPrimitives';
+import ForkButton from './components/UI/ForkButton';
 import Footer from './components/Layout/Footer';
 import ModelPage from './pages/ModelPage';
 import { MODEL_DATA } from './utils/modelData';
 import { TimeInput, NumInput, PageCorners } from './app/widgets';
 import { TERMINAL_STATS_EVENT, computeTerminalSessionStats, tradeCardsStorageKey } from './features/terminal/phases/phase-10-mission-control/missionControl/helpers';
-import { saveState } from './utils/storage';
+import { loadState, saveState } from './utils/storage';
 
 const FULL_ACCESS_PAGES = ["home", "pinaka", "trishul", "about", "portfolio"];
+const MAYA_CHAT_PANE_DEFAULT_WIDTH = 440;
+const MAYA_CHAT_PANE_MIN_WIDTH = 360;
+const MAYA_CHAT_PANE_MAX_WIDTH = 760;
+const MAYA_CHAT_PANE_STORAGE_KEY = 'mayaChatPaneWidth';
+
+function mayaChatPaneMaxWidth(leftPaneOpen: boolean) {
+  if (typeof window === 'undefined') return MAYA_CHAT_PANE_MAX_WIDTH;
+  const reservedWidth = (leftPaneOpen ? 400 : 0) + 420;
+  return Math.max(
+    MAYA_CHAT_PANE_MIN_WIDTH,
+    Math.min(MAYA_CHAT_PANE_MAX_WIDTH, window.innerWidth - reservedWidth),
+  );
+}
+
+function clampMayaChatPaneWidth(width: number, leftPaneOpen: boolean) {
+  return Math.min(
+    mayaChatPaneMaxWidth(leftPaneOpen),
+    Math.max(MAYA_CHAT_PANE_MIN_WIDTH, width),
+  );
+}
+
 const HEADER_GRADIENTS = [
   'linear-gradient(90deg, #f97316 0%, #facc15 34%, #8cc6e8 68%, #2563eb 100%)',
   'linear-gradient(90deg, #06b6d4 0%, #3b82f6 32%, #8b5cf6 66%, #f43f5e 100%)',
@@ -94,11 +111,9 @@ function normalizeAssetTickerInput(value: string) {
 
 function NetraBootLoader() {
   return (
-    <div className="netra-lux-loader" role="status" aria-live="polite" aria-label="Loading Netra">
-      <div className="netra-lux-grain" />
-      <div className="netra-lux-frame">
-        <LuxuryShapeSpinner label="App Loading" />
-      </div>
+    <div className="netra-terminal-boot-screen" aria-busy="true">
+      <div className="netra-terminal-boot-mark">NETRA</div>
+      <TerminalActivityDock loading message="Loading terminal" />
       <GlobalOverlay />
     </div>
   );
@@ -214,6 +229,17 @@ export default function NetraTerminal() {
     }
   };
 
+  const openHypothesisFork = (phaseNum: number, label: string, recordKey: 'hypothesis_h1' | 'hypothesis_h2') => {
+    const defaultName = buildForkName(tradeName, label);
+    setForkModalState({
+      isOpen: true,
+      phaseNum,
+      forkRecord: { recordKey, label },
+      defaultName,
+    });
+    setForkInputName(defaultName);
+  };
+
   const toast = useSelector((s: RootState) => s.ui.toast);
   const allowedPages = session?.role === 'admin' ? FULL_ACCESS_PAGES : (session?.allowedPages || []);
   const tradeLogs = useSelector((s: RootState) => s.logs.tradeLogs);
@@ -310,15 +336,18 @@ export default function NetraTerminal() {
   };
 
   const editLiveMarketContext = () => {
+    // Editing must preserve the confirmed context. The analyst can modify the
+    // existing values in place; only Reset intentionally clears the draft.
+    setIsLiveContextEditing(true);
+    showToast('Pre-Session Context unlocked for editing', 'info');
+  };
+
+  const resetLiveMarketContext = () => {
     setLiveCorrelation('');
     setLiveDisplacement('');
     setLiveDisplacementSize('');
     setLiveContextNote('');
-    setIsLiveContextEditing(true);
-    void saveSession({ silent: true, liveMarketContext: {
-      correlatedMarketAlignment: '', preSessionDisplacement: '', displacementSize: '', note: '',
-      updated_at: new Date().toISOString(), confirmed_at: null,
-    } });
+    showToast('Pre-Session Context reset — confirm to save', 'warning');
   };
   const editFormData = useSelector((s: RootState) => s.logs.editFormData);
   const sessionInput = useSelector((s: RootState) => s.session.sessionInput);
@@ -338,11 +367,16 @@ export default function NetraTerminal() {
   const finalCommand = useSelector((s: RootState) => s.analysis.finalCommand);
   const recognitionCheckpoints = useSelector((s: RootState) => s.analysis.recognitionCheckpoints);
   const netraOutput = useSelector((s: RootState) => s.analysis.netraOutput);
+  const h1Hypothesis = useSelector((s: RootState) => s.analysis.h1Hypothesis);
   const highestStep = useSelector((s: RootState) => s.analysis.highestStep);
   const confirmedDecisionNode = recognitionCheckpoints.find(checkpoint => checkpoint.pathConfirmed);
-  const decisionPathConfirmed = !!confirmedDecisionNode;
   const netraStateConfirmed = !!confirmedDecisionNode?.commandSelected;
   const stepTimestamps = useSelector((s: RootState) => s.analysis.stepTimestamps);
+  const macroMappingConfirmed = highestStep >= 3;
+  const macroHypothesisConfirmed = macroMappingConfirmed && h1Hypothesis?.status === 'CONFIRMED';
+  const marketPulseConfirmed = macroHypothesisConfirmed && highestStep >= 4;
+  const marketHypothesisConfirmed = marketPulseConfirmed && netraStateConfirmed;
+  const commandConfirmed = marketHypothesisConfirmed && highestStep >= 5;
   const interSelections = useSelector((s: RootState) => s.analysis.interSelections);
   const strikeSelections = useSelector((s: RootState) => s.analysis.strikeSelections);
   const weaponLocked = useSelector((s: RootState) => s.analysis.weaponLocked);
@@ -358,18 +392,74 @@ export default function NetraTerminal() {
   const isMobileMenuOpen = useSelector((s: RootState) => s.ui.isMobileMenuOpen);
   const headerAccentGradient = useMemo(() => HEADER_GRADIENTS[Math.floor(Math.random() * HEADER_GRADIENTS.length)], []);
 
-  const [smcOpen, setSmcOpen] = useState(false);
-  const [smcChecked, setSmcChecked] = useState<Record<string, boolean>>({});
-  const smcDone = Object.values(smcChecked).filter(Boolean).length;
-
   const [isDownloading, setIsDownloading] = useState(false);
   const [isLeftPaneOpen, setIsLeftPaneOpen] = useState(true);
+  const [mayaChatPaneWidth, setMayaChatPaneWidth] = useState(() => clampMayaChatPaneWidth(
+    loadState(MAYA_CHAT_PANE_STORAGE_KEY, MAYA_CHAT_PANE_DEFAULT_WIDTH),
+    isLoggerOpen,
+  ));
+  const [isMayaChatPaneResizing, setIsMayaChatPaneResizing] = useState(false);
   const [sortCol, setSortCol] = useState<string>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const frameworkRef = useRef<HTMLDivElement>(null);
   const [frameworkIdx, setFrameworkIdx] = useState(0);
   const [slideIdx, setSlideIdx] = useState(0);
   const [modelSlideIdx, setModelSlideIdx] = useState(0);
+
+  const setAndSaveMayaChatPaneWidth = useCallback((width: number) => {
+    const nextWidth = clampMayaChatPaneWidth(width, isLoggerOpen);
+    setMayaChatPaneWidth(nextWidth);
+    saveState(MAYA_CHAT_PANE_STORAGE_KEY, nextWidth);
+  }, [isLoggerOpen]);
+
+  const resizeMayaChatPaneBy = useCallback((delta: number) => {
+    setMayaChatPaneWidth(currentWidth => {
+      const nextWidth = clampMayaChatPaneWidth(currentWidth + delta, isLoggerOpen);
+      saveState(MAYA_CHAT_PANE_STORAGE_KEY, nextWidth);
+      return nextWidth;
+    });
+  }, [isLoggerOpen]);
+
+  const startMayaChatPaneResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = mayaChatPaneWidth;
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    let latestWidth = startWidth;
+
+    setIsMayaChatPaneResizing(true);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      latestWidth = clampMayaChatPaneWidth(startWidth + startX - moveEvent.clientX, isLoggerOpen);
+      setMayaChatPaneWidth(latestWidth);
+    };
+    const finishResize = () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', finishResize);
+      window.removeEventListener('pointercancel', finishResize);
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+      setIsMayaChatPaneResizing(false);
+      saveState(MAYA_CHAT_PANE_STORAGE_KEY, latestWidth);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', finishResize);
+    window.addEventListener('pointercancel', finishResize);
+  }, [isLoggerOpen, mayaChatPaneWidth]);
+
+  useEffect(() => {
+    const keepPaneWithinViewport = () => {
+      setMayaChatPaneWidth(currentWidth => clampMayaChatPaneWidth(currentWidth, isLoggerOpen));
+    };
+    keepPaneWithinViewport();
+    window.addEventListener('resize', keepPaneWithinViewport);
+    return () => window.removeEventListener('resize', keepPaneWithinViewport);
+  }, [isLoggerOpen]);
 
   // ─── Today's stats strip ─────────────────────────────────────────────────────
   const [todayStats, setTodayStats] = useState<any>(null);
@@ -459,6 +549,17 @@ export default function NetraTerminal() {
   if (!session) return <><Login /><GlobalOverlay /></>;
 
   if (!sysData) return <NetraBootLoader />;
+
+  const terminalPhases = sysData.terminalPhases ?? {};
+  const terminalPhaseProps = (key: string) => {
+    const config = terminalPhases[key];
+    return {
+      phase: config?.counter,
+      timeframe: config?.timeframe,
+      title: config?.title,
+      subtitle: config?.subtitle,
+    };
+  };
 
   // Redirect root to /home
   if (location.pathname === '/' || location.pathname === '/login') {
@@ -653,7 +754,7 @@ export default function NetraTerminal() {
                   </div>
                 </div>
                 <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: '8px', fontWeight: 900, letterSpacing: '0.16em', color: '#38bdf8', textTransform: 'uppercase', marginBottom: '8px' }}>Correlated Market Context</div>
+                  <div style={{ fontSize: '8px', fontWeight: 900, letterSpacing: '0.16em', color: '#38bdf8', textTransform: 'uppercase', marginBottom: '8px' }}>Pre-Session Context</div>
                   {([
                     ['correlatedMarketAlignment', 'Correlated Market Alignment', liveCorrelation, setLiveCorrelation],
                     ['preSessionDisplacement', 'Pre-Session Displacement', liveDisplacement, setLiveDisplacement],
@@ -677,7 +778,7 @@ export default function NetraTerminal() {
                       value={liveContextNote}
                       disabled={!isLiveContextEditing}
                       onChange={event => setLiveContextNote(event.target.value)}
-                      placeholder="Live correlation / displacement observation…"
+                      placeholder="Pre-session correlation / displacement observation…"
                       rows={2}
                       className="w-full bg-transparent outline-none resize-none text-[11px] text-[var(--text-2)] placeholder:text-[var(--text-4)] leading-relaxed min-h-[44px]"
                       style={{ opacity: isLiveContextEditing ? 1 : 0.6 }}
@@ -685,12 +786,7 @@ export default function NetraTerminal() {
                   </div>
                   <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
                     <button type="button" disabled={isLiveContextEditing} onClick={editLiveMarketContext} className="btn-edit w-20" style={{ fontSize: '8px' }}>Edit</button>
-                    <button type="button" disabled={!isLiveContextEditing} onClick={() => {
-                      setLiveCorrelation('');
-                      setLiveDisplacement('');
-                      setLiveDisplacementSize('');
-                      setLiveContextNote('');
-                    }} className="btn-reset w-20" style={{ fontSize: '8px' }}>Reset</button>
+                    <button type="button" disabled={!isLiveContextEditing} onClick={resetLiveMarketContext} className="btn-reset w-20" style={{ fontSize: '8px' }}>Reset</button>
                     <button type="button" disabled={!isLiveContextEditing} onClick={() => void saveLiveMarketContext()} className="btn-confirm flex-1" style={{ fontSize: '8px' }}>Confirm Context</button>
                   </div>
                 </div>
@@ -715,52 +811,34 @@ export default function NetraTerminal() {
             {activeSessionId && (() => {
               const txt  = darkMode ? '#ffffff' : '#0f172a';
               const bdr  = darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.1)';
+              const muted = darkMode ? 'rgba(255,255,255,0.42)' : 'rgba(15,23,42,0.48)';
               const MONO = 'JetBrains Mono, monospace';
               const lbl: React.CSSProperties  = { fontFamily: MONO, fontSize: '9px',  fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: txt };
               const val: React.CSSProperties  = { fontFamily: MONO, fontSize: '13px', fontWeight: 900, color: txt, lineHeight: 1 };
               const vbar = <div style={{ width: '1px', height: '16px', background: bdr, margin: '0 16px', flexShrink: 0 }} />;
 
-              // color = hex accent, e.g. '#f59e0b'. Default bg = color@12%, border = color@40%, text = color.
-              // Hover deepens to bg@22%, border@70%.
-              const subBtn = (label: string, icon: React.ReactNode, onClick: () => void, color: string, disabled = false): React.ReactNode => (
+              const subBtn = (label: string, icon: React.ReactNode, onClick: () => void, tone: 'amber' | 'emerald' | 'coral', disabled = false): React.ReactNode => (
                 <button
                   onClick={onClick}
                   disabled={disabled}
                   title={label}
                   aria-label={label}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    width: '28px', height: '28px', padding: 0,
-                    fontFamily: MONO,
-                    border: `1px solid ${color}55`,
-                    background: `${color}18`,
-                    color: color,
-                    cursor: disabled ? 'not-allowed' : 'pointer',
-                    opacity: disabled ? 0.4 : 1,
-                    transition: 'all 150ms',
-                    flexShrink: 0,
-                    borderRadius: '999px',
-                    outline: 'none',
-                  }}
-                  onMouseEnter={e => { if (!disabled) { e.currentTarget.style.background = color; e.currentTarget.style.borderColor = color; e.currentTarget.style.color = darkMode ? '#050608' : '#ffffff'; } }}
-                  onMouseLeave={e => { if (!disabled) { e.currentTarget.style.background = `${color}18`; e.currentTarget.style.borderColor = `${color}55`; e.currentTarget.style.color = color; } }}
+                  className={`terminal-subheader-control tone-${tone}`}
                 >
                   {icon}
                 </button>
               );
 
               return (
-                <div data-loading-region="header" style={{ height: '42px', background: darkMode ? '#090c14' : '#f4f6fa', borderBottom: `1px solid ${bdr}`, display: 'flex', alignItems: 'center', zIndex: 90, flexShrink: 0, gap: 0 }} className="desktop-only">
+                <div data-loading-region="header" style={{ height: '42px', background: darkMode ? '#090c14' : '#f4f6fa', borderBottom: `1px solid ${bdr}`, display: 'flex', alignItems: 'center', zIndex: 90, flexShrink: 0, gap: 0 }} className={`desktop-only terminal-subheader ${darkMode ? 'is-dark' : 'is-light'}`}>
 
                   {/* LEFT: ledger toggle + identity */}
-                  <div style={{ display: 'flex', alignItems: 'center', height: '100%', borderRight: `1px solid ${bdr}`, flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', height: '100%', borderRight: `1px solid ${bdr}`, flex: '1 1 auto', minWidth: 0 }}>
                     <button
                       onClick={() => ctxSetIsLoggerOpen(!isLoggerOpen)}
                       title={isLoggerOpen ? 'Close left ledger' : 'Open left ledger'}
                       aria-label={isLoggerOpen ? 'Close left ledger' : 'Open left ledger'}
-                      style={{ width: '42px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: isLoggerOpen ? 'rgba(65,105,225,0.12)' : 'transparent', border: 'none', borderRight: `1px solid ${bdr}`, color: isLoggerOpen ? '#4169E1' : txt, cursor: 'pointer', transition: 'all 150ms', flexShrink: 0 }}
-                      onMouseEnter={e => { if (!isLoggerOpen) { e.currentTarget.style.color = '#4169E1'; e.currentTarget.style.background = 'rgba(65,105,225,0.08)'; } }}
-                      onMouseLeave={e => { if (!isLoggerOpen) { e.currentTarget.style.color = txt; e.currentTarget.style.background = 'transparent'; } }}
+                      className={`terminal-subheader-control terminal-subheader-edge-control tone-blue ${isLoggerOpen ? 'is-active' : ''}`}
                     >
                       {isLoggerOpen ? (
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
@@ -768,28 +846,49 @@ export default function NetraTerminal() {
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
                       )}
                     </button>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 16px' }}>
-                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4169E1', boxShadow: '0 0 8px rgba(16,185,129,0.9)', flexShrink: 0 }} className="animate-pulse" />
-                      {renamingField === 'asset' ? (
-                        <input autoFocus value={renameValue} onChange={e => setRenameValue(e.target.value)} onBlur={commitRename} onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingField(null); }} style={{ fontFamily: MONO, fontSize: '11px', fontWeight: 800, color: '#4169E1', textTransform: 'uppercase', letterSpacing: '0.15em', background: 'transparent', border: 'none', borderBottom: '1px solid #4169E1', outline: 'none', width: `${Math.max(renameValue.length, 4) + 2}ch`, padding: '2px 0' }} />
-                      ) : (
-                        <button onClick={() => session && startRename('asset')} title="Click to rename" style={{ fontFamily: MONO, fontSize: '11px', fontWeight: 800, color: '#4169E1', textTransform: 'uppercase', letterSpacing: '0.15em', background: 'none', border: 'none', cursor: session ? 'pointer' : 'default', padding: 0 }}>
-                          {session?.assetName || activeEditLog?.phase1?.asset_ticker || '—'}
-                        </button>
-                      )}
-                      <span style={{ fontFamily: MONO, fontSize: '12px', color: txt, userSelect: 'none' }}>·</span>
-                      {renamingField === 'trade' ? (
-                        <input autoFocus value={renameValue} onChange={e => setRenameValue(e.target.value)} onBlur={commitRename} onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingField(null); }} style={{ fontFamily: MONO, fontSize: '11px', fontWeight: 600, color: txt, textTransform: 'uppercase', letterSpacing: '0.1em', background: 'transparent', border: 'none', borderBottom: `1px solid ${bdr}`, outline: 'none', width: `${Math.max(renameValue.length, 6) + 2}ch`, padding: '2px 0', maxWidth: '140px' }} />
-                      ) : (
-                        <button onClick={() => session && startRename('trade')} title="Click to rename" style={{ fontFamily: MONO, fontSize: '11px', fontWeight: 600, color: txt, textTransform: 'uppercase', letterSpacing: '0.1em', background: 'none', border: 'none', cursor: session ? 'pointer' : 'default', padding: 0, maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {session?.tradeName || tradeName || activeEditLog?.name || '—'}
-                        </button>
-                      )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '0 20px', flex: '1 1 auto', minWidth: 0 }}>
+                      <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#4169E1', boxShadow: '0 0 8px rgba(16,185,129,0.9)', flexShrink: 0 }} className="animate-pulse" />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 0', minWidth: 0 }}>
+                        <span style={{ fontFamily: MONO, fontSize: '8.5px', fontWeight: 850, color: muted, letterSpacing: '0.13em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Asset Name —</span>
+                        {renamingField === 'asset' ? (
+                          <input autoFocus aria-label="Edit asset name" value={renameValue} onChange={e => setRenameValue(e.target.value)} onBlur={commitRename} onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingField(null); }} className="terminal-subheader-field-input is-asset" />
+                        ) : (
+                          <button onClick={() => session && startRename('asset')} aria-label="Edit asset name" title="Edit asset name" className="terminal-subheader-field is-asset" disabled={!session}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{session?.assetName || activeEditLog?.phase1?.asset_ticker || '—'}</span>
+                            {session && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>}
+                          </button>
+                        )}
+                      </div>
+                      <span style={{ width: '1px', height: '16px', background: bdr, flexShrink: 0 }} aria-hidden="true" />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1.35 1 0', minWidth: 0 }}>
+                        <span style={{ fontFamily: MONO, fontSize: '8.5px', fontWeight: 850, color: muted, letterSpacing: '0.13em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Trade Identity —</span>
+                        {renamingField === 'trade' ? (
+                          <input autoFocus aria-label="Edit trade identity" value={renameValue} onChange={e => setRenameValue(e.target.value)} onBlur={commitRename} onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingField(null); }} className="terminal-subheader-field-input" />
+                        ) : (
+                          <button onClick={() => session && startRename('trade')} aria-label="Edit trade identity" title="Edit trade identity" className="terminal-subheader-field" disabled={!session}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{session?.tradeName || tradeName || activeEditLog?.name || '—'}</span>
+                            {session && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div style={{ flex: 1 }} />
-                  <button type="button" onClick={() => setIsTreeOpen(true)} style={{ height: '26px', marginRight: '12px', padding: '0 11px', border: '1px solid rgba(56,189,248,0.42)', background: 'rgba(56,189,248,0.08)', color: '#38bdf8', fontSize: '8px', fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', cursor: 'pointer', fontFamily: MONO }}>Tree</button>
+                  <button
+                    type="button"
+                    onClick={() => setIsTreeOpen(true)}
+                    aria-label="Open terminal tree"
+                    title="Open terminal tree"
+                    className="terminal-subheader-control terminal-tree-control tone-cyan"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="square" strokeLinejoin="miter" aria-hidden="true">
+                      <path d="M6 4v12" />
+                      <path d="M6 8h8" />
+                      <path d="M6 16h8" />
+                      <rect x="14" y="5" width="5" height="6" />
+                      <rect x="14" y="13" width="5" height="6" />
+                    </svg>
+                  </button>
 
                   {/* RIGHT: action buttons */}
                   {prepStep >= 2 && (activeView === 'terminal' || activeView === 'trishul') && (
@@ -797,7 +896,7 @@ export default function NetraTerminal() {
                       {subBtn('Reset',
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
                         () => { resetTerminalState(); showToast('Mission Scrubbed — State Purged', 'warning'); },
-                        '#f59e0b'
+                        'amber',
                       )}
                       {subBtn('Save',
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
@@ -807,7 +906,8 @@ export default function NetraTerminal() {
                             else showToast('Save incomplete — session or trade write failed', 'error');
                           });
                         },
-                        '#60a5fa', isAiLoading
+                        'emerald',
+                        isAiLoading
                       )}
                       {subBtn('Cut',
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
@@ -825,7 +925,7 @@ export default function NetraTerminal() {
                           showToast('Session Saved & Returned to Model Console', 'success');
                           });
                         },
-                        '#ef4444'
+                        'coral',
                       )}
                     </div>
                   )}
@@ -1461,214 +1561,100 @@ export default function NetraTerminal() {
                 <div className="phase-stack">
 
                   {/* P0: VISION */}
-                  <div className="phase-card" data-phase="0" data-active={highestStep === 0 ? 'true' : undefined}>
-                    <div className="phase-card-header">
-                      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P1</span>
-                      <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
-                      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>MAYA CHART ANALYSIS</span>
-                      <div style={{ flex: 1 }} />
-                      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Chart Context Analysis</span>
-                    </div>
-                    <div className="phase-card-body" style={{ padding: '12px' }}><Phase0Vision /></div>
-                  </div>
+                  <TerminalPhaseCard {...terminalPhaseProps('vision')} active={highestStep === 0} compactBody className="phase-theme-0">
+                    <Phase0Vision />
+                  </TerminalPhaseCard>
 
-                  {/* P1: PRE-SESSION CONTEXT */}
+                  {/* P2 + P3: HYPOTHESIS H1 — SUPER HTF + HTF STRUCTURE */}
                   {highestStep >= 1 && (
-                    <div className="phase-card phase-theme-1" data-phase="1" data-active={highestStep === 1 ? 'true' : undefined}>
-                      <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.25em' }}>P2</span>
-                        <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>PRE-SESSION CONTEXT</span>
-                        <div style={{ flex: 1 }} />
-                        {highestStep > 1
-                          ? <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.1em' }}>✓ LOCKED</span>
-                          : <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Correlated Markets · Displacement · Session Profile</span>
-                        }
-                      </div>
-                      <div className="phase-card-body">
-                        <BiasDimensions />
-                        <PreSessionActions />
-                      </div>
-                    </div>
+                    <TerminalPhaseCard
+                      {...terminalPhaseProps('macroMapping')}
+                      active={highestStep <= 2}
+                      locked={highestStep > 2}
+                      className="mm-card phase-theme-1"
+                    >
+                      <HypothesisH1Components />
+                      <HypothesisH1Actions />
+                    </TerminalPhaseCard>
                   )}
 
-                  {/* MACRO MAPPING — Strategic Marking + HTF Structure */}
-                  {highestStep >= 2 && (
-                    <div className="phase-card mm-card phase-theme-1" data-phase="2" data-active={highestStep <= 2 ? 'true' : undefined}>
-
-                      {/* Card header */}
-                      <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.25em' }}>P3</span>
-                        <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>MACRO MAPPING</span>
-                        <div style={{ flex: 1 }} />
-                        {highestStep > 2
-                          ? <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.1em' }}>✓ LOCKED</span>
-                          : <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Strategic Marking · HTF Structure</span>
-                        }
-                      </div>
-
-                      <div className="phase-card-body">
-
-                        {/* ── Component 1: Strategic Marking ── */}
-                        <div
-                          onClick={() => setSmcOpen(o => !o)}
-                          style={{
-                            margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '10px',
-                            borderLeft: '3px solid var(--phase-accent)', paddingLeft: '10px',
-                            cursor: 'pointer', userSelect: 'none',
-                          }}
-                        >
-                          <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '11px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase', flexShrink: 0 }}>Component 1 — Strategic Marking</span>
-                          <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '9px', fontWeight: 700, color: smcDone === STRATEGIC_MARKS_TOTAL ? 'var(--phase-accent)' : 'var(--text-3)', letterSpacing: '0.04em', flexShrink: 0 }}>{smcDone}/{STRATEGIC_MARKS_TOTAL}</span>
-                          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
-                          <span style={{ fontSize: '9px', color: 'var(--text-4)', flexShrink: 0 }}>{smcOpen ? '▾' : '▸'}</span>
-                        </div>
-                        <StrategicMarkingChecklist
-                          open={smcOpen}
-                          checked={smcChecked}
-                          onToggle={(id) => setSmcChecked(c => ({ ...c, [id]: !c[id] }))}
+                  {/* MAYA: only becomes available after Macro Mapping is confirmed. */}
+                  {macroMappingConfirmed && (
+                    <TerminalPhaseCard
+                      {...terminalPhaseProps('macroMappingHypothesis')}
+                      compactBody
+                      className="phase-theme-1"
+                      action={(
+                        <ForkButton
+                          size="md"
+                          disabled={!macroHypothesisConfirmed}
+                          title={macroHypothesisConfirmed ? 'Fork from this H1 hypothesis' : 'Confirm H1 before forking'}
+                          onClick={() => openHypothesisFork(3, 'Macro Mapping Hypothesis', 'hypothesis_h1')}
                         />
-
-                        {/* ── Component 2: HTF Structure ── */}
-                        <div style={{
-                          margin: '28px 0 12px 0', display: 'flex', alignItems: 'center', gap: '10px',
-                          borderLeft: '3px solid var(--phase-accent)', paddingLeft: '10px',
-                        }}>
-                          <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '11px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase', flexShrink: 0 }}>Component 2 — HTF Structure</span>
-                          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
-                          <ForkButton onClick={() => {
-                            const defaultName = buildForkName(tradeName, 'HTF Structure');
-                            setForkModalState({ isOpen: true, phaseNum: 2, forkRecord: { recordKey: 'htf_structure', label: 'HTF Structure' }, defaultName });
-                            setForkInputName(defaultName);
-                          }} size="sm" />
-                        </div>
-                        <HTFDimensions />
-
-                        {/* ── Component 3: HTF Events ── */}
-                        <div style={{
-                          margin: '28px 0 12px 0', display: 'flex', alignItems: 'center', gap: '10px',
-                          borderLeft: '3px solid var(--phase-accent)', paddingLeft: '10px',
-                        }}>
-                          <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '11px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase', flexShrink: 0 }}>Component 3 — HTF Events</span>
-                          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
-                          <ForkButton onClick={() => {
-                            const defaultName = buildForkName(tradeName, 'HTF Events');
-                            setForkModalState({ isOpen: true, phaseNum: 2, forkRecord: { recordKey: 'htf_events', label: 'HTF Events', clearSelectionKeys: (sysData?.htfStructure?.dimensions || []).filter(dim => dim.multiselect).map(dim => dim.id) }, defaultName });
-                            setForkInputName(defaultName);
-                          }} size="sm" />
-                        </div>
-                        <HTFEvents />
-
-                        <MacroMappingActions />
-
-                      </div>
-                    </div>
+                      )}
+                    >
+                      <PhaseMayaH1 />
+                    </TerminalPhaseCard>
                   )}
 
                   {/* P3: MARKET PULSE (Auction & Energy + Liquidity Context combined) */}
-                  {highestStep >= 3 && (
-                    <div className="phase-card mp-card phase-theme-3" data-phase="3" data-active={highestStep === 3 ? 'true' : undefined}>
-                      <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P4</span>
-                        <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>MARKET PULSE</span>
-                        <div style={{ flex: 1 }} />
-                        {stepTimestamps.marketPulse
-                          ? <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', fontWeight: 700, color: 'var(--phase-accent)', letterSpacing: '0.1em' }}>✓ LOCKED · {stepTimestamps.marketPulse}</span>
-                          : <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Auction State · Price Behaviour · Liquidity Context</span>
-                        }
-                      </div>
-                      <div className="phase-card-body">
-                        <Phase3MarketPulse onFork={(phaseNum, defaultName, forkRecord) => {
-                          setForkModalState({ isOpen: true, phaseNum, forkRecord, defaultName });
-                          setForkInputName(defaultName);
-                        }} />
-                      </div>
-                    </div>
+                  {macroHypothesisConfirmed && (
+                    <TerminalPhaseCard
+                      {...terminalPhaseProps('marketPulse')}
+                      status={stepTimestamps.marketPulse ? `LOCKED · ${stepTimestamps.marketPulse}` : undefined}
+                      active={highestStep === 3}
+                      locked={Boolean(stepTimestamps.marketPulse)}
+                      className="mp-card phase-theme-3"
+                    >
+                      <Phase3MarketPulse />
+                    </TerminalPhaseCard>
                   )}
 
-                  {/* P4: BEHAVIOUR */}
-                  {/* P5: DECISION PATH */}
-                  {highestStep >= 4 && (
-                    <div className="phase-card" data-phase="5" data-active={highestStep === 4 ? 'true' : undefined}>
-                      <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P5</span>
-                        <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>DECISION PATH</span>
-                        <div style={{ flex: 1 }} />
-                        {decisionPathConfirmed
-                          ? <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.1em' }}>✓ LOCKED</span>
-                          : <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Recognition · WAIT · Command Selection</span>
-                        }
-                      </div>
-                      <div className="phase-card-body" style={{ padding: '12px' }}><Phase5Synthesis /></div>
-                    </div>
-                  )}
-
-                  {/* P6: PINAKA STATE — recognised state + forward-path graph */}
-                  {highestStep >= 4 && decisionPathConfirmed && (
-                    <div className="phase-card" data-phase="5" data-active={highestStep === 4 ? 'true' : undefined}>
-                      <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P6</span>
-                        <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>PINAKA STATE</span>
-                        <div style={{ flex: 1 }} />
-                        {netraStateConfirmed
-                          ? <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.1em' }}>✓ LOCKED</span>
-                          : <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Recognised State &amp; Transitions</span>
-                        }
-                      </div>
-                      <div className="phase-card-body" style={{ padding: '12px' }}><PhaseNetraState /></div>
-                    </div>
+                  {/* H2: MAYA + WAIT + NS hypothesis selection */}
+                  {marketPulseConfirmed && (
+                    <TerminalPhaseCard
+                      {...terminalPhaseProps('marketPulseHypothesis')}
+                      active={highestStep === 4}
+                      locked={netraStateConfirmed}
+                      compactBody
+                      className="phase-theme-3"
+                      action={(
+                        <ForkButton
+                          size="md"
+                          disabled={!marketHypothesisConfirmed}
+                          title={marketHypothesisConfirmed ? 'Fork from this H2 hypothesis' : 'Confirm H2 before forking'}
+                          onClick={() => openHypothesisFork(4, 'Market Pulse Hypothesis', 'hypothesis_h2')}
+                        />
+                      )}
+                    >
+                      <Phase5Synthesis />
+                    </TerminalPhaseCard>
                   )}
 
                   {/* P7: COMMAND */}
-                  {highestStep >= 4 && netraStateConfirmed && (
-                    <div className="phase-card cmd-card phase-theme-2" data-phase="6" data-active={highestStep === 4 ? 'true' : undefined}>
-                      <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P7</span>
-                        <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>COMMAND</span>
-                        <div style={{ flex: 1 }} />
-                        {stepTimestamps.command
-                          ? <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', fontWeight: 700, color: '#4169E1', letterSpacing: '0.1em' }}>✓ LOCKED · {stepTimestamps.command}</span>
-                          : <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Doctrine Selection & STS</span>
-                        }
-                      </div>
-                      <div className="phase-card-body"><Phase6Command onFork={(point, clearSelectionKeys) => {
-                        const name = buildForkName(tradeName, point === 'command_dimensions' ? 'Command Dimensions' : 'Command Events');
-                        setForkModalState({ isOpen: true, phaseNum: 4, forkRecord: { recordKey: point === 'command_dimensions' ? 'state_dimensions' : 'state_events', label: point === 'command_dimensions' ? 'Command Dimensions' : 'Command Events', clearSelectionKeys }, defaultName: name });
-                        setForkInputName(name);
-                      }} /></div>
-                    </div>
+                  {marketHypothesisConfirmed && (
+                    <TerminalPhaseCard
+                      {...terminalPhaseProps('command')}
+                      status={stepTimestamps.command ? `LOCKED · ${stepTimestamps.command}` : undefined}
+                      active={highestStep === 4}
+                      locked={Boolean(stepTimestamps.command)}
+                      className="cmd-card phase-theme-2"
+                    >
+                      <Phase6Command />
+                    </TerminalPhaseCard>
                   )}
 
                   {/* P8: TRADING DATA — weapon + trade hybrid (command confirm → step 5 lands here) */}
-                  {highestStep >= 5 && (
-                    <div className="phase-card" data-phase="9" data-active={highestStep === 5 ? 'true' : undefined}>
-                      <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P8</span>
-                        <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>TRADING DATA</span>
-                        <div style={{ flex: 1 }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>Trade Execution Record</span>
-                      </div>
-                      <div className="phase-card-body"><Phase10MissionControl /></div>
-                    </div>
+                  {commandConfirmed && (
+                    <TerminalPhaseCard {...terminalPhaseProps('tradingData')} active={highestStep === 5} className="phase-theme-5">
+                      <Phase10MissionControl />
+                    </TerminalPhaseCard>
                   )}
-                  {/* P9: MAYA AUDIT */}
-                  {highestStep >= 5 && (
-                    <div className="phase-card" data-phase="10" data-active={highestStep === 6 && terminalStats.closed > 0 ? 'true' : undefined}>
-                      <div className="phase-card-header">
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', fontWeight: 700, color: 'var(--text-4)', letterSpacing: '0.25em' }}>P9</span>
-                        <div style={{ width: '1px', height: '14px', background: 'var(--border)' }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', fontWeight: 900, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>MAYA AUDIT</span>
-                        <div style={{ flex: 1 }} />
-                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '7px', color: 'var(--text-4)', letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.4 }}>{terminalStats.closed > 0 ? 'Strategic Evaluation' : 'Requires Closed Trade'}</span>
-                      </div>
-                      <div className="phase-card-body" style={{ padding: '12px' }}><Phase11MayaAudit enabled={terminalStats.closed > 0} /></div>
-                    </div>
+                  {/* P9: MAYA TERMINAL AUDIT */}
+                  {commandConfirmed && (
+                    <TerminalPhaseCard {...terminalPhaseProps('terminalAudit')} active={highestStep === 6} compactBody className="phase-theme-audit">
+                      <Phase11MayaAudit enabled />
+                    </TerminalPhaseCard>
                   )}
 
                   <footer className="desktop-only" style={{ width: '100%', background: 'transparent', borderTop: '1px solid var(--border)', padding: '40px 0 60px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: 0.5, marginTop: '80px' }}>
@@ -1686,8 +1672,50 @@ export default function NetraTerminal() {
         </div>
 
         {/* RIGHT SIDEBAR — Maya Chat Panel */}
-        <aside className={`sidebar-transition flex flex-col z-[150] ${isAiPaneOpen ? 'w-[440px] max-w-[100vw] opacity-100 translate-x-0' : 'w-0 opacity-0 translate-x-full overflow-hidden'}`} style={{ background: '#0d0d0d', borderLeft: isAiPaneOpen ? '1px solid rgba(255,255,255,0.08)' : 'none', boxShadow: isAiPaneOpen ? '-20px 0 60px rgba(0,0,0,0.5)' : 'none', position: 'relative', height: '100%', transition: 'all 500ms cubic-bezier(0.23,1,0.32,1)' }}>
-          <div style={{ minWidth: '440px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <aside
+          className={`maya-chat-sidebar sidebar-transition flex flex-col z-[150] ${isMayaChatPaneResizing ? 'is-resizing' : ''} ${isAiPaneOpen ? 'max-w-[100vw] opacity-100 translate-x-0' : 'w-0 opacity-0 translate-x-full overflow-hidden'}`}
+          style={{
+            width: isAiPaneOpen ? `${mayaChatPaneWidth}px` : '0px',
+            flex: '0 0 auto',
+            background: '#0d0d0d',
+            borderLeft: isAiPaneOpen ? '1px solid rgba(255,255,255,0.08)' : 'none',
+            boxShadow: isAiPaneOpen ? '-20px 0 60px rgba(0,0,0,0.5)' : 'none',
+            position: 'relative',
+            height: '100%',
+            transition: isMayaChatPaneResizing ? 'none' : 'width 300ms cubic-bezier(0.23,1,0.32,1), opacity 220ms ease, transform 300ms cubic-bezier(0.23,1,0.32,1)',
+          }}
+        >
+          {isAiPaneOpen && (
+            <div
+              className="maya-chat-resize-handle"
+              role="separator"
+              aria-label="Resize Maya chat panel"
+              aria-orientation="vertical"
+              aria-valuemin={MAYA_CHAT_PANE_MIN_WIDTH}
+              aria-valuemax={mayaChatPaneMaxWidth(isLoggerOpen)}
+              aria-valuenow={mayaChatPaneWidth}
+              tabIndex={0}
+              title="Drag to resize · Arrow keys adjust · Double-click to reset"
+              onPointerDown={startMayaChatPaneResize}
+              onDoubleClick={() => setAndSaveMayaChatPaneWidth(MAYA_CHAT_PANE_DEFAULT_WIDTH)}
+              onKeyDown={event => {
+                if (event.key === 'ArrowLeft') {
+                  event.preventDefault();
+                  resizeMayaChatPaneBy(24);
+                } else if (event.key === 'ArrowRight') {
+                  event.preventDefault();
+                  resizeMayaChatPaneBy(-24);
+                } else if (event.key === 'Home') {
+                  event.preventDefault();
+                  setAndSaveMayaChatPaneWidth(MAYA_CHAT_PANE_DEFAULT_WIDTH);
+                }
+              }}
+            >
+              <span aria-hidden="true" />
+              <output>{mayaChatPaneWidth}px</output>
+            </div>
+          )}
+          <div className="maya-chat-sidebar-content">
             <MayaChatPanel />
           </div>
         </aside>
@@ -1721,41 +1749,36 @@ export default function NetraTerminal() {
       )}
 
       {isForkingSession && (
-        <div className="netra-lux-loader netra-global-action-loader" role="status" aria-live="assertive" aria-label="Forking Branch" style={{ zIndex: 10001 }}>
-          <div className="netra-lux-grain" />
-          <div className="netra-lux-frame">
-            <LuxuryShapeSpinner label="Forking Branch" />
-          </div>
-        </div>
+        <TerminalActivityDock loading message="Forking branch" />
       )}
 
       {forkModalState.isOpen && !isForkingSession && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: '8px', padding: '24px', width: '320px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-1)' }}>Fork Session</div>
-            <div style={{ fontSize: '10px', color: 'var(--text-3)' }}>Enter new trade name for the fork:</div>
+        <div className="terminal-modal-backdrop" role="presentation">
+          <div className="terminal-modal" role="dialog" aria-modal="true" aria-labelledby="fork-session-title">
+            <div id="fork-session-title" className="terminal-modal-title">Fork Session</div>
+            <div className="terminal-modal-description">Enter new trade name for the fork:</div>
             <input 
               type="text" 
               value={forkInputName} 
               onChange={e => setForkInputName(e.target.value)} 
               placeholder={forkModalState.defaultName}
-              style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '4px', padding: '8px', color: 'var(--text-1)', fontSize: '12px', outline: 'none' }}
+              className="terminal-modal-input"
               onKeyDown={e => {
                 if (e.key === 'Enter') forkConfirmButtonRef.current?.click();
                 if (e.key === 'Escape') setForkModalState({ ...forkModalState, isOpen: false });
               }}
             />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <div className="terminal-action-buttons">
               <button 
                 onClick={() => setForkModalState({ ...forkModalState, isOpen: false })}
-                style={{ height: '28px', padding: '0 12px', borderRadius: '4px', border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-3)' }}
+                className="btn-reset w-24"
               >
                 Cancel
               </button>
               <button 
                 ref={forkConfirmButtonRef}
                 onClick={handleConfirmFork}
-                style={{ height: '28px', padding: '0 12px', borderRadius: '4px', border: '1px solid var(--accent)', background: 'var(--accent-bg)', cursor: 'pointer', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent)' }}
+                className="btn-confirm w-28"
               >
                 Confirm
               </button>

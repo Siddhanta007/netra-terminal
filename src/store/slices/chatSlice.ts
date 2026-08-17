@@ -4,7 +4,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { ChatMessage } from '../../types';
 import { loadState } from '../../utils/storage';
 
-export type ChatSource = 'terminal' | 'doctrine' | 'historical' | 'information';
+export type ChatSource = 'terminal' | 'doctrine' | 'historical' | 'information' | 'news';
 
 interface ChatState {
   chatHistory: ChatMessage[];

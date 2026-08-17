@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 
 type LuxuryShapeSpinnerProps = {
   compact?: boolean;
+  micro?: boolean;
   className?: string;
   label?: string;
 };
@@ -20,7 +21,7 @@ const shapeStyle = (index: number, dash: number) => ({
   '--shape-dash': dash,
 } as CSSProperties);
 
-export function LuxuryShapeSpinner({ compact = false, className = '', label = 'App Loading' }: LuxuryShapeSpinnerProps) {
+export function LuxuryShapeSpinner({ compact = false, micro = false, className = '', label = 'App Loading' }: LuxuryShapeSpinnerProps) {
   const polygons = [
     { className: 'netra-lux-triangle', sides: 3, dash: 390 },
     { className: 'netra-lux-square', sides: 4, dash: 420 },
@@ -33,7 +34,12 @@ export function LuxuryShapeSpinner({ compact = false, className = '', label = 'A
   ];
 
   return (
-    <div className={`netra-lux-spinner ${compact ? 'netra-lux-spinner-compact' : ''} ${className}`}>
+    <div
+      className={`netra-lux-spinner ${compact ? 'netra-lux-spinner-compact' : ''} ${micro ? 'netra-lux-spinner-micro' : ''} ${className}`}
+      role="status"
+      aria-live="polite"
+      aria-label={label}
+    >
       <div className="netra-lux-title">{label}</div>
       <div className="netra-lux-stage">
         <svg viewBox="0 0 220 220" className="netra-lux-svg" aria-hidden="true">

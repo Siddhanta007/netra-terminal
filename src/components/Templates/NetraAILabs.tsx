@@ -12,6 +12,7 @@ import { MONO, tempColor, freqColor } from './aiLabs/helpers';
 import { OutputDisplay } from './aiLabs/OutputDisplay';
 import { TerminalScroller } from './aiLabs/Loading';
 import { SliderRow } from './aiLabs/SliderRow';
+import { formatAiElapsed, useAiResponseTimer } from './aiLabs/useAiResponseTimer';
 
 interface NetraAILabsProps {
   title?: string;
@@ -26,9 +27,14 @@ interface NetraAILabsProps {
   customStatus?: ReactNode;
   analyseDisabled?: boolean;
   analyseDisabledReason?: string;
+  showActions?: boolean;
+  bottomPanel?: ReactNode;
+  controlPanelTop?: ReactNode;
 }
 
 export default function NetraAILabs({
+  title = 'Netra AI Labs',
+  subheading = 'MAYA',
   showUpload = false,
   isEvaluating,
   output,
@@ -37,6 +43,10 @@ export default function NetraAILabs({
   customStatus,
   analyseDisabled = false,
   analyseDisabledReason,
+  showActions = true,
+  bottomPanel,
+  controlPanelTop,
+  phaseId = 'maya',
 }: NetraAILabsProps) {
   const dispatch = useDispatch<AppDispatch>();
   const [previews, setPreviews] = useState<string[]>([]);
@@ -44,7 +54,16 @@ export default function NetraAILabs({
 
   const selectedModel  = useSelector((s: RootState) => s.model.selectedModel);
   const modelConfig    = useSelector((s: RootState) => s.model.modelConfig);
-  const { AVAILABLE_MODELS, uploadedVisionFiles, setUploadedVisionFiles } = useNetra();
+  const { AVAILABLE_MODELS, uploadedVisionFiles, setUploadedVisionFiles, activeSessionId } = useNetra();
+  const timerStorageKey = `netra.ai-timing.${activeSessionId || 'no-session'}.${phaseId}`;
+  const runTiming = useAiResponseTimer(isEvaluating, output, timerStorageKey);
+  const timerLabel = runTiming.status === 'running'
+    ? 'ELAPSED'
+    : runTiming.status === 'complete'
+      ? 'RESPONSE'
+      : runTiming.status === 'stopped'
+        ? 'STOPPED'
+        : 'READY';
 
   // The suggestion box runs the multi-agent pipeline — only models that reliably
   // follow JSON belong here (tagged "Agent" in models_config.json). The chat box
@@ -105,16 +124,31 @@ export default function NetraAILabs({
   })();
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 lg:gap-3 gap-3 fade-up items-stretch">
+    <div data-loading-owner="local" className="fade-up" style={bottomPanel ? { overflow: 'hidden', border: '1px solid rgba(255,255,255,0.09)', background: '#05080d' } : undefined}>
+    <div className={`grid grid-cols-1 lg:grid-cols-12 ${bottomPanel ? 'gap-0' : 'lg:gap-3 gap-3'} items-stretch`}>
 
       {/* ── LEFT: Intelligence Output ── */}
       <div className="lg:col-span-7 flex flex-col"
         style={{
           background: '#030608',
-          border: '1px solid rgba(255,255,255,0.07)',
+          border: bottomPanel ? 'none' : '1px solid rgba(255,255,255,0.07)',
           height: '420px',
           overflow: 'hidden',
         }}>
+
+        <div className="terminal-ai-output-header">
+          <div className="terminal-ai-output-identity">
+            <span className={`terminal-ai-runtime-dot ${runTiming.status === 'running' ? 'is-running' : runTiming.status === 'complete' ? 'is-complete' : ''}`} />
+            <div>
+              <div className="terminal-ai-output-title">{title}</div>
+              <div className="terminal-ai-output-subheading">{subheading}</div>
+            </div>
+          </div>
+          <div className={`terminal-ai-timer is-${runTiming.status}`} role="timer" aria-live="polite">
+            <span>{timerLabel}</span>
+            <strong>{runTiming.status === 'idle' ? '—' : formatAiElapsed(runTiming.elapsedMs)}</strong>
+          </div>
+        </div>
 
         {/* Output body */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -126,7 +160,8 @@ export default function NetraAILabs({
       <div className="lg:col-span-5 flex flex-col"
         style={{
           background: '#07090f',
-          border: '1px solid rgba(255,255,255,0.07)',
+          border: bottomPanel ? 'none' : '1px solid rgba(255,255,255,0.07)',
+          borderLeft: bottomPanel ? '1px solid rgba(255,255,255,0.07)' : undefined,
           overflow: 'hidden',
           minHeight: 0,
         }}>
@@ -141,6 +176,9 @@ export default function NetraAILabs({
 
         {/* Scrollable controls — sections expand on demand so nothing overflows the box */}
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+
+          {/* Optional phase-specific input. The shared Maya controls remain unchanged. */}
+          {controlPanelTop}
 
           {/* Model selector */}
           <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -257,20 +295,11 @@ export default function NetraAILabs({
         </div>
 
         {/* Action buttons — pinned at the bottom */}
-        <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: '8px', flexShrink: 0 }}>
+        {showActions && <div className="terminal-ai-actions">
           <button
             onClick={onStop}
             disabled={!isEvaluating}
-            style={{
-              flex: 1, height: '36px', background: 'transparent',
-              border: '1px solid rgba(255,255,255,0.1)',
-              ...MONO, fontSize: '9px', fontWeight: 900, letterSpacing: '0.22em', textTransform: 'uppercase',
-              color: isEvaluating ? '#ef4444' : 'rgba(255,255,255,0.2)',
-              cursor: isEvaluating ? 'pointer' : 'not-allowed',
-              transition: 'all 150ms',
-            }}
-            onMouseEnter={e => { if (isEvaluating) e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+            className="btn-reset terminal-ai-action"
           >
             ABORT
           </button>
@@ -278,22 +307,18 @@ export default function NetraAILabs({
             onClick={onAnalyse}
             disabled={executeDisabled}
             title={analyseDisabledReason}
-            style={{
-              flex: 1, height: '36px',
-              background: executeDisabled ? 'rgba(255,255,255,0.04)' : '#4169E1',
-              border: 'none',
-              ...MONO, fontSize: '9px', fontWeight: 900, letterSpacing: '0.22em', textTransform: 'uppercase',
-              color: executeDisabled ? 'rgba(255,255,255,0.2)' : '#fff',
-              cursor: executeDisabled ? 'not-allowed' : 'pointer',
-              transition: 'all 150ms',
-            }}
-            onMouseEnter={e => { if (!executeDisabled) e.currentTarget.style.background = '#3558c8'; }}
-            onMouseLeave={e => { if (!executeDisabled) e.currentTarget.style.background = '#4169E1'; }}
+            className="btn-confirm terminal-ai-action"
           >
-            {analyseDisabled ? 'DISABLED' : 'EXECUTE'}
+            EXECUTE
           </button>
-        </div>
+        </div>}
       </div>
+    </div>
+    {bottomPanel && (
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.09)', background: 'var(--surface)' }}>
+        {bottomPanel}
+      </div>
+    )}
     </div>
   );
 }

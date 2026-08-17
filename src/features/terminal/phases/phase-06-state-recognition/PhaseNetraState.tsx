@@ -1,6 +1,5 @@
-// NETRA State phase — user-owned state selection + forward-transition graph.
-// This phase is deliberately independent from P5 AI text. P5 suggests; this
-// phase stores the user's chosen state/command.
+// User-owned NS hypothesis selection + forward-transition graph, embedded in
+// the Market Pulse Hypothesis workflow after Maya/WAIT resolution.
 
 import { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
@@ -9,10 +8,11 @@ import StateGraph, { RecognizedState, TransitionBranch } from '@/components/Temp
 import { appendStateRecognition } from '@/store/slices/analysisSlice';
 import { tradeCardsStorageKey } from '@/features/terminal/phases/phase-10-mission-control/missionControl/helpers';
 import { API_BASE } from '@/utils/constants';
+import { useNetraUtils } from '@/hooks/useNetraUtils';
+import { TerminalEmptyState, TerminalStatusBadge } from '@/components/UI/TerminalPrimitives';
+import { LuxuryShapeSpinner } from '@/components/UI/LuxuryShapeSpinner';
 
-const MONO = 'JetBrains Mono, Consolas, monospace';
-
-interface StateOption { id: string; name: string; mode: string }
+interface StateOption { id: string; name: string; mode: string; command?: string }
 
 function normalizeCommand(value: unknown) {
   if (!value) return null;
@@ -30,29 +30,44 @@ function commandColor(command: string | null) {
   }
 }
 
-export default function PhaseNetraState() {
+export default function PhaseNetraState({ embedded = false }: { embedded?: boolean }) {
   const dispatch = useDispatch();
+  const { getAuthHeaders } = useNetraUtils();
   const {
-    selectedNetraState, setSelectedNetraState,
+    SYSTEM_DATA, selectedNetraState, setSelectedNetraState,
+    notes, setNotes,
     recognitionCheckpoints, setRecognitionCheckpoints,
     setFinalCommand, setCommandLocked,
     setSelectedWeaponId, setInterSelections, setStrikeSelections, setSaturationSelections,
     activeSessionId, editStep, saveSession, showToast,
   } = useNetra();
 
-  const commandNodeIndex = recognitionCheckpoints.findIndex(checkpoint => checkpoint.pathConfirmed);
-  const commandNode = commandNodeIndex >= 0 ? recognitionCheckpoints[commandNodeIndex] : null;
+  const candidateIndex = recognitionCheckpoints.reduce(
+    (latest, checkpoint, index) => checkpoint.output || checkpoint.selectedState || checkpoint.decisionChoice === 'COMMAND' ? index : latest,
+    -1,
+  );
+  const candidateCheckpoint = candidateIndex >= 0 ? recognitionCheckpoints[candidateIndex] : null;
+  const hasOpenWait = recognitionCheckpoints.some(checkpoint => checkpoint.wait?.resolutionStatus === 'OPEN');
+  const h2Config = SYSTEM_DATA.hypothesisH2;
+  const phaseConfig = SYSTEM_DATA.terminalPhases?.marketPulseSelection;
 
   const persistPath = (next: typeof recognitionCheckpoints, failureMessage: string, clearDownstream = false) => {
-    void saveSession({ silent: true, recognitionCheckpoints: next, highestStep: 4, ...(clearDownstream ? { clearAfter: 'pinaka_state' as const } : {}) }).then(saved => {
+    void saveSession({
+      silent: true,
+      recognitionCheckpoints: next,
+      highestStep: 4,
+      ...(clearDownstream ? { clearAfter: 'pinaka_state' as const, reopenH2: true, selectedNetraState: null } : {}),
+    }).then(saved => {
       if (!saved) showToast(failureMessage, 'error');
     });
   };
 
   const resetCommandPath = (clearState = true) => {
     editStep(4);
-    setFinalCommand(null);
-    if (clearState) setSelectedNetraState(null);
+    if (clearState) {
+      setSelectedNetraState(null);
+      setFinalCommand(null);
+    }
     setSelectedWeaponId(null);
     setCommandLocked(false);
     setInterSelections({ pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' });
@@ -66,69 +81,74 @@ export default function PhaseNetraState() {
   };
 
   const confirmCommandNode = async () => {
-    if (!commandNode || !commandNode.pathConfirmed || !recognizedState) return;
-    const next = recognitionCheckpoints.map((checkpoint, index) => ({
-      ...checkpoint,
-      commandSelected: index === commandNodeIndex,
-    }));
-    setRecognitionCheckpoints(next);
-    setCommandLocked(false);
-    const saved = await saveSession({
-      recognitionCheckpoints: next,
-      highestStep: 4,
-      selectedNetraState,
-    });
-    if (saved) showToast('Pinaka State confirmed — continue to Command', 'success');
-  };
-
-  const editCommandNode = () => {
-    if (!commandNode) return;
-    const next = recognitionCheckpoints.map((checkpoint, index) => index === commandNodeIndex
-      ? { ...checkpoint, commandSelected: false }
-      : checkpoint
-    );
-    setRecognitionCheckpoints(next);
-    resetCommandPath(false);
-    showToast('Pinaka State reopened; downstream command and weapon data cleared', 'info');
-    persistPath(next, 'Pinaka State edit is local but has not reached MongoDB', true);
+    if (!candidateCheckpoint || !recognizedState || hasOpenWait) return;
+    if (!activeSessionId || !notes.command?.trim() || !selectedCommand) return;
+    try {
+      const response = await fetch(`${API_BASE}/api/hypotheses/h2/${encodeURIComponent(activeSessionId)}/confirm`, {
+        method: 'PUT',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          state_id: recognizedState.state_id,
+          command: selectedCommand,
+          hypothesis: notes.command.trim(),
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || body?.status !== 'ok') throw new Error(body?.detail || `HTTP ${response.status}`);
+      const next = recognitionCheckpoints.map((checkpoint, index) => ({
+        ...checkpoint,
+        pathConfirmed: index === candidateIndex,
+        commandSelected: index === candidateIndex,
+        selectedState: index === candidateIndex ? selectedNetraState : checkpoint.selectedState,
+      }));
+      setRecognitionCheckpoints(next);
+      setCommandLocked(false);
+      const saved = await saveSession({ recognitionCheckpoints: next, highestStep: 4, selectedNetraState });
+      if (saved) showToast('Market Pulse Hypothesis confirmed — continue to Command', 'success');
+    } catch (error) {
+      showToast(`Hypothesis confirmation failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
   };
 
   const resetCommandNode = () => {
-    if (!commandNode) return;
-    const next = recognitionCheckpoints.map((checkpoint, index) => index === commandNodeIndex
-      ? { ...checkpoint, commandSelected: false, selectedState: null }
+    if (!candidateCheckpoint) return;
+    const next = recognitionCheckpoints.map((checkpoint, index) => index === candidateIndex
+      ? { ...checkpoint, pathConfirmed: false, commandSelected: false, selectedState: null }
       : checkpoint
     );
     setRecognitionCheckpoints(next);
     resetCommandPath();
-    showToast('Pinaka State reset', 'info');
-    persistPath(next, 'Pinaka State reset is local but has not reached MongoDB', true);
+    showToast('Market Pulse Hypothesis selection reset', 'info');
+    persistPath(next, 'Hypothesis reset is local but has not reached MongoDB', true);
   };
 
   const inner = (selectedNetraState || {}) as Record<string, unknown>;
   const recognizedState = inner.recognized_state as RecognizedState | undefined;
   const transitions = (inner.possible_transitions || []) as TransitionBranch[];
-  const isOverride = !!inner.state_override;
   const selectedCommand = normalizeCommand(
     inner.cmd ?? recognizedState?.command ?? inner.command
   );
   const accent = commandColor(selectedCommand);
-  const isLocked = !!commandNode?.commandSelected;
-  const canSelect = !!commandNode?.pathConfirmed && !isLocked;
+  const recommendedStateId = String((candidateCheckpoint?.output as Record<string, unknown> | null)?.state_id || '');
+  const isLocked = !!candidateCheckpoint?.commandSelected;
+  const canSelect = !hasOpenWait && !isLocked;
 
   // ── state catalog for the override picker ──
   const [catalog, setCatalog] = useState<StateOption[]>([]);
   const [switching, setSwitching] = useState(false);
+  const [catalogLoading, setCatalogLoading] = useState(true);
   useEffect(() => {
+    setCatalogLoading(true);
     fetch(`${API_BASE}/api/states`)
       .then(r => r.ok ? r.json() : { states: [] })
       .then(d => setCatalog(d.states || []))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setCatalogLoading(false));
   }, []);
 
   // ── override: fetch the chosen state's projection, replace the recognised state ──
   const selectState = (id: string) => {
-    if (!id || !commandNode?.pathConfirmed || commandNode.commandSelected) return;
+    if (!id || hasOpenWait || candidateCheckpoint?.commandSelected) return;
     setSwitching(true);
     fetch(`${API_BASE}/api/states/${id}`)
       .then(r => r.ok ? r.json() : null)
@@ -145,11 +165,28 @@ export default function PhaseNetraState() {
           state_override: true,
         };
         setSelectedNetraState(selectedState);
-        setRecognitionCheckpoints(recognitionCheckpoints.map((checkpoint, index) => index === commandNodeIndex
-          ? { ...checkpoint, selectedState }
-          : checkpoint
-        ));
-        setFinalCommand(null);
+        setFinalCommand(normalizeCommand(rec.command));
+        if (!notes.command?.trim()) setNotes({ ...notes, command: String(rec.definition || '') });
+        if (candidateIndex >= 0) {
+          setRecognitionCheckpoints(recognitionCheckpoints.map((checkpoint, index) => index === candidateIndex
+            ? { ...checkpoint, selectedState }
+            : checkpoint
+          ));
+        } else {
+          setRecognitionCheckpoints([{
+            id: `hypothesis-manual-${Date.now()}`,
+            sequence: recognitionCheckpoints.length + 1,
+            createdAt: new Date().toISOString(),
+            nodeType: 'HYPOTHESIS',
+            output: null,
+            evidence: { marketPulse: {}, liquidityContext: {} },
+            selectedState,
+            eligibility: 'ACTIVE',
+            wait: null,
+            pathConfirmed: false,
+            commandSelected: false,
+          }]);
+        }
         setCommandLocked(false);
         if (rec.state_id) dispatch(appendStateRecognition(rec.state_id));
       })
@@ -157,90 +194,90 @@ export default function PhaseNetraState() {
   };
 
   return (
-    <div style={{
-      padding: '4px', minHeight: '360px', display: 'flex', flexDirection: 'column', gap: '18px',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <span style={{ fontFamily: MONO, fontSize: '8px', fontWeight: 800, color: 'rgba(255,255,255,0.42)', letterSpacing: '0.2em', textTransform: 'uppercase' }}>P6 · State classification</span>
-          <span style={{ fontFamily: MONO, fontSize: '14px', fontWeight: 900, color: '#f8fafc', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Choose the active NETRA state</span>
+    <section className={`market-hypothesis-selector ${embedded ? 'is-embedded' : ''}`}>
+      <header className="market-hypothesis-selector-header">
+        <div className="market-hypothesis-selector-heading">
+          <span className="market-hypothesis-phase">{phaseConfig?.counter || h2Config?.phaseLabel}</span>
+          {phaseConfig?.timeframe && <span className="market-hypothesis-timeframe">{phaseConfig.timeframe}</span>}
+          <div>
+            <h2>{phaseConfig?.title || h2Config?.selectionTitle}</h2>
+            <p>{phaseConfig?.subtitle || h2Config?.selectionSubtitle}</p>
+          </div>
         </div>
-        <div style={{ flex: 1 }} />
-        <span style={{
-          fontFamily: MONO, fontSize: '7px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
-          color: isLocked ? '#86efac' : canSelect ? '#cbd5e1' : '#fbbf24',
-          border: `1px solid ${isLocked ? '#22c55e55' : canSelect ? '#94a3b855' : '#f59e0b55'}`,
-          background: isLocked ? 'rgba(34,197,94,0.08)' : canSelect ? 'rgba(148,163,184,0.06)' : 'rgba(245,158,11,0.08)',
-          padding: '5px 8px',
-        }}>{isLocked ? 'State locked' : canSelect ? 'Awaiting selection' : 'Complete P5 first'}</span>
-      </div>
+        <TerminalStatusBadge tone={isLocked ? 'success' : canSelect ? 'neutral' : 'warning'}>
+          {isLocked ? h2Config?.lockedSelectionLabel : canSelect ? h2Config?.awaitingSelectionLabel : h2Config?.selectionSubtitle}
+        </TerminalStatusBadge>
+      </header>
 
-      <div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '10px', flexWrap: 'wrap' }}>
-          <span style={{ fontFamily: MONO, fontSize: '8px', fontWeight: 900, color: '#cbd5e1', letterSpacing: '0.16em', textTransform: 'uppercase' }}>State library</span>
-          <span style={{ fontFamily: MONO, fontSize: '8px', color: 'rgba(255,255,255,0.4)' }}>Select the state that best matches the completed decision path.</span>
+      <div className="market-hypothesis-library">
+        <div className="market-hypothesis-section-heading">
+          <span>{h2Config?.catalogLabel}</span>
+          <div />
+          <small>{String(catalog.length).padStart(2, '0')} OPTIONS</small>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '5px', maxHeight: '174px', overflowY: 'auto', paddingRight: '3px' }}>
+        <div className="market-hypothesis-options">
         {catalog.map(state => {
           const selected = recognizedState?.state_id === state.id;
+          const optionCommand = normalizeCommand(state.command);
+          const optionAccent = commandColor(optionCommand);
           return (
             <button
               key={state.id}
               type="button"
               onClick={() => selectState(state.id)}
               disabled={switching || !canSelect}
-              style={{
-                minHeight: '48px', padding: '8px 9px', textAlign: 'left',
-                cursor: switching ? 'wait' : canSelect ? 'pointer' : 'not-allowed',
-                background: selected ? `${accent}12` : 'transparent',
-                border: selected ? `1px solid ${accent}` : '1px solid rgba(148,163,184,0.11)',
-                borderLeft: selected ? `2px solid ${accent}` : '1px solid rgba(148,163,184,0.11)',
-                outline: 'none', fontFamily: MONO, opacity: canSelect ? 1 : 0.56,
-                transition: 'border-color 150ms ease, background 150ms ease, transform 150ms ease',
-              }}
+              className={`market-hypothesis-option ${selected ? 'is-selected' : ''} ${recommendedStateId === state.id ? 'is-recommended' : ''}`}
+              style={{ '--option-accent': optionAccent } as React.CSSProperties}
             >
-              <span style={{ display: 'block', fontSize: '11px', fontWeight: 900, color: selected ? accent : '#e2e8f0', letterSpacing: '0.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{state.id}</span>
-              <span style={{ display: 'block', marginTop: '4px', fontSize: '8px', fontWeight: 700, color: selected ? '#f8fafc' : 'rgba(226,232,240,0.58)', letterSpacing: '0.06em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textTransform: 'uppercase' }}>{state.name}</span>
-              {state.mode && <span style={{ display: 'block', marginTop: '2px', fontSize: '7px', color: 'rgba(148,163,184,0.62)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>{state.mode}</span>}
+              <span className="market-hypothesis-option-marker" aria-hidden="true" />
+              <span className="market-hypothesis-option-copy">
+                <span className="market-hypothesis-option-identity">
+                  <strong>{state.id}</strong>
+                  {recommendedStateId === state.id && <em>Maya proposal</em>}
+                </span>
+                <span className="market-hypothesis-option-name">{state.name}</span>
+                <span className="market-hypothesis-option-meta">
+                  {state.mode && <span>{state.mode}</span>}
+                  {optionCommand && <span style={{ color: optionAccent }}>{optionCommand}</span>}
+                </span>
+              </span>
             </button>
           );
         })}
         {catalog.length === 0 && (
-          <div style={{ minWidth: '180px', padding: '12px', fontFamily: MONO, fontSize: '8px', color: 'var(--text-4)' }}>{switching ? 'Loading states…' : 'No states available'}</div>
+          catalogLoading
+            ? <div className="netra-ai-spinner-shell" style={{ minHeight: 110 }}><LuxuryShapeSpinner compact micro className="netra-lux-inline" label="States" /></div>
+            : <TerminalEmptyState title="No states available" />
         )}
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <span style={{ fontFamily: MONO, fontSize: '8px', fontWeight: 900, color: 'rgba(255,255,255,0.48)', letterSpacing: '0.16em', textTransform: 'uppercase' }}>State map</span>
-        <div style={{ flex: 1 }} />
-        {recognizedState && <span style={{ fontFamily: MONO, fontSize: '8px', fontWeight: 800, color: accent, letterSpacing: '0.12em' }}>{recognizedState.state_id} · {selectedCommand || 'UNASSIGNED'}</span>}
+      <div className="market-hypothesis-map-heading">
+        <span>{h2Config?.mapLabel}</span>
+        <div />
+        {recognizedState && <strong style={{ color: accent }}>{recognizedState.state_id} · {selectedCommand || 'UNASSIGNED'}</strong>}
       </div>
 
-      <div style={{ flex: 1, minHeight: '230px', padding: recognizedState ? '2px 0' : '0' }}>
+      <div className={`market-hypothesis-map ${recognizedState ? 'has-selection' : ''}`}>
         {recognizedState ? (
-          <StateGraph state={recognizedState} transitions={transitions} />
+          <StateGraph state={recognizedState} transitions={transitions} label={h2Config?.mapLabel} />
         ) : (
-          <div style={{ height: '100%', minHeight: '230px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '9px', padding: '34px', textAlign: 'center' }}>
-            <span style={{ fontFamily: MONO, fontSize: '10px', fontWeight: 900, color: '#94a3b8', letterSpacing: '0.14em', textTransform: 'uppercase' }}>No state selected</span>
-            <span style={{ fontFamily: MONO, maxWidth: '360px', fontSize: '9px', lineHeight: 1.6, color: 'rgba(203,213,225,0.48)' }}>Choose an available state from the library to load its recognition logic and forward transition map.</span>
-          </div>
+          <TerminalEmptyState title={h2Config?.awaitingSelectionLabel} description={h2Config?.selectionSubtitle} />
         )}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '4px' }}>
-        <span style={{ fontFamily: MONO, fontSize: '8px', fontWeight: 800, color: 'rgba(255,255,255,0.42)', letterSpacing: '0.14em', textTransform: 'uppercase' }}>Phase control</span>
-        <div style={{ flex: 1 }} />
-        <button onClick={editCommandNode} className="btn-edit w-20" disabled={!commandNode?.commandSelected}>Edit</button>
-        <button onClick={resetCommandNode} className="btn-reset w-20" disabled={!!commandNode?.commandSelected || !recognizedState}>Reset</button>
+      <div className="terminal-action-bar">
+        <div className="terminal-action-buttons">
+        <button onClick={resetCommandNode} className="btn-reset w-20" disabled={!recognizedState}>Reset</button>
         <button
           onClick={confirmCommandNode}
-          className={`${commandNode?.commandSelected ? 'btn-confirmed' : 'btn-confirm'} w-40`}
-          disabled={!commandNode?.pathConfirmed || !recognizedState || !!commandNode.commandSelected}
+          className={`${candidateCheckpoint?.commandSelected ? 'btn-confirmed' : 'btn-confirm'} w-40`}
+          disabled={!candidateCheckpoint || !recognizedState || hasOpenWait || !notes.command?.trim() || !!candidateCheckpoint.commandSelected}
         >
-          {commandNode?.commandSelected ? '✓ Confirmed' : 'Confirm State'}
+          {candidateCheckpoint?.commandSelected ? `✓ ${h2Config?.selectionConfirmedLabel}` : h2Config?.selectionConfirmLabel}
         </button>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }

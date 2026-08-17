@@ -14,13 +14,15 @@ import {
   setCommandLocked, setWeaponLocked, setStepTimestamps, setImageDescription,
   setWeaponPrediction, setStateTimeline,
   setLiveMarketContext,
+  setH1Hypothesis,
+  setH1Proposal,
 } from '../store/slices/analysisSlice';
 import { setTradeName, setActiveEditLog, setEditFormData, setAuditData, setIsAuditing } from '../store/slices/logsSlice';
 import { registerSession, updateSession, setActiveRegistryId } from '../store/slices/sessionRegistrySlice';
 import { saveState } from '../utils/storage';
 import { API_BASE } from '../utils/constants';
 import { useNetraUtils } from './useNetraUtils';
-import { TradeLog, SessionMeta, TradePhase2, TradePhase3, TradePhase4, TradePhase8, TradePhase9Card, TradePhase1, WaitSelections, RecognitionCheckpoint } from '../types';
+import { TradeLog, SessionMeta, TradePhase2, TradePhase3, TradePhase4, TradePhase8, TradePhase9Card, TradePhase1, WaitSelections, RecognitionCheckpoint, H1Hypothesis, H2Hypothesis } from '../types';
 import { buildPhase9TradeBlock, buildTradeMetadata } from '../types/tradeStorageSchema';
 import { tradeCardsStorageKey } from '../features/terminal/phases/phase-10-mission-control/missionControl/helpers';
 import { buildForkName } from '../utils/forkNaming';
@@ -44,6 +46,41 @@ function firstTradeCard(log: TradeLog): Record<string, any> | null {
   return (log.phase9?.[0] as Record<string, any> | undefined) || null;
 }
 
+function normalizeH2Checkpoints(checkpoints: RecognitionCheckpoint[], fallbackOutput: RecognitionCheckpoint['output']): RecognitionCheckpoint[] {
+  if (checkpoints.length === 0 && fallbackOutput) {
+    return [{
+      id: `recognition-restored-${Date.now()}`,
+      sequence: 1,
+      createdAt: new Date().toISOString(),
+      nodeType: 'AI',
+      output: fallbackOutput,
+      evidence: { marketPulse: {}, liquidityContext: {} },
+      selectedState: null,
+      eligibility: '',
+      wait: null,
+      pathConfirmed: false,
+      commandSelected: false,
+    }];
+  }
+  const legacyCommand = checkpoints.find(checkpoint => checkpoint.nodeType === 'COMMAND');
+  if (!legacyCommand) return checkpoints;
+  const proposalIndex = checkpoints.reduce(
+    (latest, checkpoint, index) => checkpoint.output ? index : latest,
+    -1,
+  );
+  return checkpoints
+    .filter(checkpoint => checkpoint.nodeType !== 'COMMAND')
+    .map((checkpoint, index) => index === proposalIndex
+      ? {
+          ...checkpoint,
+          pathConfirmed: !!legacyCommand.pathConfirmed,
+          commandSelected: !!legacyCommand.commandSelected,
+          selectedState: legacyCommand.selectedState || checkpoint.selectedState,
+        }
+      : checkpoint
+    );
+}
+
 // Resolve session fields from new phase structure (primary) or old session_state blob (fallback)
 function resolveLogState(log: TradeLog) {
   const s = log.session_state;
@@ -52,7 +89,16 @@ function resolveLogState(log: TradeLog) {
   const p3 = log.phase3 as TradePhase3 | undefined;
   const p4 = log.phase4 as TradePhase4 | undefined;
   const p8 = log.phase8 as TradePhase8 | undefined;
-  const finalCmd = ((log.phase6 as Record<string,unknown> | undefined)?.command as string ?? s?.finalCommand ?? null);
+  const netraOut = (log.phase5 ?? s?.netraOutput ?? null) as RecognitionCheckpoint['output'];
+  const h2Current = (log.hypothesis_chain?.h2?.current?.status === 'CONFIRMED'
+    ? log.hypothesis_chain.h2.current
+    : null) as H2Hypothesis | null;
+  const h2Proposal = (log.hypothesis_chain?.h2?.proposal
+    ?? (s as Record<string, unknown> | undefined)?.hypothesisH2Proposal
+    ?? null) as H2Hypothesis | null;
+  const finalCmd = (h2Current?.command ?? h2Proposal?.command
+    ?? (log.phase6 as Record<string,unknown> | undefined)?.command
+    ?? s?.finalCommand ?? null) as string | null;
   const selectedNetraState = ((log.phase6 as Record<string, unknown> | undefined)?.selected_state as Record<string, unknown> | undefined)
     ?? ((s as Record<string, unknown> | undefined)?.selectedNetraState as Record<string, unknown> | undefined)
     ?? null;
@@ -68,7 +114,8 @@ function resolveLogState(log: TradeLog) {
     note3:  p3?.note ?? s?.notes?.htfStructure ?? '',
     note4mp:p4?.marketPulse_note ?? s?.notes?.marketPulse ?? '',
     note4lq:p4?.liquidityContext_note ?? s?.notes?.liquidityContext ?? '',
-    netraOut:  (log.phase5 ?? s?.netraOutput ?? null),
+    noteCommand: h2Current?.hypothesis ?? h2Proposal?.hypothesis ?? s?.notes?.command ?? '',
+    netraOut,
     sysRec:    ((log.phase6 as Record<string,unknown> | undefined)?.recommendation ?? s?.sysRecommendation ?? null),
     selectedNetraState,
     finalCmd,
@@ -80,13 +127,26 @@ function resolveLogState(log: TradeLog) {
     waitSel: (((log.phase6 as Record<string, unknown> | undefined)?.wait as WaitSelections | undefined)
       ?? ((s as Record<string, unknown> | undefined)?.waitSelections as WaitSelections | undefined)
       ?? {}),
-    recognitionCheckpoints: (((log.phase6 as Record<string, unknown> | undefined)?.recognition_checkpoints as RecognitionCheckpoint[] | undefined)
+    recognitionCheckpoints: normalizeH2Checkpoints((((log.phase6 as Record<string, unknown> | undefined)?.recognition_checkpoints as RecognitionCheckpoint[] | undefined)
       ?? ((s as Record<string, unknown> | undefined)?.recognitionCheckpoints as RecognitionCheckpoint[] | undefined)
-      ?? []),
+      ?? []), netraOut),
     imgDesc:   ((log.phase1 as TradePhase1 | undefined)?.image_description ?? (s as Record<string,unknown> | undefined)?.imageDescription ?? null) as string | null,
     audit:     (log.phase10 ?? (s as Record<string,unknown> | undefined)?.auditData ?? null),
     assetName: (log.assetName ?? s?.assetName ?? (firstTrade as TradePhase9Card | undefined)?.asset ?? '') as string,
     stateTimeline: ((log as Record<string, unknown>).state_timeline ?? []) as Array<{ state_id: string; ts: string }>,
+    h1Proposal: (log.hypothesis_chain?.h1?.proposal
+      ?? (log.hypothesis_chain?.h1?.current?.status !== 'CONFIRMED' ? log.hypothesis_chain?.h1?.current : null)
+      ?? s?.hypothesisH1Proposal
+      ?? (s?.hypothesisH1?.status !== 'CONFIRMED' ? s?.hypothesisH1 : null)
+      ?? null) as H1Hypothesis | null,
+    h1Hypothesis: (
+      log.hypothesis_chain?.h1?.current?.status === 'CONFIRMED'
+        ? log.hypothesis_chain.h1.current
+        : s?.hypothesisH1?.status === 'CONFIRMED'
+          ? s.hypothesisH1
+          : null
+    ) as H1Hypothesis | null,
+    h2Confirmed: !!h2Current,
   };
 }
 
@@ -130,6 +190,8 @@ export function useSessionManager() {
     auditData: null as RootState['logs']['auditData'],
     stateTimeline: [] as Array<{ state_id: string; ts: string }>,
     liveMarketContext: {} as Record<string, unknown>,
+    h1Hypothesis: null as H1Hypothesis | null,
+    h1Proposal: null as H1Hypothesis | null,
   });
   const saveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
 
@@ -152,13 +214,15 @@ export function useSessionManager() {
   const auditData = useSelector((s: RootState) => s.logs.auditData);
   const stateTimeline = useSelector((s: RootState) => s.analysis.stateTimeline);
   const liveMarketContext = useSelector((s: RootState) => s.analysis.liveMarketContext);
+  const h1Hypothesis = useSelector((s: RootState) => s.analysis.h1Hypothesis);
+  const h1Proposal = useSelector((s: RootState) => s.analysis.h1Proposal);
   const sysData = useSelector((s: RootState) => s.model.sysData);
 
   analysisRef.current = {
     highestStep, selections, notes, interSelections, strikeSelections, saturationSelections, waitSelections, recognitionCheckpoints,
     finalCommand, netraOutput, selectedNetraState, sysRecommendation, weaponPrediction,
     selectedWeaponId, stepTimestamps, tradeName, activeSessionId,
-    assetName: session?.assetName || '', imageDescription, auditData, stateTimeline, liveMarketContext,
+    assetName: session?.assetName || '', imageDescription, auditData, stateTimeline, liveMarketContext, h1Hypothesis, h1Proposal,
   };
 
   const resetTerminalState = useCallback(() => {
@@ -190,6 +254,8 @@ export function useSessionManager() {
     dispatch(setWeaponPrediction(null));
     dispatch(setStateTimeline([]));
     dispatch(setLiveMarketContext({}));
+    dispatch(setH1Hypothesis(null));
+    dispatch(setH1Proposal(null));
   }, [dispatch]);
 
   const buildSessionMeta = useCallback((log: TradeLog, parentId: string | null = null, forkPoint: number | string | null = null): SessionMeta => ({
@@ -219,13 +285,14 @@ export function useSessionManager() {
       const r = resolveLogState(log);
       dispatch(setHighestStep(r.highestStep));
       dispatch(setSelections({ preSessionContext: r.preSessionContext, htfStructure: r.htfStructure, marketPulse: r.marketPulse, liquidityContext: r.liquidityCtx }));
-      dispatch(setNotes({ preSessionContext: r.note2, htfStructure: r.note3, marketPulse: r.note4mp, liquidityContext: r.note4lq }));
+      dispatch(setNotes({ preSessionContext: r.note2, htfStructure: r.note3, marketPulse: r.note4mp, liquidityContext: r.note4lq, command: r.noteCommand }));
       dispatch(setStrikeSelections(r.strikeSel as Parameters<typeof setStrikeSelections>[0]));
       dispatch(setInterSelections(r.interSel   as Parameters<typeof setInterSelections>[0]));
       dispatch(setSaturationSelections(r.saturationSel));
       dispatch(setWaitSelections(r.waitSel));
       dispatch(setRecognitionCheckpoints(r.recognitionCheckpoints));
       dispatch(setFinalCommand(r.finalCmd));
+      dispatch(setCommandLocked(r.h2Confirmed));
       dispatch(setNetraOutput(r.netraOut as Parameters<typeof setNetraOutput>[0] | null));
       dispatch(setSelectedNetraState(r.selectedNetraState));
       dispatch(setSysRecommendation(r.sysRec));
@@ -236,6 +303,8 @@ export function useSessionManager() {
       if (r.imgDesc) dispatch(setImageDescription(r.imgDesc));
       if (r.audit)   dispatch(setAuditData(r.audit as Parameters<typeof setAuditData>[0]));
       dispatch(setStateTimeline(r.stateTimeline));
+      dispatch(setH1Hypothesis(r.h1Hypothesis));
+      dispatch(setH1Proposal(r.h1Proposal));
       dispatch(setSession({ ...(session || {}), userName: session?.userName || 'User', assetName: r.assetName, tradeName: log.name || '' }));
       dispatch(setActiveSessionId(log.id));
       saveState('activeSessionId', log.id);
@@ -361,13 +430,14 @@ export function useSessionManager() {
     const r = resolveLogState(log);
     dispatch(setHighestStep(r.highestStep));
     dispatch(setSelections({ preSessionContext: r.preSessionContext, htfStructure: r.htfStructure, marketPulse: r.marketPulse, liquidityContext: r.liquidityCtx }));
-    dispatch(setNotes({ preSessionContext: r.note2, htfStructure: r.note3, marketPulse: r.note4mp, liquidityContext: r.note4lq }));
+    dispatch(setNotes({ preSessionContext: r.note2, htfStructure: r.note3, marketPulse: r.note4mp, liquidityContext: r.note4lq, command: r.noteCommand }));
     dispatch(setStrikeSelections(r.strikeSel as Parameters<typeof setStrikeSelections>[0]));
     dispatch(setInterSelections(r.interSel   as Parameters<typeof setInterSelections>[0]));
     dispatch(setSaturationSelections(r.saturationSel));
     dispatch(setWaitSelections(r.waitSel));
     dispatch(setRecognitionCheckpoints(r.recognitionCheckpoints));
     dispatch(setFinalCommand(r.finalCmd));
+    dispatch(setCommandLocked(r.h2Confirmed));
     dispatch(setNetraOutput(r.netraOut as Parameters<typeof setNetraOutput>[0] | null));
     dispatch(setSelectedNetraState(r.selectedNetraState));
     dispatch(setSysRecommendation(r.sysRec));
@@ -378,6 +448,8 @@ export function useSessionManager() {
     if (r.imgDesc) dispatch(setImageDescription(r.imgDesc));
     if (r.audit)   dispatch(setAuditData(r.audit as Parameters<typeof setAuditData>[0]));
     dispatch(setStateTimeline(r.stateTimeline));
+    dispatch(setH1Hypothesis(r.h1Hypothesis));
+    dispatch(setH1Proposal(r.h1Proposal));
     if (window.innerWidth < 1024) dispatch(setIsLoggerOpen(false));
     dispatch(setSession({ ...(session || {}), userName: session?.userName || 'User', assetName: r.assetName, tradeName: log.name || '' }));
     dispatch(setActiveSessionId(log.id));
@@ -419,13 +491,14 @@ export function useSessionManager() {
       .then((data: TradeLog) => {
         dispatch(setHighestStep(r.highestStep));
         dispatch(setSelections({ preSessionContext: r.preSessionContext, htfStructure: r.htfStructure, marketPulse: r.marketPulse, liquidityContext: r.liquidityCtx }));
-        dispatch(setNotes({ preSessionContext: r.note2, htfStructure: r.note3, marketPulse: r.note4mp, liquidityContext: r.note4lq }));
+        dispatch(setNotes({ preSessionContext: r.note2, htfStructure: r.note3, marketPulse: r.note4mp, liquidityContext: r.note4lq, command: r.noteCommand }));
         dispatch(setStrikeSelections(r.strikeSel as Parameters<typeof setStrikeSelections>[0]));
         dispatch(setInterSelections(r.interSel   as Parameters<typeof setInterSelections>[0]));
         dispatch(setSaturationSelections(r.saturationSel));
         dispatch(setWaitSelections(r.waitSel));
         dispatch(setRecognitionCheckpoints(r.recognitionCheckpoints));
         dispatch(setFinalCommand(r.finalCmd));
+        dispatch(setCommandLocked(r.h2Confirmed));
         dispatch(setNetraOutput(r.netraOut as Parameters<typeof setNetraOutput>[0] | null));
         dispatch(setSelectedNetraState(r.selectedNetraState));
         dispatch(setSysRecommendation(r.sysRec));
@@ -434,7 +507,9 @@ export function useSessionManager() {
         dispatch(setStepTimestamps(r.stepTimestamps));
         if (r.imgDesc) dispatch(setImageDescription(r.imgDesc));
         if (r.audit)   dispatch(setAuditData(r.audit as Parameters<typeof setAuditData>[0]));
-      dispatch(setStateTimeline(r.stateTimeline));
+        dispatch(setStateTimeline(r.stateTimeline));
+        dispatch(setH1Hypothesis(r.h1Hypothesis));
+        dispatch(setH1Proposal(r.h1Proposal));
         dispatch(setTradeName(data.name));
         dispatch(setActiveSessionId(data.id));
         saveState('activeSessionId', data.id);
@@ -481,7 +556,7 @@ export function useSessionManager() {
         root_session_id: (activeEditLog as any)?.branch?.root_session_id || String(snap.activeSessionId),
         fork: {
           record_key: forkOverride?.recordKey || ({ 1: 'pre_session_context', 2: 'htf_structure', 3: 'auction_state_events', 4: 'command_dimensions', 5: 'state_dimensions', 6: 'trade_execution' } as Record<number, string>)[phaseNum] || 'market_snapshot',
-          label: forkOverride?.label || `Fork at ${({ 1: 'Pre-Session Context', 2: 'HTF Structure', 3: 'Auction State Events', 4: 'Command Dimensions', 5: 'State Dimensions', 6: 'Trade Execution' } as Record<number, string>)[phaseNum] || 'Market Snapshot'}`,
+          label: forkOverride?.label || `Fork at ${({ 1: 'Super HTF Structure', 2: 'HTF Structure', 3: 'Auction State Events', 4: 'Command Dimensions', 5: 'State Dimensions', 6: 'Trade Execution' } as Record<number, string>)[phaseNum] || 'Market Snapshot'}`,
           clear_selection_keys: forkOverride?.clearSelectionKeys || [],
           created_at: new Date().toISOString(),
         },
@@ -497,6 +572,8 @@ export function useSessionManager() {
         sysRecommendation: snap.sysRecommendation,
         selectedNetraState: snap.selectedNetraState,
         recognitionCheckpoints: snap.recognitionCheckpoints,
+        hypothesisH1: snap.h1Hypothesis,
+        hypothesisH1Proposal: snap.h1Proposal,
         selectedWeaponId: snap.selectedWeaponId,
         stepTimestamps: snap.stepTimestamps,
         tradeName: `${snap.tradeName || 'FORKED'}_P${phaseNum}_FORK`,
@@ -519,6 +596,8 @@ export function useSessionManager() {
         dispatch(setSaturationSelections(snap.saturationSelections));
         dispatch(setWaitSelections(snap.waitSelections));
         dispatch(setRecognitionCheckpoints(snap.recognitionCheckpoints));
+        dispatch(setH1Hypothesis(snap.h1Hypothesis));
+        dispatch(setH1Proposal(snap.h1Proposal));
         dispatch(setFinalCommand(snap.finalCommand));
         dispatch(setNetraOutput(snap.netraOutput));
         dispatch(setSelectedNetraState(snap.selectedNetraState));
@@ -538,7 +617,41 @@ export function useSessionManager() {
 
         // Clear the data for the forked phase so the user starts it fresh
         const ts = { ...snap.stepTimestamps };
-        if (phaseNum === 1) {
+        const forkKey = forkOverride?.recordKey;
+        const emptyWait: WaitSelections = {
+          waitingFor: '', referenceLocation: '', requiredResolution: '', developmentStage: '',
+          institutionalSignature: '', validityHorizon: '', resolutionStatus: 'OPEN',
+          waitNote: '', resolutionEvent: '', resolutionNote: '', openedAt: '', resolvedAt: '',
+        };
+        const clearExecutionPath = () => {
+          dispatch(setFinalCommand(null));
+          dispatch(setNetraOutput(null));
+          dispatch(setSelectedNetraState(null));
+          dispatch(setSysRecommendation(null));
+          dispatch(setRecognitionCheckpoints([]));
+          dispatch(setWaitSelections(emptyWait));
+          dispatch(setCommandLocked(false));
+          dispatch(setInterSelections({ pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }));
+          dispatch(setStrikeSelections({ impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' }));
+          dispatch(setSaturationSelections({}));
+          dispatch(setWeaponPrediction(null));
+          dispatch(setSelectedWeaponId(null));
+          dispatch(setWeaponLocked(false));
+          dispatch(setAuditData(null));
+        };
+
+        if (forkKey === 'hypothesis_h1') {
+          dispatch(setSelections({ ...snap.selections, marketPulse: {}, liquidityContext: {} }));
+          dispatch(setNotes({ ...snap.notes, marketPulse: '', liquidityContext: '', command: '' }));
+          dispatch(setH1Hypothesis(null));
+          dispatch(setH1Proposal(null));
+          clearExecutionPath();
+          for (const key of ['hypothesisH1', 'marketPulse', 'liquidityContext', 'evaluation', 'command', 'matrix', 'armory', 'control']) delete ts[key];
+        } else if (forkKey === 'hypothesis_h2') {
+          dispatch(setNotes({ ...snap.notes, command: '' }));
+          clearExecutionPath();
+          for (const key of ['hypothesisH2', 'evaluation', 'command', 'matrix', 'armory', 'control']) delete ts[key];
+        } else if (phaseNum === 1) {
           dispatch(setSelections({ ...snap.selections, preSessionContext: {} }));
           dispatch(setNotes({ ...snap.notes, preSessionContext: '' }));
           delete ts.preSessionContext;
@@ -559,33 +672,44 @@ export function useSessionManager() {
           dispatch(setStrikeSelections({ impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' }));
           dispatch(setSelectedWeaponId(null));
           dispatch(setWeaponLocked(false));
+          dispatch(setH1Hypothesis(null));
+          dispatch(setH1Proposal(null));
+          delete ts.hypothesisH1;
           delete ts.htfStructure;
           delete ts.marketPulse;
           delete ts.liquidityContext;
         } else if (phaseNum === 3) {
           const marketForkKey = forkOverride?.recordKey;
-          const operationalMarkingKeys = new Set(['operationalMarkingIds', 'operationalMarkings']);
-          const auctionStateKeys = new Set(['auctionState', 'subAuctionState', 'auctionActiveLeg', 'activeLeg']);
-          const inheritedMarketPulse = marketForkKey === 'price_behaviour'
-            ? Object.fromEntries(Object.entries(snap.selections.marketPulse || {}).filter(([key]) => operationalMarkingKeys.has(key) || auctionStateKeys.has(key)))
-            : marketForkKey === 'liquidity_context' || marketForkKey === 'auction_state_events'
-              ? { ...(snap.selections.marketPulse || {}) }
-              : marketForkKey === 'auction_state'
-                ? Object.fromEntries(Object.entries(snap.selections.marketPulse || {}).filter(([key]) => operationalMarkingKeys.has(key)))
-                : {};
-          const inheritedLiquidity = marketForkKey === 'auction_state_events'
-            ? Object.fromEntries(Object.entries(snap.selections.liquidityContext || {}).filter(([key]) => key !== 'auctionEvent'))
-            : {};
+          const marketComponents = sysData?.marketPulse?.dimensions || [];
+          const forkIndex = marketComponents.findIndex(component => component.recordKey === marketForkKey);
+          const upstreamComponents = forkIndex >= 0 ? marketComponents.slice(0, forkIndex) : [];
+          const configuredKeys = (target: 'marketPulse' | 'liquidityContext') => new Set(
+            upstreamComponents
+              .filter(component => (component.selectionTarget === 'liquidityContext' ? 'liquidityContext' : 'marketPulse') === target)
+              .flatMap(component => [
+                ...(component.selectionIdKey ? [component.selectionIdKey] : []),
+                ...(component.selectionValueKey ? [component.selectionValueKey] : []),
+                ...(component.dimensions || []).flatMap(dimension => [dimension.id, ...(dimension.selectionAliases || [])]),
+              ]),
+          );
+          const inheritedMarketKeys = configuredKeys('marketPulse');
+          const inheritedLiquidityKeys = configuredKeys('liquidityContext');
+          const inheritedMarketPulse = Object.fromEntries(
+            Object.entries(snap.selections.marketPulse || {}).filter(([key]) => inheritedMarketKeys.has(key)),
+          );
+          const inheritedLiquidity = Object.fromEntries(
+            Object.entries(snap.selections.liquidityContext || {}).filter(([key]) => inheritedLiquidityKeys.has(key)),
+          );
           dispatch(setSelections({
             ...snap.selections,
             marketPulse: inheritedMarketPulse,
             liquidityContext: inheritedLiquidity,
           }));
-          if (!marketForkKey || marketForkKey === 'auction_state') {
-            dispatch(setNotes({ ...snap.notes, marketPulse: '', liquidityContext: '' }));
-          } else if (marketForkKey === 'price_behaviour') {
-            dispatch(setNotes({ ...snap.notes, liquidityContext: '' }));
-          }
+          dispatch(setNotes({
+            ...snap.notes,
+            marketPulse: Object.keys(inheritedMarketPulse).length ? snap.notes.marketPulse : '',
+            liquidityContext: Object.keys(inheritedLiquidity).length ? snap.notes.liquidityContext : '',
+          }));
           dispatch(setFinalCommand(null));
           dispatch(setNetraOutput(null));
           dispatch(setSelectedNetraState(null));
@@ -654,7 +778,7 @@ export function useSessionManager() {
       });
   }, [dispatch, session, currentModel, navigate, showToast, getAuthHeaders, buildSessionMeta, activeEditLog]);
 
-  const saveSession = useCallback(async (options: { silent?: boolean; recognitionCheckpoints?: RecognitionCheckpoint[]; highestStep?: number; clearDownstream?: boolean; clearAfter?: 'pre_session' | 'htf' | 'market_pulse' | 'decision_path' | 'pinaka_state' | 'command'; selectedNetraState?: Record<string, unknown> | null; liveMarketContext?: Record<string, unknown> } = {}): Promise<boolean> => {
+  const saveSession = useCallback(async (options: { silent?: boolean; recognitionCheckpoints?: RecognitionCheckpoint[]; highestStep?: number; stepTimestamps?: Record<string, string>; clearDownstream?: boolean; clearAfter?: 'pre_session' | 'htf' | 'market_pulse' | 'decision_path' | 'pinaka_state' | 'command'; reopenH2?: boolean; selectedNetraState?: Record<string, unknown> | null; liveMarketContext?: Record<string, unknown> } = {}): Promise<boolean> => {
     const snap = analysisRef.current;
     const sessionId = String(snap.activeSessionId || '').trim();
     if (!sessionId) {
@@ -756,6 +880,7 @@ export function useSessionManager() {
     const clearAfter = options.clearAfter ?? (options.clearDownstream ? 'decision_path' : null);
     const clearDownstream = !!clearAfter;
     const clearHtf = clearAfter === 'pre_session';
+    const clearHypothesis = clearAfter === 'pre_session' || clearAfter === 'htf';
     const clearMarketPulse = clearHtf || clearAfter === 'htf';
     const clearDecisionPath = clearMarketPulse || clearAfter === 'market_pulse';
     const clearPinakaState = clearDecisionPath || clearAfter === 'decision_path';
@@ -775,19 +900,33 @@ export function useSessionManager() {
     const marketPulse = snap.selections.marketPulse || {};
     const liquidity = snap.selections.liquidityContext || {};
     const htf = snap.selections.htfStructure || {};
+    const htfDimensions = (sysData?.hypothesisH1?.dimensions || [])
+      .filter(component => component.selectionTarget !== 'preSessionContext')
+      .flatMap(dimension => dimension.dimensions || [dimension]);
     const htfEventIds = new Set(
-      (sysData?.htfStructure?.dimensions || []).filter(dimension => dimension.multiselect).map(dimension => dimension.id),
+      htfDimensions.filter(dimension => dimension.multiselect).map(dimension => dimension.id),
     );
     const htfStructureDimensions = Object.fromEntries(Object.entries(htf).filter(([key]) => !htfEventIds.has(key)));
     const htfEventDimensions = Object.fromEntries(Object.entries(htf).filter(([key]) => htfEventIds.has(key)));
-    const auctionStateDimensions = Object.fromEntries(Object.entries(marketPulse).filter(([key]) => [
-      'operationalMarkingIds', 'operationalMarkings', 'auctionState', 'subAuctionState', 'auctionActiveLeg', 'activeLeg',
-    ].includes(key)));
-    const priceBehaviourDimensions = Object.fromEntries(Object.entries(marketPulse).filter(([key]) => [
-      'activeLegMomentum', 'momentum', 'activeLegResistance', 'resistance',
-    ].includes(key)));
-    const auctionEventDimensions = Object.fromEntries(Object.entries(liquidity).filter(([key]) => key === 'auctionEvent'));
-    const liquidityDimensions = Object.fromEntries(Object.entries(liquidity).filter(([key]) => key !== 'auctionEvent'));
+    const marketPulseRecords = Object.fromEntries(
+      (sysData?.marketPulse?.dimensions || [])
+        .filter(component => !!component.recordKey)
+        .map(component => {
+          const includedComponents = [
+            component,
+            ...(sysData?.marketPulse?.dimensions || []).filter(candidate => component.includeComponentIds?.includes(candidate.id)),
+          ];
+          const source = component.selectionTarget === 'liquidityContext' ? liquidity : marketPulse;
+          const keys = new Set(includedComponents.flatMap(included => [
+            ...(included.selectionIdKey ? [included.selectionIdKey] : []),
+            ...(included.selectionValueKey ? [included.selectionValueKey] : []),
+            ...(included.dimensions || []).flatMap(dimension => [dimension.id, ...(dimension.selectionAliases || [])]),
+          ]));
+          const dimensions = Object.fromEntries(Object.entries(source).filter(([key]) => keys.has(key)));
+          const note = component.selectionTarget === 'liquidityContext' ? snap.notes.liquidityContext : snap.notes.marketPulse;
+          return [component.recordKey, record(dimensions, note)];
+        }),
+    );
     const commandDimensions = snap.finalCommand === 'STRIKE'
       ? snap.strikeSelections
       : snap.finalCommand === 'SATURATION'
@@ -824,10 +963,26 @@ export function useSessionManager() {
       pre_session_context: record(snap.selections.preSessionContext, snap.notes.preSessionContext),
       htf_structure: record(htfStructureDimensions, snap.notes.htfStructure),
       htf_events: record(htfEventDimensions, snap.notes.htfStructure),
-      auction_state: record(auctionStateDimensions, snap.notes.marketPulse),
-      price_behaviour: record(priceBehaviourDimensions, snap.notes.marketPulse),
-      liquidity_context: record(liquidityDimensions, snap.notes.liquidityContext),
-      auction_state_events: record(auctionEventDimensions, snap.notes.liquidityContext),
+      hypothesis_h1: !clearHypothesis && snap.h1Hypothesis?.status === 'CONFIRMED' ? {
+        hypothesis_id: snap.h1Hypothesis.hypothesis_id,
+        status: snap.h1Hypothesis.status,
+        claim: snap.h1Hypothesis.claim,
+        structural_view: snap.h1Hypothesis.structural_view,
+        objective: snap.h1Hypothesis.objective,
+        pullback_magnet: snap.h1Hypothesis.pullback_magnet,
+        expected_path: snap.h1Hypothesis.expected_path,
+        confirmation_conditions: snap.h1Hypothesis.confirmation_conditions,
+        invalidation_conditions: snap.h1Hypothesis.invalidation_conditions,
+        handoff: snap.h1Hypothesis.handoff,
+        confidence: snap.h1Hypothesis.confidence,
+        evidence_summary: {
+          supporting_count: snap.h1Hypothesis.evidence.supporting.length,
+          contradicting_count: snap.h1Hypothesis.evidence.contradicting.length,
+          missing: snap.h1Hypothesis.evidence.missing,
+        },
+        updated_at: new Date().toISOString(),
+      } : null,
+      ...marketPulseRecords,
       maya_market_type_selector: snap.netraOutput ? { suggestion: aiSuggestionText(snap.netraOutput), updated_at: new Date().toISOString() } : null,
       wait: compactWaits.length ? { checkpoints: compactWaits, updated_at: new Date().toISOString() } : null,
       pinaka_state: selectedState ? { state: selectedState, command: snap.finalCommand, updated_at: new Date().toISOString() } : null,
@@ -844,6 +999,7 @@ export function useSessionManager() {
     if (clearHtf) {
       marketSnapshot.htf_structure = null;
       marketSnapshot.htf_events = null;
+      marketSnapshot.hypothesis_h1 = null;
     }
     if (clearMarketPulse) {
       marketSnapshot.auction_state = null;
@@ -854,6 +1010,7 @@ export function useSessionManager() {
     if (clearDecisionPath) {
       marketSnapshot.maya_market_type_selector = null;
       marketSnapshot.wait = null;
+      marketSnapshot.hypothesis_h2 = null;
     }
     if (clearPinakaState) marketSnapshot.pinaka_state = null;
     if (clearCommand) {
@@ -867,9 +1024,21 @@ export function useSessionManager() {
       highestStep:    options.highestStep ?? snap.highestStep,
       tradeName:      snap.tradeName,
       assetName:      snap.assetName,
-      stepTimestamps: persistedTimestamps,
+      stepTimestamps: options.stepTimestamps ?? persistedTimestamps,
       state_timeline: snap.stateTimeline,
       marketSnapshot,
+      ...(clearHypothesis
+        ? { hypothesisH1: null, hypothesisH1Proposal: null }
+        : snap.h1Hypothesis
+          ? { hypothesisH1: snap.h1Hypothesis, ...(snap.h1Proposal ? { hypothesisH1Proposal: snap.h1Proposal } : {}) }
+          : snap.h1Proposal
+            ? { hypothesisH1Proposal: snap.h1Proposal }
+            : {}),
+      ...(clearDecisionPath
+        ? { hypothesisH2: null, hypothesisH2Proposal: null }
+        : options.reopenH2
+          ? { hypothesisH2: null, hypothesisH2Proposal: snap.netraOutput ?? null }
+          : {}),
 
       phase1: snap.imageDescription
         ? { image_description: snap.imageDescription }
@@ -898,6 +1067,7 @@ export function useSessionManager() {
       phase6: !clearDecisionPath && ((!clearCommand && snap.finalCommand) || persistedCheckpoints.length)
         ? {
             command:        clearCommand ? null : snap.finalCommand,
+            hypothesis:     snap.notes.command || null,
             confirmed_at:   clearCommand ? null : snap.stepTimestamps?.command ?? null,
             selected_state: clearPinakaState ? null : selectedState,
             recommendation: clearCommand ? null : snap.sysRecommendation ?? null,

@@ -2,23 +2,61 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useNetra } from '../../context/NetraContext';
-import { LuxuryShapeSpinner } from '../UI/LuxuryShapeSpinner';
+import { TerminalActivityDock } from '../UI/TerminalActivityDock';
 
 export default function GlobalOverlay() {
   const { toast, confirmModal, setConfirmModal } = useNetra();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [headerRequestCount, setHeaderRequestCount] = useState(0);
-  const [globalRequestCount, setGlobalRequestCount] = useState(0);
-  const [globalLoadingLabel, setGlobalLoadingLabel] = useState('Processing');
+  const [requestCount, setRequestCount] = useState(0);
+  const [activityLabel, setActivityLabel] = useState('Processing');
+  const [interactionActive, setInteractionActive] = useState(false);
   const lastClickedButton = useRef<{ button: HTMLButtonElement; at: number } | null>(null);
 
   // One shared request observer gives every API-backed button the same immediate
   // feedback. Local UI-only buttons remain instant and never show a false spinner.
   useEffect(() => {
     const pendingRequests = new Map<HTMLButtonElement, { count: number; wasDisabled: boolean; showSpinner: boolean }>();
+    const feedbackTimers = new Map<HTMLButtonElement, number>();
+    let interactionTimer: number | null = null;
+    const actionLabel = (button: HTMLButtonElement) => {
+      const explicit = button.dataset.activityLabel || button.dataset.loadingLabel;
+      if (explicit) return explicit;
+      const text = (button.textContent || button.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim();
+      if (/execute|analyse|maya/i.test(text)) return 'Running Maya';
+      if (/abort|stop/i.test(text)) return 'Stopping Maya';
+      if (/edit|reopen/i.test(text) || button.classList.contains('btn-edit')) return 'Reopening workflow';
+      if (/reset|remove|delete|cut/i.test(text) || button.classList.contains('btn-reset')) return 'Updating workflow';
+      if (/confirm|save|apply|resolve/i.test(text) || button.classList.contains('btn-confirm')) return 'Saving changes';
+      return text ? `${text}…` : 'Processing';
+    };
+    const beginInteraction = (button: HTMLButtonElement) => {
+      setActivityLabel(actionLabel(button));
+      setInteractionActive(true);
+      if (interactionTimer) window.clearTimeout(interactionTimer);
+      interactionTimer = window.setTimeout(() => {
+        setInteractionActive(false);
+        interactionTimer = null;
+      }, 650);
+    };
+    const animateButton = (button: HTMLButtonElement, className: string, duration: number) => {
+      const current = feedbackTimers.get(button);
+      if (current) window.clearTimeout(current);
+      button.classList.remove('netra-button-activated', 'netra-button-settled');
+      void button.offsetWidth;
+      button.classList.add(className);
+      feedbackTimers.set(button, window.setTimeout(() => {
+        button.classList.remove(className);
+        feedbackTimers.delete(button);
+      }, duration));
+    };
     const rememberButton = (event: MouseEvent) => {
       const target = event.target instanceof Element ? event.target.closest('button') : null;
       if (target instanceof HTMLButtonElement && !target.disabled) {
+        animateButton(target, 'netra-button-activated', 240);
+        const hasLocalLoading = Boolean(target.closest('[data-loading-owner="local"]'));
+        if (!hasLocalLoading && target.matches('.btn-primary, .btn-confirm, .btn-edit, .btn-reset, [data-activity-label], [data-loading-label]')) {
+          beginInteraction(target);
+        }
         lastClickedButton.current = { button: target, at: Date.now() };
       }
     };
@@ -50,7 +88,10 @@ export default function GlobalOverlay() {
       button.classList.remove('netra-button-pending-compact');
       button.style.removeProperty('--netra-button-loading-color');
       button.removeAttribute('aria-busy');
-      if (button.isConnected) button.disabled = pending.wasDisabled;
+      if (button.isConnected) {
+        button.disabled = pending.wasDisabled;
+        if (pending.showSpinner) animateButton(button, 'netra-button-settled', 520);
+      }
     };
 
     window.addEventListener('click', rememberButton, true);
@@ -59,19 +100,18 @@ export default function GlobalOverlay() {
       const button = candidate && Date.now() - candidate.at < 800 && candidate.button.isConnected
         ? candidate.button
         : null;
+      const hasLocalLoading = Boolean(button?.closest('[data-loading-owner="local"]'));
       const globalTrigger = button?.closest<HTMLButtonElement>('[data-loading-scope="global"]');
       const isGlobalRequest = Boolean(globalTrigger);
       const isHeaderRequest = !isGlobalRequest && Boolean(button?.closest('header, [data-loading-region="header"]'));
-      if (button) start(button, !isHeaderRequest && !isGlobalRequest);
-      if (isGlobalRequest) {
-        setGlobalLoadingLabel(globalTrigger?.dataset.loadingLabel || 'Processing');
-        setGlobalRequestCount(count => count + 1);
+      if (button && !hasLocalLoading) start(button, !isHeaderRequest && !isGlobalRequest);
+      if (button && !hasLocalLoading) {
+        setActivityLabel(actionLabel(globalTrigger || button));
+        setRequestCount(count => count + 1);
       }
-      if (isHeaderRequest) setHeaderRequestCount(count => count + 1);
       return originalFetch.call(window, ...args).finally(() => {
-        if (button) finish(button);
-        if (isGlobalRequest) setGlobalRequestCount(count => Math.max(0, count - 1));
-        if (isHeaderRequest) setHeaderRequestCount(count => Math.max(0, count - 1));
+        if (button && !hasLocalLoading) finish(button);
+        if (button && !hasLocalLoading) setRequestCount(count => Math.max(0, count - 1));
       });
     }) as typeof window.fetch;
 
@@ -85,6 +125,9 @@ export default function GlobalOverlay() {
         button.removeAttribute('aria-busy');
         if (button.isConnected) button.disabled = pending.wasDisabled;
       });
+      feedbackTimers.forEach(timeout => window.clearTimeout(timeout));
+      feedbackTimers.clear();
+      if (interactionTimer) window.clearTimeout(interactionTimer);
     };
   }, []);
 
@@ -107,15 +150,6 @@ export default function GlobalOverlay() {
 
   return (
     <>
-      {globalRequestCount > 0 && (
-        <div className="netra-lux-loader netra-global-action-loader" role="status" aria-live="assertive" aria-label={globalLoadingLabel}>
-          <div className="netra-lux-grain" />
-          <div className="netra-lux-frame">
-            <LuxuryShapeSpinner label={globalLoadingLabel} />
-          </div>
-        </div>
-      )}
-
       {confirmModal && (
         <div
           style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}
@@ -148,6 +182,7 @@ export default function GlobalOverlay() {
                 <button
                   onClick={confirmModalAction}
                   disabled={isSubmitting}
+                  data-activity-label={confirmModal.loadingText || 'Processing'}
                   style={{ flex: 1, height: '40px', border: 'none', background: confirmModal.isDanger === false ? '#4169E1' : '#ef4444', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#ffffff', cursor: isSubmitting ? 'wait' : 'pointer', fontFamily: 'inherit', transition: 'all 150ms', opacity: isSubmitting ? 0.8 : 1 }}
                   onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; }}
                   onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
@@ -156,26 +191,18 @@ export default function GlobalOverlay() {
                 </button>
               </div>
             </div>
-            {isSubmitting && (
-              <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,0.78)', backdropFilter: 'blur(2px)' }}>
-                <LuxuryShapeSpinner compact label={confirmModal.loadingText || 'Processing'} />
-              </div>
-            )}
           </div>
         </div>
       )}
 
-      {toast && (
-        <div className={`toast ${toast.type === 'error' ? 'toast-error' : 'toast-success'}`}>
-          {toast.type === 'success' ? '✓' : '✕'} {toast.msg}
-        </div>
-      )}
-
-      {headerRequestCount > 0 && (
-        <div role="status" aria-live="polite" style={{ position: 'fixed', right: '22px', bottom: '22px', zIndex: 9997, display: 'flex', alignItems: 'center', gap: '9px', padding: '9px 12px', background: 'rgba(15,23,42,0.92)', border: '1px solid rgba(148,163,184,0.28)', boxShadow: '0 10px 30px rgba(15,23,42,0.2)', color: '#f8fafc', fontSize: '9px', fontWeight: 850, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-          Loading<span className="netra-loading-dots" aria-hidden="true"><i /><i /><i /></span>
-        </div>
-      )}
+      {(requestCount > 0 || interactionActive || isSubmitting) ? (
+        <TerminalActivityDock
+          loading
+          message={isSubmitting ? (confirmModal?.loadingText || 'Processing') : activityLabel}
+        />
+      ) : toast ? (
+        <TerminalActivityDock message={toast.msg} tone={toast.type} />
+      ) : null}
     </>
   );
 }

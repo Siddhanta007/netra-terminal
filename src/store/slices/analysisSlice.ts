@@ -5,6 +5,7 @@ import { loadState } from '../../utils/storage';
 import {
   Selections, Notes, InterSelections, StrikeSelections,
   NetraOutput, WeaponPrediction, WaitSelections, RecognitionCheckpoint,
+  H1Hypothesis, H1AgentTraceStep,
 } from '../../types';
 
 interface AnalysisState {
@@ -24,6 +25,11 @@ interface AnalysisState {
   recognitionCheckpoints: RecognitionCheckpoint[];
   selectedWeaponId: string | null;
   isEvaluating: boolean;
+  h1Hypothesis: H1Hypothesis | null;
+  h1Proposal: H1Hypothesis | null;
+  h1AgentTrace: H1AgentTraceStep[];
+  isConfirmingH1: boolean;
+  isGeneratingH1: boolean;
   isPredictingWeapon: boolean;
   weaponPrediction: WeaponPrediction | null;
   imageDescription: string | null;
@@ -78,6 +84,11 @@ const initialState: AnalysisState = {
   liveMarketContext: {},
   selectedWeaponId: loadState('selectedWeaponId', null),
   isEvaluating: false,
+  h1Hypothesis: null,
+  h1Proposal: null,
+  h1AgentTrace: [],
+  isConfirmingH1: false,
+  isGeneratingH1: false,
   isPredictingWeapon: false,
   weaponPrediction: loadState<WeaponPrediction | null>('weaponPrediction', null),  // expensive AI call — persist across reloads
   imageDescription: loadState('imageDescription', null),
@@ -163,6 +174,21 @@ export const analysisSlice = createSlice({
     setIsEvaluating: (state, action: PayloadAction<boolean>) => {
       state.isEvaluating = action.payload;
     },
+    setH1Hypothesis: (state, action: PayloadAction<H1Hypothesis | null>) => {
+      state.h1Hypothesis = action.payload;
+    },
+    setH1Proposal: (state, action: PayloadAction<H1Hypothesis | null>) => {
+      state.h1Proposal = action.payload;
+    },
+    setH1AgentTrace: (state, action: PayloadAction<H1AgentTraceStep[]>) => {
+      state.h1AgentTrace = action.payload;
+    },
+    setIsGeneratingH1: (state, action: PayloadAction<boolean>) => {
+      state.isGeneratingH1 = action.payload;
+    },
+    setIsConfirmingH1: (state, action: PayloadAction<boolean>) => {
+      state.isConfirmingH1 = action.payload;
+    },
     setIsPredictingWeapon: (state, action: PayloadAction<boolean>) => {
       state.isPredictingWeapon = action.payload;
     },
@@ -224,6 +250,11 @@ export const {
   updateLatestRecognitionCheckpoint,
   setSelectedWeaponId,
   setIsEvaluating,
+  setH1Hypothesis,
+  setH1Proposal,
+  setH1AgentTrace,
+  setIsGeneratingH1,
+  setIsConfirmingH1,
   setIsPredictingWeapon,
   setWeaponPrediction,
   setImageDescription,

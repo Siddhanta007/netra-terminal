@@ -1,101 +1,70 @@
 import React, { useEffect, useState } from 'react';
-import { useSelector } from 'react-redux';
-import { RootState } from '@/store';
+import { TerminalComponentHeader } from '@/components/UI/TerminalPrimitives';
 import { useNetra } from '@/context/NetraContext';
-import ForkButton from '@/components/UI/ForkButton';
-import { buildForkName } from '@/utils/forkNaming';
+import { SystemDimension } from '@/types';
 
-// ─── Operational Marking checklist ───────────────────────────────────────────
+const MONO: React.CSSProperties = { fontFamily: 'Space Grotesk, Inter, sans-serif' };
 
-const MONO_MP: React.CSSProperties = { fontFamily: 'Space Grotesk, Inter, sans-serif' };
+type SelectionTarget = 'marketPulse' | 'liquidityContext';
 
-function OperationalMarkingChecklist({
+function ChecklistRows({
+  open,
+  options,
   checked,
-  toggle,
-  marks,
+  onToggle,
 }: {
+  open: boolean;
+  options: string[];
   checked: Record<string, boolean>;
-  toggle: (id: string) => void;
-  marks: { id: string; label: string }[];
+  onToggle: (id: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const done  = marks.filter(m => checked[m.id]).length;
-  const total = marks.length;
+  if (!open) return null;
 
   return (
-    <div style={{ marginBottom: '20px' }}>
-      <div
-        onClick={() => setOpen(o => !o)}
-        style={{
-          margin: '0 0 12px 0',
-          display: 'flex', alignItems: 'center', gap: '10px',
-          borderLeft: '3px solid var(--phase-accent)',
-          paddingLeft: '10px',
-          cursor: 'pointer', userSelect: 'none',
-        }}
-      >
-          <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '11px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase', flexShrink: 0 }}>Component 1 — Operational Marking</span>
-          <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '9px', fontWeight: 700, color: done === total ? 'var(--phase-accent)' : 'var(--text-3)', letterSpacing: '0.04em', flexShrink: 0 }}>{done}/{total}</span>
-          <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '8px', color: 'var(--text-4)', letterSpacing: '0.08em', textTransform: 'uppercase', flexShrink: 0 }}>≤ 10 min</span>
-          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
-          <span style={{ fontSize: '9px', color: 'var(--text-4)', flexShrink: 0 }}>{open ? '▾' : '▸'}</span>
-      </div>
-
-      {open && (
-        <div style={{
-          display: 'flex', flexDirection: 'column',
-          border: '1px solid var(--border-strong)',
-          borderRadius: '0 0 5px 5px',
-          marginBottom: '4px', overflow: 'hidden',
-        }}>
-          {marks.map((m, i) => {
-            const isDone = !!checked[m.id];
-            const isLastRow = i === marks.length - 1;
-            return (
-              <div
-                key={m.id}
-                onClick={e => { e.stopPropagation(); toggle(m.id); }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '10px',
-                  padding: '12px 16px', cursor: 'pointer',
-                  background: isDone ? 'var(--accent-bg)' : 'transparent',
-                  borderBottom: isLastRow ? 'none' : '1px solid var(--border)',
-                  transition: 'background 120ms',
-                }}
-              >
-                <div style={{
-                  width: '12px', height: '12px', flexShrink: 0,
-                  border: `1.5px solid ${isDone ? 'var(--phase-accent)' : 'var(--border-strong)'}`,
-                  background: isDone ? 'var(--phase-accent)' : 'transparent',
-                  borderRadius: '2px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'border-color 100ms, background 100ms',
-                }}>
-                  {isDone && <span style={{ fontSize: '8px', color: 'white', fontWeight: 900, lineHeight: 1 }}>✓</span>}
-                </div>
-                <span style={{
-                  ...MONO_MP, fontSize: '10px', fontWeight: 600, flex: 1, lineHeight: 1.4,
-                  color: isDone ? 'var(--text-3)' : 'var(--text-1)',
-                  textDecoration: isDone ? 'line-through' : 'none',
-                  textDecorationColor: 'var(--text-4)',
-                }}>
-                  {m.label}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      border: '1px solid var(--border-strong)',
+      marginBottom: '4px', overflow: 'hidden',
+    }}>
+      {options.map((label, index) => {
+        const id = `drawing_${index + 1}`;
+        const isDone = !!checked[id];
+        return (
+          <div
+            key={id}
+            onClick={event => { event.stopPropagation(); onToggle(id); }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '10px',
+              padding: '12px 16px', cursor: 'pointer',
+              background: isDone ? 'var(--accent-bg)' : 'transparent',
+              borderBottom: index === options.length - 1 ? 'none' : '1px solid var(--border)',
+              transition: 'background 120ms',
+            }}
+          >
+            <div style={{
+              width: '12px', height: '12px', flexShrink: 0,
+              border: `1.5px solid ${isDone ? 'var(--phase-accent)' : 'var(--border-strong)'}`,
+              background: isDone ? 'var(--phase-accent)' : 'transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {isDone && <span style={{ fontSize: '8px', color: 'white', fontWeight: 900, lineHeight: 1 }}>✓</span>}
+            </div>
+            <span style={{
+              ...MONO, fontSize: '10px', fontWeight: 600, flex: 1, lineHeight: 1.4,
+              color: isDone ? 'var(--text-3)' : 'var(--text-1)',
+              textDecoration: isDone ? 'line-through' : 'none',
+              textDecorationColor: 'var(--text-4)',
+            }}>
+              {label}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-type MarketPulseForkRecord = {
-  recordKey: 'auction_state' | 'price_behaviour' | 'liquidity_context' | 'auction_state_events';
-  label: string;
-};
-
-export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: number, defaultName: string, forkRecord: MarketPulseForkRecord) => void }) {
+export default function Phase3MarketPulse() {
   const {
     SYSTEM_DATA, selections, setSelections,
     notes, setNotes,
@@ -103,251 +72,193 @@ export default function Phase3MarketPulse({ onFork }: { onFork?: (phaseNum: numb
     confirmMarketPulse, editStep,
   } = useNetra();
 
-  const tradeName = useSelector((s: RootState) => s.logs.tradeName);
   const [editing, setEditing] = useState(false);
+  const [openComponents, setOpenComponents] = useState<Record<string, boolean>>({});
+  const [checklists, setChecklists] = useState<Record<string, Record<string, boolean>>>({});
 
+  const components = SYSTEM_DATA.marketPulse?.dimensions || [];
+  const marketPulse = (selections.marketPulse || {}) as Record<string, string>;
+  const liquidityContext = (selections.liquidityContext || {}) as Record<string, string>;
   const isLocked = highestStep > 3 && !editing;
+  const checklistSelectionSignature = components
+    .filter(component => component.display === 'checklist')
+    .map(component => {
+      const source = component.selectionTarget === 'liquidityContext' ? liquidityContext : marketPulse;
+      return source[component.selectionIdKey || ''] || '';
+    })
+    .join('|');
 
-  // ── A: Auction State & Energy ─────────────────────────────────────────────
-  const mp = (selections.marketPulse || {}) as Record<string, string>;
-  const auctionState = mp.auctionState || '';
-  const subAuctionState = mp.subAuctionState || '';
-  const activeLeg = mp.auctionActiveLeg || mp.activeLeg || '';
-  const momentum = mp.activeLegMomentum || mp.momentum || '';
-  const resistance = mp.activeLegResistance || mp.resistance || '';
-  const selectedOperationalMarkIds = String(mp.operationalMarkingIds || '')
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
-
-  const setMp = (key: string, val: string) => {
-    if (isLocked) return;
-    setSelections({ ...selections, marketPulse: { ...mp, [key]: val } });
-  };
-
-  const mpExtras = SYSTEM_DATA.marketPulseExtras || {};
-  const marketPulseDims = SYSTEM_DATA.marketPulse?.dimensions || [];
-  const dimensionOptions = (id: string) => (
-    marketPulseDims.find(d => d.id === id)?.options || []
-  ) as string[];
-  const subAuctionOptionsByState = (mpExtras.subAuctionOptions || {}) as Record<string, string[]>;
-  const SUB_AUCTION_OPTIONS = subAuctionOptionsByState[auctionState] || (
-    auctionState === 'Balance' ? dimensionOptions('subAuctionState') : []
-  );
-  const ACTIVE_LEG_OPTIONS = (
-    mpExtras.activeLegOptions?.[auctionState]
-    || dimensionOptions('auctionActiveLeg')
-    || dimensionOptions('activeLeg')
-  ) as string[];
-  const drawingMarks = (SYSTEM_DATA.marketPulse?.drawings || []).map((label, idx) => ({
-    id: `drawing_${idx + 1}`,
-    label,
-  }));
-  const OPERATIONAL_MARKS = (mpExtras.operationalMarks && mpExtras.operationalMarks.length > 0)
-    ? mpExtras.operationalMarks
-    : drawingMarks;
-
-  const showSubAuction = auctionState === 'Balance';
-  const showActiveLeg  = !!auctionState;
-
-  // ── B: Liquidity Context (SYSTEM_DATA-driven) ─────────────────────────────
-  const liq = (selections.liquidityContext || {}) as Record<string, string>;
-  const liqDims = SYSTEM_DATA.liquidityContext?.dimensions || [];
-  const setLiq = (key: string, val: string) => {
-    if (isLocked) return;
-    setSelections({ ...selections, liquidityContext: { ...liq, [key]: val } });
-  };
-  const [opChecked, setOpChecked] = useState<Record<string, boolean>>({});
   useEffect(() => {
-    setOpChecked(Object.fromEntries(selectedOperationalMarkIds.map(id => [id, true])));
-  }, [mp.operationalMarkingIds]);
-  const toggleOp = (id: string) => {
+    const restored = Object.fromEntries(
+      components
+        .filter(component => component.display === 'checklist')
+        .map(component => {
+          const idKey = component.selectionIdKey || '';
+          const source = component.selectionTarget === 'liquidityContext' ? liquidityContext : marketPulse;
+          const selectedIds = String(source[idKey] || '')
+            .split(',')
+            .map(value => value.trim())
+            .filter(Boolean);
+          return [component.id, Object.fromEntries(selectedIds.map(id => [id, true]))];
+        }),
+    );
+    setChecklists(restored);
+  }, [components, checklistSelectionSignature]);
+
+  const targetState = (target: SelectionTarget) => (
+    target === 'liquidityContext' ? liquidityContext : marketPulse
+  );
+
+  const setDimensionValue = (target: SelectionTarget, dimension: SystemDimension, value: string) => {
     if (isLocked) return;
-    setOpChecked(current => {
-      const next = { ...current, [id]: !current[id] };
-      const selectedMarks = OPERATIONAL_MARKS.filter(mark => next[mark.id]);
-      setSelections({
-        ...selections,
-        marketPulse: {
-          ...mp,
-          operationalMarkingIds: selectedMarks.map(mark => mark.id).join(', '),
-          operationalMarkings: selectedMarks.map(mark => mark.label).join(' | '),
-        },
-      });
-      return next;
-    });
+    const current = targetState(target);
+    const updates = Object.fromEntries(
+      [dimension.id, ...(dimension.selectionAliases || [])].map(key => [key, value]),
+    );
+    setSelections({ ...selections, [target]: { ...current, ...updates } });
   };
 
-  const canConfirm = !isLocked;
+  const selectedValue = (target: SelectionTarget, dimension: SystemDimension) => {
+    const current = targetState(target);
+    return current[dimension.id]
+      || (dimension.selectionAliases || []).map(alias => current[alias]).find(Boolean)
+      || '';
+  };
 
-  const subLabel = (text: string, first = false, onForkClick?: () => void) => (
-    <div style={{
-      margin: first ? '14px 0 12px 0' : '28px 0 12px 0',
-      display: 'flex', alignItems: 'center', gap: '10px',
-      borderLeft: '3px solid var(--phase-accent)',
-      paddingLeft: '10px',
-    }}>
-      <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '11px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase', flexShrink: 0 }}>{text}</span>
-      <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
-      {onForkClick && <ForkButton onClick={onForkClick} size="sm" />}
-    </div>
-  );
+  const toggleMultiselect = (target: SelectionTarget, dimension: SystemDimension, option: string) => {
+    const currentValues = selectedValue(target, dimension).split(', ').filter(Boolean);
+    const exclusiveOptions = dimension.exclusiveOptions || [];
+    let nextValues: string[];
+
+    if (exclusiveOptions.includes(option)) {
+      nextValues = [option];
+    } else {
+      const withoutExclusive = currentValues.filter(value => !exclusiveOptions.includes(value));
+      nextValues = withoutExclusive.includes(option)
+        ? withoutExclusive.filter(value => value !== option)
+        : [...withoutExclusive, option];
+    }
+    setDimensionValue(target, dimension, nextValues.join(', '));
+  };
+
+  const toggleChecklist = (component: SystemDimension, id: string) => {
+    if (isLocked) return;
+    const currentForComponent = checklists[component.id] || {};
+    const nextForComponent = { ...currentForComponent, [id]: !currentForComponent[id] };
+    const selectedItems = (component.options || [])
+      .map((label, index) => ({ id: `drawing_${index + 1}`, label }))
+      .filter(item => nextForComponent[item.id]);
+    const idKey = component.selectionIdKey;
+    const valueKey = component.selectionValueKey;
+    const updates: Record<string, string> = {};
+    if (idKey) updates[idKey] = selectedItems.map(item => item.id).join(', ');
+    if (valueKey) updates[valueKey] = selectedItems.map(item => item.label).join(' | ');
+    const target = component.selectionTarget === 'liquidityContext' ? 'liquidityContext' : 'marketPulse';
+    setChecklists({ ...checklists, [component.id]: nextForComponent });
+    setSelections({ ...selections, [target]: { ...targetState(target), ...updates } });
+  };
+
+  const renderDimension = (
+    dimension: SystemDimension,
+    target: SelectionTarget,
+    forceMultiselect: boolean,
+  ) => {
+    const value = selectedValue(target, dimension);
+    const selectedValues = value.split(', ').filter(Boolean);
+    const isMultiselect = forceMultiselect || !!dimension.multiselect;
+
+    return (
+      <div key={dimension.id} className="precision-row">
+        <div className="precision-label">{dimension.name}</div>
+        <div className="precision-selector">
+          {(dimension.options || []).map(option => {
+            const isSelected = isMultiselect ? selectedValues.includes(option) : value === option;
+            return (
+              <button
+                key={option}
+                onClick={() => isMultiselect
+                  ? toggleMultiselect(target, dimension, option)
+                  : setDimensionValue(target, dimension, option)}
+                disabled={isLocked}
+                className={`precision-opt ${isSelected ? 'selected' : ''} ${isLocked && !isSelected ? 'opacity-30 cursor-not-allowed' : ''}`}
+              >
+                {option}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="flex flex-col fade-up phase-theme-3">
+      {components.map((component, index) => {
+        const display = component.display || 'dimensions';
+        const isChecklist = display === 'checklist';
+        const target: SelectionTarget = component.selectionTarget === 'liquidityContext'
+          ? 'liquidityContext'
+          : 'marketPulse';
+        const nestedDimensions = component.dimensions || [];
+        const options = component.options || [];
+        const checked = checklists[component.id] || {};
+        const done = options.filter((_, optionIndex) => checked[`drawing_${optionIndex + 1}`]).length;
+        const isOpen = !!openComponents[component.id];
 
-      {/* ── COMPONENT 1: OPERATIONAL MARKING ── */}
-      <OperationalMarkingChecklist checked={opChecked} toggle={toggleOp} marks={OPERATIONAL_MARKS} />
+        return (
+          <div key={component.id}>
+            <TerminalComponentHeader
+              title={component.name}
+              count={isChecklist ? `${done}/${options.length}` : undefined}
+              meta={component.duration}
+              collapsible={isChecklist}
+              open={isOpen}
+              onToggle={() => setOpenComponents(current => ({ ...current, [component.id]: !current[component.id] }))}
+              className={index > 0 ? 'is-spaced' : ''}
+            />
 
-      {/* ── COMPONENT 2: AUCTION STATE ── */}
-      {subLabel('Component 2 — Auction State', false, onFork ? () => onFork(
-        3,
-        buildForkName(tradeName, 'Auction State'),
-        { recordKey: 'auction_state', label: 'Auction State' },
-      ) : undefined)}
-
-      <div className="precision-row">
-        <div className="precision-label">Auction State</div>
-        <div className="precision-selector">
-          {(['Balance', 'Relocation In HTF Direction', 'Relocation Against HTF Direction', 'Transitional'] as const).map(opt => (
-            <button
-              key={opt}
-              onClick={() => {
-                if (isLocked) return;
-                setSelections({ ...selections, marketPulse: { ...mp, auctionState: opt, subAuctionState: '', auctionActiveLeg: '', activeLeg: '' } });
-              }}
-              disabled={isLocked}
-              className={`precision-opt ${auctionState === opt ? 'selected' : ''} ${isLocked && auctionState !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
-            >{opt}</button>
-          ))}
-        </div>
-      </div>
-
-      {showSubAuction && (
-        <div className="precision-row">
-          <div className="precision-label">Sub-State</div>
-          <div className="precision-selector">
-            {SUB_AUCTION_OPTIONS.map(opt => (
-              <button key={opt} onClick={() => setMp('subAuctionState', opt)} disabled={isLocked}
-                className={`precision-opt ${subAuctionState === opt ? 'selected' : ''} ${isLocked && subAuctionState !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
-              >{opt}</button>
-            ))}
+            {isChecklist ? (
+              <ChecklistRows
+                open={isOpen}
+                options={options}
+                checked={checked}
+                onToggle={id => toggleChecklist(component, id)}
+              />
+            ) : (
+              nestedDimensions.map(dimension => renderDimension(dimension, target, display === 'multiselect'))
+            )}
           </div>
-        </div>
-      )}
+        );
+      })}
 
-      {showActiveLeg && (
-        <div className="precision-row">
-          <div className="precision-label">Active Leg</div>
-          <div className="precision-selector">
-            {ACTIVE_LEG_OPTIONS.map(opt => (
-              <button key={opt} onClick={() => {
-                if (isLocked) return;
-                setSelections({ ...selections, marketPulse: { ...mp, auctionActiveLeg: opt, activeLeg: opt } });
-              }} disabled={isLocked}
-                className={`precision-opt ${activeLeg === opt ? 'selected' : ''} ${isLocked && activeLeg !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
-              >{opt}</button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── COMPONENT 3: PRICE BEHAVIOUR ── */}
-      {subLabel('Component 3 — Price Behaviour', false, onFork ? () => onFork(
-        3,
-        buildForkName(tradeName, 'Price Behaviour'),
-        { recordKey: 'price_behaviour', label: 'Price Behaviour' },
-      ) : undefined)}
-      <div className="precision-row">
-        <div className="precision-label">Momentum</div>
-        <div className="precision-selector">
-          {(['Impulsive', 'Sustained', 'Opposed', 'Stalling'] as const).map(opt => (
-            <button key={opt} onClick={() => setMp('activeLegMomentum', opt)} disabled={isLocked}
-              className={`precision-opt ${momentum === opt ? 'selected' : ''} ${isLocked && momentum !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
-            >{opt}</button>
-          ))}
-        </div>
-      </div>
-      <div className="precision-row">
-        <div className="precision-label">Resistance</div>
-        <div className="precision-selector">
-          {(['Weak', 'Moderate', 'Strong', 'Dominant'] as const).map(opt => (
-            <button key={opt} onClick={() => setMp('activeLegResistance', opt)} disabled={isLocked}
-              className={`precision-opt ${resistance === opt ? 'selected' : ''} ${isLocked && resistance !== opt ? 'opacity-30 cursor-not-allowed' : ''}`}
-            >{opt}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── COMPONENT 4: LIQUIDITY CONTEXT & COMPONENT 5: AUCTION EVENT ── */}
-      {liqDims.length > 0 && (
-        <>
-          {subLabel('Component 4 — Liquidity Context', false, onFork ? () => onFork(
-            3,
-            buildForkName(tradeName, 'Liquidity Context'),
-            { recordKey: 'liquidity_context', label: 'Liquidity Context' },
-          ) : undefined)}
-
-          {liqDims.filter(dim => dim.id !== 'auctionEvent').map((dim) => (
-            <div key={dim.id} className="precision-row">
-              <div className="precision-label">{dim.name}</div>
-              <div className="precision-selector">
-                {(dim.options || []).map(opt => {
-                  const isSelected = liq[dim.id] === opt;
-                  return (
-                    <button key={opt} onClick={() => setLiq(dim.id, opt)} disabled={isLocked}
-                      className={`precision-opt ${isSelected ? 'selected' : ''} ${isLocked && !isSelected ? 'opacity-30 cursor-not-allowed' : ''}`}
-                    >{opt}</button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-
-          {subLabel('Component 5 — Auction Event', false, onFork ? () => onFork(
-            3,
-            buildForkName(tradeName, 'Auction Event'),
-            { recordKey: 'auction_state_events', label: 'Auction Event' },
-          ) : undefined)}
-
-          {liqDims.filter(dim => dim.id === 'auctionEvent').map((dim) => (
-            <div key={dim.id} className="precision-row">
-              <div className="precision-label">{dim.name}</div>
-              <div className="precision-selector">
-                {(dim.options || []).map(opt => {
-                  const isSelected = liq[dim.id] === opt;
-                  return (
-                    <button key={opt} onClick={() => setLiq(dim.id, opt)} disabled={isLocked}
-                      className={`precision-opt ${isSelected ? 'selected' : ''} ${isLocked && !isSelected ? 'opacity-30 cursor-not-allowed' : ''}`}
-                    >{opt}</button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-
-        </>
-      )}
-
-      {/* ── OBSERVATIONS + ACTIONS ── */}
-      <div className="flex gap-4 items-start pt-4 mt-2 border-t border-[var(--border-strong)]">
+      <div className="terminal-action-bar">
         <textarea
           value={notes.marketPulse || ''}
-          onChange={e => setNotes({ ...notes, marketPulse: e.target.value })}
-          placeholder="Record observations — auction state, energy quality, price behaviour, liquidity context..."
+          onChange={event => setNotes({ ...notes, marketPulse: event.target.value })}
+          placeholder="Record Market Pulse observations…"
           disabled={isLocked}
-          className="flex-1 bg-transparent outline-none resize-none text-[12px] text-[var(--text-2)] placeholder:text-[var(--text-4)] leading-relaxed min-h-[52px]"
+          className="terminal-note flex-1"
         />
-        <div className="flex gap-2 shrink-0">
+        <div className="terminal-action-buttons">
           <button onClick={() => { setEditing(true); editStep(3); }} className="btn-edit w-20" disabled={!isLocked}>Edit</button>
-          <button onClick={() => { if (!isLocked) { setOpChecked({}); setSelections({ ...selections, marketPulse: {} }); } }} className="btn-reset w-20" disabled={isLocked || Object.keys(mp).length === 0}>Reset</button>
+          <button
+            onClick={() => {
+              if (isLocked) return;
+              setChecklists({});
+              setSelections({ ...selections, marketPulse: {}, liquidityContext: {} });
+            }}
+            className="btn-reset w-20"
+            disabled={isLocked || (Object.keys(marketPulse).length === 0 && Object.keys(liquidityContext).length === 0)}
+          >
+            Reset
+          </button>
           <button
             onClick={() => {
               if (editing) setEditing(false);
               confirmMarketPulse();
             }}
             className={`${isLocked ? 'btn-confirmed' : 'btn-confirm'} w-40`}
-            disabled={!canConfirm}
+            disabled={isLocked}
           >
             {isLocked ? '✓ Confirmed' : editing ? 'Save' : 'Confirm Pulse'}
           </button>

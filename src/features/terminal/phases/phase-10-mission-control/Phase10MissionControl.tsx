@@ -9,8 +9,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNetra } from '@/context/NetraContext';
 import { useNetraUtils } from '@/hooks/useNetraUtils';
 import type { TradeCard } from './missionControl/types';
-import { TERMINAL_STATS_EVENT, localDateStr, mkCard, MONO, computeTerminalSessionStats, tradeCardsStorageKey } from './missionControl/helpers';
+import { TERMINAL_STATS_EVENT, localDateStr, mkCard, computeTerminalSessionStats, tradeCardsStorageKey } from './missionControl/helpers';
 import UnifiedTradeCard from './missionControl/UnifiedTradeCard';
+import { TerminalEmptyState, TerminalStatusBadge } from '@/components/UI/TerminalPrimitives';
 
 export default function Phase10MissionControl() {
   const {
@@ -59,9 +60,9 @@ export default function Phase10MissionControl() {
 
       {/* S-400 KILL SWITCH — daily loss/target limit terminates the session */}
       {s400Active && (
-        <div style={{ padding: '16px 20px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.5)' }}>
-          <div style={{ fontSize: '13px', fontWeight: 900, color: '#ef4444', letterSpacing: '0.25em', textTransform: 'uppercase' }}>SESSION TERMINATED</div>
-          <div style={{ fontSize: '13px', color: '#ef4444', opacity: 0.8, marginTop: '4px' }}>
+        <div className="terminal-notice is-danger">
+          <TerminalStatusBadge tone="danger">SESSION TERMINATED</TerminalStatusBadge>
+          <div className="terminal-notice-description">
             {dailyLossHit ? 'Daily loss limit hit. No further trades.' : 'Daily target achieved. Session ends voluntarily.'}
           </div>
         </div>
@@ -87,22 +88,14 @@ export default function Phase10MissionControl() {
           ))}
         </div>
       ) : (
-        <div style={{ padding: '32px', textAlign: 'center', border: '1px dashed var(--border)', color: '#ffffff', fontSize: '12px', fontFamily: MONO, letterSpacing: '0.1em' }}>
-          No trades today
-        </div>
+        <TerminalEmptyState title="No trades today" description="Plan a trade to begin the execution ledger." />
       )}
 
       {/* ── Add trade ── */}
       {!s400Active && (
         <button
           onClick={() => setCards(prev => [...prev, mkCard()])}
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-            width: '100%', padding: '9px 0',
-            border: '1px dashed var(--border)', background: 'none', cursor: 'pointer',
-            fontSize: '10px', fontWeight: 900, color: '#ffffff',
-            letterSpacing: '0.15em', textTransform: 'uppercase',
-          }}
+          className="terminal-add-action"
         >
           + Plan next trade (new weapon)
         </button>

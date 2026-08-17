@@ -35,6 +35,8 @@ import {
   setRulesAcknowledged as setRulesAcknowledgedAction,
   appendWeaponStage as appendWeaponStageAction,
   setWeaponStageLog as setWeaponStageLogAction,
+  setH1Hypothesis as setH1HypothesisAction,
+  setH1Proposal as setH1ProposalAction,
 } from '../store/slices/analysisSlice';
 import {
   setAvailableModels as setAvailableModelsAction,
@@ -72,8 +74,9 @@ import { API_BASE, WEIGHTS, SCORES, STEP_NAMES, DEBOUNCE_MS } from '../utils/con
 import { useNetraUtils } from '../hooks/useNetraUtils';
 import { useSessionManager } from '../hooks/useSessionManager';
 import { useAnalysisFlow } from '../hooks/useAnalysisFlow';
+import { useHypothesisFlow } from '../hooks/useHypothesisFlow';
 import { useTradeLogsCrud } from '../hooks/useTradeLogsCrud';
-import { useChatPanel } from '../hooks/useChatPanel';
+import { useChatPanel, type ChatThreadSummary } from '../hooks/useChatPanel';
 import { useVisionAnalysis } from '../hooks/useVisionAnalysis';
 import { useAudit } from '../hooks/useAudit';
 import { tradeCardsStorageKey } from '../features/terminal/phases/phase-10-mission-control/missionControl/helpers';
@@ -81,7 +84,7 @@ import {
   Selections, Notes, InterSelections, StrikeSelections, SysData,
   AvailableModel, ModelConfig, TradeLog, EditFormData, Toast,
   ConfirmModal, ChatMessage, SessionInput, Session, ActiveView, AuditData,
-  NetraOutput, WeaponPrediction, RecognitionCheckpoint,
+  NetraOutput, WeaponPrediction, RecognitionCheckpoint, H1Hypothesis, H1AgentTraceStep,
 } from '../types';
 
 // ─── Context Value Type ───────────────────────────────────────────────────────
@@ -95,8 +98,11 @@ export interface NetraContextValue {
   setHighestStep: (v: number) => void;
   confirmStep: (step: number) => void;
   editStep: (step: number) => void;
+  confirmHypothesisH1: () => Promise<void>;
+  editHypothesisH1: () => void;
+  editFinalH1Hypothesis: () => void;
   doResetStep: (step: number) => void;
-  confirmMarketPulse: () => void;
+  confirmMarketPulse: () => Promise<void>;
   editMarketPulse: () => void;
   stepTimestamps: Record<string, string>;
   setStepTimestamps: (v: Record<string, string>) => void;
@@ -142,6 +148,15 @@ export interface NetraContextValue {
   sysRecommendation: unknown;
   setSysRecommendation: (v: unknown) => void;
   isEvaluating: boolean;
+  h1Hypothesis: H1Hypothesis | null;
+  h1Proposal: H1Hypothesis | null;
+  h1AgentTrace: H1AgentTraceStep[];
+  setH1Hypothesis: (v: H1Hypothesis | null) => void;
+  isGeneratingH1: boolean;
+  isConfirmingH1: boolean;
+  triggerH1Hypothesis: () => Promise<H1Hypothesis | null>;
+  stopH1Hypothesis: () => void;
+  confirmFinalH1Hypothesis: (draft: H1Hypothesis) => Promise<H1Hypothesis | null>;
   // Session
   session: Session | null;
   setSession: (v: Session | null) => void;
@@ -164,7 +179,7 @@ export interface NetraContextValue {
   forkSession: (log: TradeLog, newName: string) => Promise<boolean>;
   forkCurrentSession: (phaseNum: number, newName: string, fork?: { recordKey: string; label: string; clearSelectionKeys?: string[] }) => Promise<boolean>;
   loadSessionById: (id: string) => Promise<void>;
-  saveSession: (options?: { silent?: boolean; recognitionCheckpoints?: RecognitionCheckpoint[]; highestStep?: number; clearDownstream?: boolean; clearAfter?: 'pre_session' | 'htf' | 'market_pulse' | 'decision_path' | 'pinaka_state' | 'command'; selectedNetraState?: Record<string, unknown> | null; liveMarketContext?: Record<string, unknown> }) => Promise<boolean>;
+  saveSession: (options?: { silent?: boolean; recognitionCheckpoints?: RecognitionCheckpoint[]; highestStep?: number; stepTimestamps?: Record<string, string>; clearDownstream?: boolean; clearAfter?: 'pre_session' | 'htf' | 'market_pulse' | 'decision_path' | 'pinaka_state' | 'command'; reopenH2?: boolean; selectedNetraState?: Record<string, unknown> | null; liveMarketContext?: Record<string, unknown> }) => Promise<boolean>;
   resetTerminalState: () => void;
   logout: () => void;
   // Logs
@@ -193,7 +208,14 @@ export interface NetraContextValue {
   setIsAiLoading: (v: boolean) => void;
   sources: ChatSource[];
   toggleSource: (s: ChatSource) => void;
+  chatId: string | null;
   chatTitle: string;
+  chatThreads: ChatThreadSummary[];
+  isChatThreadsLoading: boolean;
+  loadChatThreads: () => Promise<ChatThreadSummary[]>;
+  openChatThread: (chatId: string) => Promise<boolean>;
+  renameChatThread: (chatId: string, title: string) => Promise<boolean>;
+  deleteChatThread: (chatId: string) => Promise<boolean>;
   startNewChat: (title?: string) => Promise<void>;
   renameChat: (title: string) => Promise<void>;
   summarizeNow: () => void;
@@ -234,7 +256,7 @@ export interface NetraContextValue {
   setAuditData: (v: AuditData | null) => void;
   isAuditing: boolean;
   setIsAuditing: (v: boolean) => void;
-  triggerPostTradeAudit: (telemetry: Record<string, unknown>) => void;
+  triggerPostTradeAudit: () => void;
   stopPostTradeAudit: () => void;
   selectedModel: string;
   setSelectedModel: (v: string) => void;
@@ -255,9 +277,10 @@ export interface NetraContextValue {
 const NetraContext = createContext<NetraContextValue | null>(null);
 
 const EMPTY_SYS_DATA: SysData = {
+  terminalPhases: {},
   weapons: { strike: [], interception: [], saturation: [] },
   preSessionContext: { dimensions: [] },
-  htfStructure: { dimensions: [] },
+  hypothesisH1: { dimensions: [] },
   marketPulse: { dimensions: [] },
   liquidityContext: { dimensions: [] },
   strikeDimensions: [],
@@ -289,9 +312,11 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
   // Domain hooks
   const session_ = useSessionManager();
   const analysis_ = useAnalysisFlow();
+  const hypothesis_ = useHypothesisFlow();
   const logs_ = useTradeLogsCrud();
   const chat_ = useChatPanel();
   const audit_ = useAudit();
+  const restoreSessionById = session_.loadSessionById;
 
   // Vision hook needs uploadedVisionFiles from chat panel
   const vision_ = useVisionAnalysis(chat_.uploadedVisionFiles, chat_.setUploadedVisionFiles);
@@ -453,6 +478,21 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
   // ─── Auto-save log details (debounced) ──────────────────────────���─
   const activeEditLog = useSelector((s: RootState) => s.logs.activeEditLog);
   const editFormData = useSelector((s: RootState) => s.logs.editFormData);
+  const restoredSessionRef = useRef<string | null>(null);
+
+  // Redux restores the active ID from browser storage, then Mongo restores the
+  // authoritative session payload. This makes refresh show the previous H1 and
+  // lets useHypothesisFlow fetch its separately stored agent trace by run_id.
+  useEffect(() => {
+    if (!session || !activeSessionId || window.location.pathname !== '/mission/pinaka') return;
+    if (activeEditLog?.id === activeSessionId) {
+      restoredSessionRef.current = activeSessionId;
+      return;
+    }
+    if (restoredSessionRef.current === activeSessionId) return;
+    restoredSessionRef.current = activeSessionId;
+    void restoreSessionById(activeSessionId);
+  }, [activeEditLog?.id, activeSessionId, restoreSessionById, session]);
 
   useEffect(() => {
     if (!activeEditLog?.id || Object.keys(editFormData).length === 0) return;
@@ -545,6 +585,29 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     }
   }, [dispatch, stepTimestamps, showToast]);
 
+  const confirmHypothesisH1 = useCallback(async () => {
+    const timestamp = new Date().toLocaleTimeString('en-IN');
+    const nextTimestamps = {
+      ...stepTimestamps,
+      hypothesisH1: timestamp,
+      preSessionContext: timestamp,
+      htfStructure: timestamp,
+    };
+    const saved = await session_.saveSession({
+      silent: true,
+      highestStep: 3,
+      stepTimestamps: nextTimestamps,
+    });
+    if (!saved) {
+      showToast('Macro Mapping was not confirmed because MongoDB save failed', 'error');
+      return;
+    }
+    persistenceClearAfterRef.current = null;
+    dispatch(setHighestStepAction(3));
+    dispatch(setStepTimestampsAction(nextTimestamps));
+    showToast('Macro Mapping confirmed and saved');
+  }, [dispatch, session_, stepTimestamps, showToast]);
+
   const editStep = useCallback((stepLevel: number) => {
     dispatch(setHighestStepAction(stepLevel));
     if (stepLevel < 4) {
@@ -609,6 +672,72 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     }
   }, [dispatch, stepTimestamps, selections, notes, activeSessionId]);
 
+  const editHypothesisH1 = useCallback(() => {
+    editStep(2);
+    dispatch(setH1HypothesisAction(null));
+    dispatch(setH1ProposalAction(null));
+    dispatch(setHighestStepAction(1));
+    dispatch(setStepTimestampsAction(Object.fromEntries(
+      Object.entries(stepTimestamps).filter(([key]) => ![
+        'hypothesisH1', 'preSessionContext', 'htfStructure', 'marketPulse',
+        'liquidityContext', 'evaluation', 'command', 'matrix', 'armory', 'control',
+      ].includes(key)),
+    )));
+  }, [dispatch, editStep, stepTimestamps]);
+
+  const editFinalH1Hypothesis = useCallback(() => {
+    // Reopening the analyst-owned H1 keeps the Macro Mapping evidence and
+    // Maya proposal, but invalidates every lower-timeframe decision.
+    persistenceClearAfterRef.current = 'htf';
+    dispatch(setHighestStepAction(3));
+    dispatch(setH1HypothesisAction(
+      hypothesis_.h1Hypothesis
+        ? { ...hypothesis_.h1Hypothesis, status: 'PROPOSED' }
+        : null,
+    ));
+    dispatch(setSelectionsAction({
+      ...selections,
+      marketPulse: {},
+      liquidityContext: {},
+    }));
+    dispatch(setNotesAction({
+      ...notes,
+      marketPulse: '',
+      liquidityContext: '',
+      command: '',
+    }));
+    dispatch(setFinalCommandAction(null));
+    dispatch(setNetraOutputAction(null));
+    dispatch(setSelectedNetraStateAction(null));
+    dispatch(setSysRecommendationAction(null));
+    dispatch(setSelectedWeaponIdAction(null));
+    dispatch(setCommandLockedAction(false));
+    dispatch(setWeaponLockedAction(false));
+    dispatch(setWeaponPredictionAction(null));
+    dispatch(setRecognitionCheckpointsAction([]));
+    dispatch(setWaitSelectionsAction({
+      waitingFor: '', referenceLocation: '', requiredResolution: '', developmentStage: '',
+      institutionalSignature: '', validityHorizon: '', waitNote: '', resolutionStatus: 'OPEN',
+      resolutionEvent: '', resolutionNote: '', openedAt: '', resolvedAt: '',
+    }));
+    dispatch(setInterSelectionsAction({ pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }));
+    dispatch(setStrikeSelectionsAction({
+      impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '',
+      zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '',
+      postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '',
+    }));
+    dispatch(setSaturationSelectionsAction({}));
+    dispatch(setWeaponStageLogAction([]));
+    if (activeSessionId) localStorage.removeItem(tradeCardsStorageKey(activeSessionId));
+    dispatch(setStepTimestampsAction(Object.fromEntries(
+      Object.entries(stepTimestamps).filter(([key]) => ![
+        'marketPulse', 'liquidityContext', 'evaluation', 'command', 'matrix', 'armory', 'control',
+      ].includes(key)),
+    )));
+    setPersistenceRevision(revision => revision + 1);
+    showToast('Macro Mapping Hypothesis reopened — downstream data cleared');
+  }, [activeSessionId, dispatch, hypothesis_.h1Hypothesis, notes, selections, showToast, stepTimestamps]);
+
   const doResetStep = useCallback((stepLevel: number) => {
     const stepKeys = ['preSessionContext', 'htfStructure', 'marketPulse', 'liquidityContext'] as const;
     const key = stepKeys[stepLevel - 1];
@@ -635,18 +764,27 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     showToast('Step reset');
   }, [dispatch, selections, notes, showToast]);
 
-  const confirmMarketPulse = useCallback(() => {
-    persistenceClearAfterRef.current = null;
+  const confirmMarketPulse = useCallback(async () => {
     const time = new Date().toLocaleTimeString('en-IN');
-    dispatch(setHighestStepAction(4));
-    dispatch(setStepTimestampsAction({
+    const nextTimestamps = {
       ...stepTimestamps,
       marketPulse: time,
       liquidityContext: time,
-    }));
-    setPersistenceRevision(revision => revision + 1);
-    showToast('Market Pulse confirmed');
-  }, [dispatch, stepTimestamps, showToast]);
+    };
+    const saved = await session_.saveSession({
+      silent: true,
+      highestStep: 4,
+      stepTimestamps: nextTimestamps,
+    });
+    if (!saved) {
+      showToast('Market Pulse was not confirmed because MongoDB save failed', 'error');
+      return;
+    }
+    persistenceClearAfterRef.current = null;
+    dispatch(setHighestStepAction(4));
+    dispatch(setStepTimestampsAction(nextTimestamps));
+    showToast('Market Pulse confirmed and saved');
+  }, [dispatch, session_, stepTimestamps, showToast]);
 
   const editMarketPulse = useCallback(() => {
     persistenceClearAfterRef.current = 'market_pulse';
@@ -672,7 +810,8 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     // Step
     highestStep,
     setHighestStep: (v) => dispatch(setHighestStepAction(v)),
-    confirmStep, editStep, doResetStep, confirmMarketPulse, editMarketPulse,
+    confirmStep, editStep, confirmHypothesisH1, editHypothesisH1, editFinalH1Hypothesis,
+    doResetStep, confirmMarketPulse, editMarketPulse,
     stepTimestamps,
     setStepTimestamps: (v) => dispatch(setStepTimestampsAction(v)),
     // Selections
@@ -706,6 +845,15 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     sysRecommendation,
     setSysRecommendation: (v) => dispatch(setSysRecommendationAction(v)),
     isEvaluating: analysis_.isEvaluating,
+    h1Hypothesis: hypothesis_.h1Hypothesis,
+    h1Proposal: hypothesis_.h1Proposal,
+    h1AgentTrace: hypothesis_.h1AgentTrace,
+    setH1Hypothesis: (v) => dispatch(setH1HypothesisAction(v)),
+    isGeneratingH1: hypothesis_.isGeneratingH1,
+    isConfirmingH1: hypothesis_.isConfirmingH1,
+    triggerH1Hypothesis: hypothesis_.triggerH1Hypothesis,
+    stopH1Hypothesis: hypothesis_.stopH1Hypothesis,
+    confirmFinalH1Hypothesis: hypothesis_.confirmH1Hypothesis,
     // Session
     session: session_.session,
     setSession: session_.setSession,
@@ -757,7 +905,14 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     setIsAiLoading: (v) => dispatch(setIsAiLoadingAction(v)),
     sources: chat_.sources,
     toggleSource: chat_.toggleSource,
+    chatId: chat_.chatId,
     chatTitle: chat_.chatTitle,
+    chatThreads: chat_.chatThreads,
+    isChatThreadsLoading: chat_.isChatThreadsLoading,
+    loadChatThreads: chat_.loadChatThreads,
+    openChatThread: chat_.openChatThread,
+    renameChatThread: chat_.renameChatThread,
+    deleteChatThread: chat_.deleteChatThread,
     startNewChat: chat_.startNewChat,
     renameChat: chat_.renameChat,
     summarizeNow: chat_.summarizeNow,

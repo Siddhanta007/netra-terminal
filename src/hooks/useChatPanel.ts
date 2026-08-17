@@ -11,12 +11,20 @@ import { ChatMessage } from '../types';
 import { API_BASE } from '../utils/constants';
 import { useNetraUtils } from './useNetraUtils';
 
+export interface ChatThreadSummary {
+  chat_id: string;
+  title: string;
+  updated_at: string;
+}
+
 export function useChatPanel() {
   const dispatch = useDispatch<AppDispatch>();
   const { getAuthHeaders, showToast, getActiveModel, checkGuestLimit, markGuestAiUsed } = useNetraUtils();
 
   const [uploadedVisionFiles, setUploadedVisionFiles] = useState<File[]>([]);
   const [chatTitle, setChatTitle] = useState('Maya Chat');
+  const [chatThreads, setChatThreads] = useState<ChatThreadSummary[]>([]);
+  const [isChatThreadsLoading, setIsChatThreadsLoading] = useState(false);
 
   const chatHistory = useSelector((s: RootState) => s.chat.chatHistory);
   const chatInput = useSelector((s: RootState) => s.chat.chatInput);
@@ -24,11 +32,8 @@ export function useChatPanel() {
   const sources = useSelector((s: RootState) => s.chat.sources);
   const chatId = useSelector((s: RootState) => s.chat.chatId);
   const session = useSelector((s: RootState) => s.session.session);
+  const activeSessionId = useSelector((s: RootState) => s.session.activeSessionId);
   const activeEditLog = useSelector((s: RootState) => s.logs.activeEditLog);
-  const highestStep = useSelector((s: RootState) => s.analysis.highestStep);
-  const selections = useSelector((s: RootState) => s.analysis.selections);
-  const notes = useSelector((s: RootState) => s.analysis.notes);
-  const imageDescription = useSelector((s: RootState) => s.analysis.imageDescription);
   const modelConfig = useSelector((s: RootState) => s.model.modelConfig);
 
   // Rehydrate the active thread from the server on first mount
@@ -46,6 +51,50 @@ export function useChatPanel() {
 
   const toggle = useCallback((s: ChatSource) => dispatch(toggleSource(s)), [dispatch]);
 
+  const loadChatThreads = useCallback(async () => {
+    setIsChatThreadsLoading(true);
+    try {
+      const userId = session?.userName || 'Unknown';
+      const res = await fetch(`${API_BASE}/api/chat/threads?user_id=${encodeURIComponent(userId)}`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error('Chat history failed');
+      const threads = await res.json() as ChatThreadSummary[];
+      const normalized = Array.isArray(threads) ? threads : [];
+      setChatThreads(normalized);
+      return normalized;
+    } catch {
+      showToast('Could not load Maya chat history', 'error');
+      return [];
+    } finally {
+      setIsChatThreadsLoading(false);
+    }
+  }, [getAuthHeaders, session?.userName, showToast]);
+
+  const openChatThread = useCallback(async (targetChatId: string) => {
+    if (!targetChatId || isAiLoading) return false;
+    try {
+      const res = await fetch(`${API_BASE}/api/chat/${encodeURIComponent(targetChatId)}`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error('Chat load failed');
+      const thread = await res.json() as {
+        chat_id?: string;
+        title?: string;
+        messages?: ChatMessage[];
+      };
+      dispatch(setChatHistory(Array.isArray(thread.messages) ? thread.messages : []));
+      dispatch(setChatInput(''));
+      dispatch(setChatId(thread.chat_id || targetChatId));
+      setChatTitle(thread.title || 'New chat');
+      setUploadedVisionFiles([]);
+      return true;
+    } catch {
+      showToast('Could not open Maya chat', 'error');
+      return false;
+    }
+  }, [dispatch, getAuthHeaders, isAiLoading, showToast]);
+
   const startNewChat = useCallback(async (title = 'New chat') => {
     const cleanTitle = title.trim() || 'New chat';
     try {
@@ -60,11 +109,47 @@ export function useChatPanel() {
       dispatch(setChatInput(''));
       dispatch(setChatId(thread.chat_id || null));
       setChatTitle(thread.title || cleanTitle);
+      if (thread.chat_id) {
+        setChatThreads(previous => [
+          {
+            chat_id: thread.chat_id as string,
+            title: thread.title || cleanTitle,
+            updated_at: new Date().toISOString(),
+          },
+          ...previous.filter(item => item.chat_id !== thread.chat_id),
+        ]);
+      }
       showToast('New Maya chat created');
     } catch {
       showToast('Could not create Maya chat', 'error');
     }
   }, [dispatch, getAuthHeaders, session?.userName, showToast]);
+
+  const renameChatThread = useCallback(async (targetChatId: string, title: string) => {
+    const cleanTitle = title.trim();
+    if (!targetChatId || !cleanTitle) return false;
+    try {
+      const res = await fetch(`${API_BASE}/api/chat/${encodeURIComponent(targetChatId)}`, {
+        method: 'PATCH',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ title: cleanTitle }),
+      });
+      if (!res.ok) throw new Error('Chat rename failed');
+      const data = await res.json() as { title?: string; updated_at?: string };
+      const savedTitle = data.title || cleanTitle;
+      setChatThreads(previous => previous.map(thread => (
+        thread.chat_id === targetChatId
+          ? { ...thread, title: savedTitle, updated_at: data.updated_at || thread.updated_at }
+          : thread
+      )));
+      if (targetChatId === chatId) setChatTitle(savedTitle);
+      showToast('Maya chat renamed');
+      return true;
+    } catch {
+      showToast('Could not rename Maya chat', 'error');
+      return false;
+    }
+  }, [chatId, getAuthHeaders, showToast]);
 
   const renameChat = useCallback(async (title: string) => {
     const cleanTitle = title.trim();
@@ -75,20 +160,32 @@ export function useChatPanel() {
       return;
     }
 
+    await renameChatThread(chatId, cleanTitle);
+  }, [chatId, renameChatThread, startNewChat]);
+
+  const deleteChatThread = useCallback(async (targetChatId: string) => {
+    if (!targetChatId || isAiLoading) return false;
     try {
-      const res = await fetch(`${API_BASE}/api/chat/${encodeURIComponent(chatId)}`, {
-        method: 'PATCH',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ title: cleanTitle }),
+      const res = await fetch(`${API_BASE}/api/chat/${encodeURIComponent(targetChatId)}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
       });
-      if (!res.ok) throw new Error('Chat rename failed');
-      const data = await res.json() as { title?: string };
-      setChatTitle(data.title || cleanTitle);
-      showToast('Maya chat renamed');
+      if (!res.ok) throw new Error('Chat delete failed');
+      setChatThreads(previous => previous.filter(thread => thread.chat_id !== targetChatId));
+      if (targetChatId === chatId) {
+        dispatch(setChatHistory([]));
+        dispatch(setChatInput(''));
+        dispatch(setChatId(null));
+        setChatTitle('Maya Chat');
+        setUploadedVisionFiles([]);
+      }
+      showToast('Maya chat deleted');
+      return true;
     } catch {
-      showToast('Could not rename Maya chat', 'error');
+      showToast('Could not delete Maya chat', 'error');
+      return false;
     }
-  }, [chatId, getAuthHeaders, showToast, startNewChat]);
+  }, [chatId, dispatch, getAuthHeaders, isAiLoading, showToast]);
 
   const summarizeNow = useCallback(async () => {
     if (!chatId || isAiLoading) return;
@@ -148,13 +245,11 @@ export function useChatPanel() {
     }
 
     try {
-      // Terminal context is attached only when the user selected the "terminal" source
+      // Send identity only. The backend rebuilds the same compact, data.json-driven
+      // agent context used by the H1/H2 workflows from the persisted terminal.
       const contextObj = sources.includes('terminal') ? {
-        asset: session?.assetName || activeEditLog?.phase1?.asset_ticker,
-        selections, notes,
-        active_log_id: activeEditLog?.id,
-        current_step: highestStep,
-        image_description: imageDescription,
+        session_id: activeSessionId || activeEditLog?.id || null,
+        asset: session?.assetName || activeEditLog?.phase1?.asset_ticker || '',
       } : null;
 
       const { provider: providerVal, model_id: modelIdVal } = getActiveModel();
@@ -193,11 +288,13 @@ export function useChatPanel() {
     } finally {
       dispatch(setIsAiLoading(false));
     }
-  }, [chatInput, isAiLoading, uploadedVisionFiles, sources, chatId, chatHistory, session, activeEditLog, highestStep, selections, notes, imageDescription, modelConfig, dispatch, getActiveModel, getAuthHeaders, showToast, checkGuestLimit, markGuestAiUsed]);
+  }, [chatInput, isAiLoading, uploadedVisionFiles, sources, chatId, session, activeSessionId, activeEditLog, modelConfig, dispatch, getActiveModel, getAuthHeaders, showToast, checkGuestLimit, markGuestAiUsed]);
 
   return {
-    chatHistory, chatInput, isAiLoading, sources, chatTitle,
+    chatHistory, chatInput, isAiLoading, sources, chatId, chatTitle,
+    chatThreads, isChatThreadsLoading,
     uploadedVisionFiles, setUploadedVisionFiles,
     handleSendMessage, toggleSource: toggle, startNewChat, renameChat, summarizeNow,
+    loadChatThreads, openChatThread, renameChatThread, deleteChatThread,
   };
 }

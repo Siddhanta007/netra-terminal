@@ -139,7 +139,7 @@ export default function ModelPage({ model, onBack, fetchLogs, resumeSession, for
   const getSessionStep = (log: TradeLog) => Number(log.highestStep ?? log.session_state?.highestStep ?? 1);
   const getSessionProgress = (log: TradeLog) => {
     const step = getSessionStep(log);
-    return ({ 0: 'Chart Analysis', 1: 'Pre-Session', 2: 'HTF Mapping', 3: 'Market Pulse', 4: 'Decision Path', 5: 'Trading Data', 6: 'Maya Audit' } as Record<number, string>)[step] || `Step ${step}`;
+    return ({ 0: 'Chart Analysis', 1: 'Super HTF', 2: 'HTF Mapping', 3: 'Market Pulse', 4: 'Decision Path', 5: 'Trading Data', 6: 'Maya Terminal Audit' } as Record<number, string>)[step] || `Step ${step}`;
   };
   const getBranch = (log: TradeLog) => (log.branch || {}) as Record<string, any>;
   const getForkPoint = (log: TradeLog) => String(getBranch(log).fork?.label || 'Root Session');

@@ -1,6 +1,6 @@
 // Subway-style graph of the recognised NETRA state and its forward transitions (annotated with path stats).
 
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 
 // ─── Types (loose — backend-driven) ─────────────────────────────────────────
 
@@ -84,76 +84,81 @@ function engageHex(v?: string | null): string {
   return v === 'ENGAGE' ? '#22c55e' : v ? '#ef4444' : '#94a3b8';
 }
 
-function Chip({ label, value, color }: { label: string; value: string; color: string }) {
+function StateMetric({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', border: `1px solid ${color}40`, background: `${color}10`, padding: '4px 10px' }}>
-      <span style={{ ...MONO, fontSize: '6.5px', fontWeight: 700, letterSpacing: '0.25em', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>{label}</span>
-      <span style={{ ...MONO, fontSize: '11px', fontWeight: 900, color, letterSpacing: '0.06em' }}>{value}</span>
+    <div className="state-hypothesis-metric">
+      <span>{label}</span>
+      <strong style={{ color }}>{value}</strong>
     </div>
+  );
+}
+
+function StateDetailRows({ title, items }: { title: string; items?: string[] }) {
+  if (!items?.length) return null;
+  return (
+    <section className="state-hypothesis-detail-section">
+      <header>
+        <span>{title}</span>
+        <small>{String(items.length).padStart(2, '0')}</small>
+      </header>
+      <div className="state-hypothesis-detail-rows">
+        {items.map((item, index) => (
+          <div className="state-hypothesis-detail-row" key={`${title}-${index}`}>
+            <span>{String(index + 1).padStart(2, '0')}</span>
+            <p>{item}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
 // ─── Recognized-state hero card (properties) ─────────────────────────────────
 
-function StateHero({ state }: { state: RecognizedState }) {
-  const [open, setOpen] = useState(false);
+function StateHero({ state, label }: { state: RecognizedState; label?: string }) {
   const accent = tacticalHex(state.command);
+  const definition = state.definition || state.meaning || state.description;
 
   return (
-    <div style={{
-      position: 'relative', border: `1px solid ${accent}55`, borderLeft: `3px solid ${accent}`,
-      background: `linear-gradient(135deg, ${accent}12 0%, rgba(0,0,0,0.25) 60%)`,
-      padding: '16px 18px', overflow: 'hidden',
-    }}>
-      <div style={{ position: 'absolute', top: -40, right: -40, width: 120, height: 120, background: `radial-gradient(circle, ${accent}22 0%, transparent 70%)`, pointerEvents: 'none' }} />
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap' }}>
-        <span style={{ ...MONO, fontSize: '30px', fontWeight: 900, color: accent, lineHeight: 1, letterSpacing: '0.04em' }}>{state.state_id}</span>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          <span style={{ ...MONO, fontSize: '14px', fontWeight: 800, color: '#ffffff' }}>{state.state_name}</span>
-          <span style={{ ...MONO, fontSize: '8px', fontWeight: 700, letterSpacing: '0.22em', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>{state.mode}</span>
+    <section
+      className="state-hypothesis-card"
+      style={{ '--state-accent': accent } as React.CSSProperties}
+      aria-label={`Selected market pulse hypothesis ${state.state_id || ''}`}
+    >
+      <header className="state-hypothesis-header">
+        <div className="state-hypothesis-heading">
+          <span className="state-hypothesis-eyebrow">{label || 'Market Pulse Hypothesis'}</span>
+          <div className="state-hypothesis-identity">
+            <strong>{state.state_id || 'NS —'}</strong>
+            <div>
+              <h3>{state.state_name || 'Unnamed hypothesis'}</h3>
+              {state.mode && <span>{state.mode}</span>}
+            </div>
+          </div>
         </div>
+        <span className="state-hypothesis-selected">Selected</span>
+      </header>
+
+      <div className="state-hypothesis-metrics">
+        <StateMetric label="Command" value={(state.command || '—').replace(/_/g, ' ')} color={accent} />
+        <StateMetric label="Posture" value={(state.posture || '—').replace(/_/g, ' ')} color={engageHex(state.posture)} />
+        {state.status && (
+          <StateMetric label="Status" value={state.status.replace(/_/g, ' ')} color={state.status === 'OK' ? '#86efac' : '#fbbf24'} />
+        )}
       </div>
-      <div style={{ display: 'flex', gap: '8px', marginTop: '14px', flexWrap: 'wrap' }}>
-        <Chip label="COMMAND" value={(state.command || '—').replace(/_/g, ' ')} color={accent} />
-        <Chip label="POSTURE" value={(state.posture || '—').replace(/_/g, ' ')} color={engageHex(state.posture)} />
-        {state.status && <Chip label="STATUS" value={state.status.replace(/_/g, ' ')} color={state.status === 'OK' ? '#22c55e' : '#f59e0b'} />}
-      </div>
-      {(state.definition || state.meaning) && (
-        <p style={{ ...MONO, fontSize: '11px', color: 'rgba(255,255,255,0.85)', lineHeight: 1.6, margin: '14px 0 12px 0' }}>
-          {state.definition || state.meaning}
-        </p>
+
+      {definition && (
+        <div className="state-hypothesis-definition">
+          <span>Hypothesis</span>
+          <p>{definition}</p>
+        </div>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '14px', marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px' }}>
-        {state.doctrine_purpose && state.doctrine_purpose.length > 0 && (
-          <div>
-            <span style={{ ...MONO, fontSize: '7.5px', fontWeight: 800, color: accent, letterSpacing: '0.15em', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
-              Doctrine Purpose
-            </span>
-            <ul style={{ margin: 0, paddingLeft: '14px', listStyleType: 'square', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              {state.doctrine_purpose.map((item, idx) => (
-                <li key={idx} style={{ ...MONO, fontSize: '9.5px', color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {state.recognition_logic && state.recognition_logic.length > 0 && (
-          <div>
-            <span style={{ ...MONO, fontSize: '7.5px', fontWeight: 800, color: accent, letterSpacing: '0.15em', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
-              Recognition Logic
-            </span>
-            <ul style={{ margin: 0, paddingLeft: '14px', listStyleType: 'square', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              {state.recognition_logic.map((item, idx) => (
-                <li key={idx} style={{ ...MONO, fontSize: '9.5px', color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+
+      <div className="state-hypothesis-details">
+        <StateDetailRows title="Doctrine Purpose" items={state.doctrine_purpose} />
+        <StateDetailRows title="Recognition Logic" items={state.recognition_logic} />
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -352,13 +357,14 @@ function SubwayMap({ state, transitions }: { state: RecognizedState; transitions
 
 // StateGraph: P6 card — shows the recognised MASTER COMMAND hero only.
 // The forward-path subway map has moved to P7 (below the weapon box).
-export default function StateGraph({ state }: {
+export default function StateGraph({ state, label }: {
   state: RecognizedState;
+  label?: string;
   transitions?: TransitionBranch[]; // kept in signature for backward-compat but not rendered here
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-      <StateHero state={state} />
+      <StateHero state={state} label={label} />
     </div>
   );
 }
@@ -388,4 +394,3 @@ export function ForwardPathMap({
     </div>
   );
 }
-

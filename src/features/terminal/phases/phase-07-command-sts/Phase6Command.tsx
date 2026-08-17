@@ -3,7 +3,7 @@ import { useNetra } from '@/context/NetraContext';
 import { useReduceFlag } from '@/hooks/useReduceFlag';
 import { StrikeSelections, InterSelections } from '@/types';
 import { API_BASE } from '@/utils/constants';
-import ForkButton from '@/components/UI/ForkButton';
+import { TerminalComponentHeader, TerminalEmptyState } from '@/components/UI/TerminalPrimitives';
 
 // ─── Component 1: Command Marking (Tier 3 — 5M chart) ─────────────────────────
 
@@ -20,28 +20,20 @@ function CommandMarkingChecklist({
 
   return (
     <div style={{ marginBottom: '16px' }}>
-      <div
-        onClick={() => setOpen(o => !o)}
-        style={{
-          margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '10px',
-          borderLeft: '3px solid var(--phase-accent)', paddingLeft: '10px',
-          cursor: 'pointer', userSelect: 'none',
-        }}
-      >
-        <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '11px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase', flexShrink: 0 }}>
-          Component 1 — Command Marking
-        </span>
-        <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '9px', fontWeight: 700, color: done === total ? 'var(--phase-accent)' : 'var(--text-3)', letterSpacing: '0.04em', flexShrink: 0 }}>{done}/{total}</span>
-        <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '8px', color: 'var(--text-4)', letterSpacing: '0.08em', textTransform: 'uppercase', flexShrink: 0 }}>5M</span>
-        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
-        <span style={{ fontSize: '9px', color: 'var(--text-4)', flexShrink: 0 }}>{open ? '▾' : '▸'}</span>
-      </div>
+      <TerminalComponentHeader
+        title="Component 1 — Command Marking"
+        count={`${done}/${total}`}
+        meta="5M"
+        collapsible
+        open={open}
+        onToggle={() => setOpen(value => !value)}
+      />
 
       {open && (
         <div style={{
           display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
           border: '1px solid var(--border-strong)',
-          borderRadius: '4px', overflow: 'hidden', marginBottom: '12px',
+          overflow: 'hidden', marginBottom: '12px',
         }}>
           {marks.map((m, i) => {
             const isDone = !!checked[m.id];
@@ -61,7 +53,7 @@ function CommandMarkingChecklist({
                 }}
               >
                 <div style={{
-                  width: '11px', height: '11px', flexShrink: 0, borderRadius: '2px',
+                  width: '11px', height: '11px', flexShrink: 0,
                   border: `1.5px solid ${isDone ? 'var(--phase-accent)' : 'var(--border-strong)'}`,
                   background: isDone ? 'var(--phase-accent)' : 'transparent',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -97,13 +89,6 @@ interface CommandEventOption {
 
 function getOptions(item: CommandEventOption) {
   return item.outputs || item.options || item.opts || [];
-}
-
-function normalizeCommand(value: unknown) {
-  if (!value) return null;
-  const normalized = String(value).trim().toUpperCase().replace(/_/g, ' ');
-  if (!normalized) return null;
-  return normalized === 'NO ENGAGEMENT' ? 'NO ENGAGEMENT' : normalized;
 }
 
 function CommandEventRow({
@@ -166,17 +151,8 @@ function CommandMarkingInfo({ items }: { items: string[] }) {
 
   return (
     <div style={{ marginBottom: '16px' }}>
-      <div style={{
-        margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '10px',
-        borderLeft: '3px solid var(--phase-accent)', paddingLeft: '10px',
-      }}>
-        <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '11px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase', flexShrink: 0 }}>
-          Component 1 — Command Marking
-        </span>
-        <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '9px', fontWeight: 700, color: done === items.length ? 'var(--phase-accent)' : 'var(--text-3)', letterSpacing: '0.04em', flexShrink: 0 }}>{done}/{items.length}</span>
-        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', border: '1px solid var(--border-strong)', borderRadius: '4px', overflow: 'hidden' }}>
+      <TerminalComponentHeader title="Component 1 — Command Marking" count={`${done}/${items.length}`} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', border: '1px solid var(--border-strong)', overflow: 'hidden' }}>
         {items.map((item, index) => {
           const id = String(index);
           const isDone = !!checked[id];
@@ -192,7 +168,7 @@ function CommandMarkingInfo({ items }: { items: string[] }) {
               }}
             >
               <span style={{
-                width: '11px', height: '11px', flexShrink: 0, borderRadius: '2px',
+                width: '11px', height: '11px', flexShrink: 0,
                 border: `1.5px solid ${isDone ? 'var(--phase-accent)' : 'var(--border-strong)'}`,
                 background: isDone ? 'var(--phase-accent)' : 'transparent',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -210,11 +186,10 @@ function CommandMarkingInfo({ items }: { items: string[] }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function Phase6Command({ onFork }: { onFork?: (point: 'command_dimensions' | 'command_events', clearSelectionKeys: string[]) => void }) {
+export default function Phase6Command() {
   const {
     SYSTEM_DATA,
-    notes, setNotes,
-    selectedNetraState, finalCommand, setFinalCommand,
+    selectedNetraState, finalCommand,
     commandLocked, setCommandLocked,
     strikeSelections, setStrikeSelections,
     interSelections, setInterSelections,
@@ -229,22 +204,11 @@ export default function Phase6Command({ onFork }: { onFork?: (point: 'command_di
   const [stateDefinition, setStateDefinition] = useState<any | null>(null);
   const isCommandPhaseLocked = commandLocked && highestStep > 4;
 
-  // P7 follows the state chosen in P6. It never reads P5 AI text.
+  // The confirmed Market Pulse Hypothesis supplies both the command and its
+  // state-specific dimension schema. This box only configures that command.
   const stateSelection = (selectedNetraState || {}) as Record<string, unknown>;
   const recognizedState = stateSelection.recognized_state as any | undefined;
   const stateId = (recognizedState?.state_id ?? stateSelection.state_id) as string | undefined;
-  const commandFromP6 = normalizeCommand(
-    stateSelection.cmd
-    ?? recognizedState?.command
-    ?? stateSelection.command
-  );
-
-  useEffect(() => {
-    if (isCommandPhaseLocked) return;
-    if (commandFromP6 && finalCommand !== commandFromP6) {
-      setFinalCommand(commandFromP6);
-    }
-  }, [commandFromP6, isCommandPhaseLocked, finalCommand, setFinalCommand]);
 
   // Derive active command state's events
   const activeState = stateDefinition || recognizedState;
@@ -303,7 +267,6 @@ export default function Phase6Command({ onFork }: { onFork?: (point: 'command_di
   const resetCommandPhase = () => {
     setCommandLocked(false);
     editStep(4);
-    setNotes({ ...notes, command: '' });
     setEmChecked({});
     setInterSelections({ pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' });
     setStrikeSelections({
@@ -325,10 +288,21 @@ export default function Phase6Command({ onFork }: { onFork?: (point: 'command_di
 
   const confirmCommandPhase = async () => {
     if (isCommandPhaseLocked || !finalCommand) return;
+    const saved = await saveSession({
+      silent: true,
+      highestStep: 5,
+      stepTimestamps: {
+        ...stepTimestamps,
+        command: new Date().toLocaleTimeString('en-IN'),
+      },
+    });
+    if (!saved) {
+      showToast('Command was not confirmed because MongoDB save failed', 'error');
+      return;
+    }
     setCommandLocked(true);
     confirmStep(4);
-    const saved = await saveSession({ highestStep: 5 });
-    if (saved) showToast('Command confirmed and saved', 'success');
+    showToast('Command configuration confirmed and saved', 'success');
   };
 
   return (
@@ -343,22 +317,12 @@ export default function Phase6Command({ onFork }: { onFork?: (point: 'command_di
 
       {/* ── Component 2: Command Dimensions ── */}
       {!finalCommand ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 0', gap: '10px', opacity: 0.3 }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" strokeLinecap="round" /></svg>
-          <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '9px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase' }}>Select a state in P6 to load the execution tree</span>
-        </div>
+        <TerminalEmptyState title="Command tree unavailable" description="Confirm the Market Pulse Hypothesis to load the execution tree." />
       ) : (
         <div style={{ marginBottom: '16px' }}>
-          <div style={{
-            margin: '4px 0 12px 0', display: 'flex', alignItems: 'center', gap: '10px',
-            borderLeft: '3px solid var(--phase-accent)', paddingLeft: '10px',
-          }}>
-            <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '11px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase', flexShrink: 0 }}>
-              Component 2 — Command Dimensions
-            </span>
-            <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
-            {onFork && <ForkButton onClick={() => onFork('command_dimensions', [...dimensions, ...events].map(item => item.id))} size="sm" />}
-          </div>
+          <TerminalComponentHeader
+            title="Component 2 — Command Dimensions"
+          />
           {dimensions.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {dimensions.map(dim => (
@@ -382,16 +346,9 @@ export default function Phase6Command({ onFork }: { onFork?: (point: 'command_di
       {/* ── Component 3: Command Event ── */}
       {finalCommand && events.length > 0 && (
         <div style={{ marginBottom: '16px' }}>
-          <div style={{
-            margin: '4px 0 12px 0', display: 'flex', alignItems: 'center', gap: '10px',
-            borderLeft: '3px solid var(--phase-accent)', paddingLeft: '10px',
-          }}>
-            <span style={{ fontFamily: 'Space Grotesk, Inter, sans-serif', fontSize: '11px', fontWeight: 800, color: 'var(--text-1)', letterSpacing: '0.15em', textTransform: 'uppercase', flexShrink: 0 }}>
-              Component 3 — Command Events
-            </span>
-            <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
-            {onFork && <ForkButton onClick={() => onFork('command_events', events.map(event => event.id))} size="sm" />}
-          </div>
+          <TerminalComponentHeader
+            title="Component 3 — Command Events"
+          />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {events.map(ev => (
               <CommandEventRow
@@ -406,16 +363,8 @@ export default function Phase6Command({ onFork }: { onFork?: (point: 'command_di
         </div>
       )}
 
-      {/* ── Notes + Actions ── */}
-      <div className="flex gap-4 items-start pt-4 mt-2 border-t border-[var(--border-strong)]">
-        <textarea
-          value={notes.command || ''}
-          onChange={e => setNotes({ ...notes, command: e.target.value })}
-          placeholder="Record strategic reasoning for protocol selection and matrix alignment..."
-          disabled={isCommandPhaseLocked}
-          className="flex-1 bg-transparent outline-none resize-none text-[12px] text-[var(--text-2)] placeholder:text-[var(--text-4)] leading-relaxed min-h-[56px]"
-        />
-        <div className="flex gap-2 shrink-0">
+      <div className="terminal-action-bar">
+        <div className="terminal-action-buttons">
           <button onClick={editCommandPhase} className="btn-edit w-20" disabled={!isCommandPhaseLocked}>Edit</button>
           <button onClick={resetCommandPhase} className="btn-reset w-20" disabled={isCommandPhaseLocked || !finalCommand}>Reset</button>
           <button
@@ -423,7 +372,7 @@ export default function Phase6Command({ onFork }: { onFork?: (point: 'command_di
             className={`${isCommandPhaseLocked ? 'btn-confirmed' : 'btn-confirm'} w-40`}
             disabled={isCommandPhaseLocked || !finalCommand}
           >
-            {isCommandPhaseLocked ? '✓ Command Locked' : 'Confirm Command'}
+            {isCommandPhaseLocked ? '✓ Confirmed' : 'Confirm Command'}
           </button>
         </div>
       </div>

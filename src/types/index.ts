@@ -83,11 +83,11 @@ export interface RecognitionCheckpoint {
   id: string;
   sequence: number;
   createdAt: string;
-  nodeType?: 'AI' | 'COMMAND';
+  nodeType?: 'AI' | 'HYPOTHESIS' | 'COMMAND';
   output: NetraOutput | null;
   evidence: {
-    preSessionContext: Record<string, string>;
-    htfStructure: Record<string, string>;
+    preSessionContext?: Record<string, string>;
+    htfStructure?: Record<string, string>;
     marketPulse: Record<string, string>;
     liquidityContext: Record<string, string>;
   };
@@ -96,6 +96,9 @@ export interface RecognitionCheckpoint {
   wait: WaitSelections | null;
   pathConfirmed?: boolean;
   commandSelected?: boolean;
+  hypothesisConfirmed?: boolean;
+  hypothesisText?: string;
+  decisionChoice?: 'WAIT' | 'COMMAND';
   reassessmentRequired?: boolean;
 }
 
@@ -155,6 +158,84 @@ export interface AvailableModel {
   name: string;
   cost: string;
   tags: string[];
+}
+
+export interface H1Evidence {
+  source_id: string;
+  source_type: 'captured' | 'graph_rag' | 'rag' | 'historian' | string;
+  statement: string;
+}
+
+export interface H1AgentTraceStep {
+  agent: string;
+  content: string;
+}
+
+export interface H1Hypothesis {
+  protocol_version: 'MAYA_HYPOTHESIS_V1';
+  hypothesis_id: string;
+  chain_id: string;
+  revision: number;
+  level: 'H1';
+  status: 'PROPOSED' | 'CONFLICTED' | 'INSUFFICIENT' | 'INCOMPLETE' | 'CONFIRMED';
+  claim: string;
+  structural_view: { direction: string; condition: string };
+  objective: { identity: string; condition: string };
+  pullback_magnet: { identity: string; condition: string };
+  expected_path: string;
+  evidence: { supporting: H1Evidence[]; contradicting: H1Evidence[]; missing: string[] };
+  confirmation_conditions: string[];
+  invalidation_conditions: string[];
+  alternative: { claim: string; activation_condition: string };
+  handoff: { target: 'H2'; must_test: string[]; do_not_assume: string[] };
+  confidence: {
+    score: number;
+    band: 'HIGH' | 'MEDIUM' | 'LOW';
+    evidence_completeness: number;
+    contradiction_level: number;
+  };
+  provenance: {
+    run_id: string;
+    snapshot_hash: string;
+    model: string;
+    source_count: number;
+    created_at: string;
+  };
+  content_hash: string;
+  created_at: string;
+  confirmed_at?: string;
+  confirmed_by?: string;
+  source_proposal_id?: string;
+  user_edited?: boolean;
+}
+
+export interface H2Hypothesis {
+  protocol_version: 'MAYA_COMMAND_HYPOTHESIS_V1';
+  hypothesis_id: string;
+  chain_id: string;
+  revision: number;
+  level: 'H2';
+  status: 'PROPOSED' | 'WAITING' | 'INSUFFICIENT' | 'CONFLICTED' | 'CONFIRMED';
+  mapping_status?: 'MATCHED' | 'CANDIDATE' | 'CONFLICT' | 'ANALYST_SELECTED';
+  parent_h1_id?: string;
+  state_id?: string;
+  state_name?: string;
+  command: 'STRIKE' | 'INTERCEPTION' | 'SATURATION' | 'NO ENGAGEMENT' | string;
+  hypothesis: string;
+  relationship_to_h1: string;
+  relationship_reason: string;
+  evidence: { supporting: H1Evidence[]; contradicting: H1Evidence[]; missing: string[] };
+  wait: { required: boolean; waiting_for: string; reference_location: string; required_resolution: string };
+  confirmation_conditions: string[];
+  invalidation_conditions: string[];
+  confidence: { band: string; evidence_completeness: number; contradiction_count: number };
+  provenance: H1Hypothesis['provenance'];
+  content_hash: string;
+  created_at: string;
+  confirmed_at?: string;
+  confirmed_by?: string;
+  source_proposal_id?: string;
+  user_edited?: boolean;
 }
 
 // ─── Trade Log Types ──────────────────────────────────────────────────────────
@@ -222,6 +303,8 @@ export interface SessionState {
   assetName: string;
   imageDescription: string | null;
   auditData: AuditData | null;
+  hypothesisH1?: H1Hypothesis | null;
+  hypothesisH1Proposal?: H1Hypothesis | null;
 }
 
 // ─── New phase-structured trade log ──────────────────────────────────────────
@@ -294,6 +377,24 @@ export interface TradeLog {
   phase10?: Record<string, any>;
   // Backward-compat: old documents carry session_state blob
   session_state?: SessionState;
+  hypothesis_chain?: {
+    h1?: {
+      proposal?: H1Hypothesis | null;
+      proposal_revision_id?: string;
+      current?: H1Hypothesis | null;
+      current_revision_id?: string;
+      status?: string;
+      revisions?: H1Hypothesis[];
+    };
+    h2?: {
+      proposal?: H2Hypothesis | null;
+      proposal_revision_id?: string;
+      current?: H2Hypothesis | null;
+      current_revision_id?: string;
+      status?: string;
+      revisions?: H2Hypothesis[];
+    };
+  };
   // Terminal trade fields
   source?: string;
   closed?: boolean;
@@ -360,6 +461,18 @@ export interface SystemDimension {
   options?: string[];
   opts?: string[];
   description?: string;
+  display?: 'checklist' | 'dimensions' | 'multiselect' | string;
+  duration?: string;
+  forkName?: string;
+  recordKey?: string;
+  selectionTarget?: 'marketPulse' | 'liquidityContext' | string;
+  selectionAliases?: string[];
+  selectionIdKey?: string;
+  selectionValueKey?: string;
+  exclusiveOptions?: string[];
+  includeComponentIds?: string[];
+  multiselect?: boolean;
+  dimensions?: SystemDimension[];
   [key: string]: unknown;
 }
 
@@ -409,11 +522,76 @@ export interface MarketPulseExtras {
   subAuctionOptions?: Record<string, string[]>;
 }
 
+export interface HypothesisH1Config {
+  phaseLabel?: string;
+  title?: string;
+  subtitle?: string;
+  confirmLabel?: string;
+  confirmedLabel?: string;
+  notes?: Array<{
+    selectionTarget: 'preSessionContext' | 'htfStructure';
+    placeholder?: string;
+  }>;
+  dimensions: SystemDimension[];
+}
+
+export interface MayaHypothesisH1Config {
+  phaseLabel?: string;
+  title?: string;
+  subtitle?: string;
+  editor?: {
+    phaseLabel?: string;
+    title?: string;
+    subtitle?: string;
+    editLabel?: string;
+    resetLabel?: string;
+    confirmLabel?: string;
+    confirmedLabel?: string;
+  };
+}
+
+export interface HypothesisH2Config {
+  phaseLabel?: string;
+  title?: string;
+  subtitle?: string;
+  aiBoxTitle?: string;
+  aiBoxSubtitle?: string;
+  editorTitle?: string;
+  editorSubtitle?: string;
+  editorFieldLabel?: string;
+  restoreProposalLabel?: string;
+  editLabel?: string;
+  resetLabel?: string;
+  selectionTitle?: string;
+  selectionSubtitle?: string;
+  catalogLabel?: string;
+  mapLabel?: string;
+  awaitingSelectionLabel?: string;
+  lockedSelectionLabel?: string;
+  selectionConfirmLabel?: string;
+  selectionConfirmedLabel?: string;
+  commandLabel?: string;
+  commands?: string[];
+  hypothesisPlaceholder?: string;
+  confirmLabel?: string;
+  confirmedLabel?: string;
+}
+
+export interface TerminalPhaseConfig {
+  counter: string;
+  timeframe: string;
+  title: string;
+  subtitle?: string;
+}
+
 export interface SysData {
+  terminalPhases?: Record<string, TerminalPhaseConfig>;
   weapons?: SystemWeapons;
   preSessionContext?: { title?: string; drawings?: string[]; dimensions: SystemDimension[] };
-  htfStructure?: { title?: string; drawings?: string[]; dimensions: SystemDimension[] };
-  marketPulse?: { title?: string; drawings?: string[]; dimensions: SystemDimension[] };
+  hypothesisH1?: HypothesisH1Config;
+  mayaHypothesisH1?: MayaHypothesisH1Config;
+  hypothesisH2?: HypothesisH2Config;
+  marketPulse?: { title?: string; subtitle?: string; drawings?: string[]; dimensions: SystemDimension[] };
   liquidityContext?: { title?: string; drawings?: string[]; dimensions: SystemDimension[] };
   strikeDimensions?: SystemDimension[];
   interceptionDimensions?: SystemDimension[];
@@ -424,6 +602,26 @@ export interface SysData {
   weaponStages?: string[];
   waitCheckpoint?: {
     title?: string;
+    decisionTitle?: string;
+    decisionSubtitle?: string;
+    actionLabel?: string;
+    actionDescription?: string;
+    commandActionLabel?: string;
+    commandActionDescription?: string;
+    commandSelectedLabel?: string;
+    validationTitle?: string;
+    validationSubtitle?: string;
+    activeLabel?: string;
+    definitionTitle?: string;
+    definitionSubtitle?: string;
+    resolverTitle?: string;
+    resolverSubtitle?: string;
+    notePlaceholder?: string;
+    resolutionNotePlaceholder?: string;
+    saveLabel?: string;
+    editLabel?: string;
+    removeLabel?: string;
+    resolveLabel?: string;
     dimensions: SystemDimension[];
     resolutionEvents: string[];
   };

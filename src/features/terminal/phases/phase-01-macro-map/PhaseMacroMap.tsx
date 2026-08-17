@@ -1,50 +1,51 @@
-// Macro Mapping phase — strategic chart marks plus the HTF risk gate (CONTINUE/REDUCE/STOP).
+// Hypothesis H1 — Super HTF and HTF evidence rendered from the shared system configuration.
 
-import { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { TerminalComponentHeader } from '@/components/UI/TerminalPrimitives';
 import { useNetra } from '@/context/NetraContext';
-import { useHTFGate } from '@/hooks/useReduceFlag';
-
-// ─── Strategic Marking ───────────────────────────────────────────────────────
-
-const STRATEGIC_MARKS = [
-  { id: 'structuralBoundaries', label: 'Category 1 — Structural Boundaries (Weekly High/Low, Significant Swings)', tier: 'T1' },
-  { id: 'structuralLiquidity',  label: 'Category 2 — Structural Liquidity (Equal High/Low Clusters, Nearest Swings)', tier: 'T2' },
-  { id: 'structuralImbalance',  label: 'Category 3 — Structural Imbalance (Fresh HTF Fair Value Gaps)', tier: 'T2' },
-  { id: 'structuralEvents',     label: 'Category 4 — Structural Events (BOS, CHoCH)', tier: 'T2' },
-] as const;
+import { SystemDimension } from '@/types';
 
 const MONO: React.CSSProperties = { fontFamily: 'Space Grotesk, Inter, sans-serif' };
 
-export const STRATEGIC_MARKS_TOTAL = STRATEGIC_MARKS.length;
+type H1SelectionTarget = 'preSessionContext' | 'htfStructure';
 
-export function StrategicMarkingChecklist({
+type SupplementalInput = {
+  id: string;
+  placeholder?: string;
+  width?: string;
+};
+
+function ChecklistRows({
   open,
+  options,
   checked,
   onToggle,
 }: {
   open: boolean;
+  options: string[];
   checked: Record<string, boolean>;
   onToggle: (id: string) => void;
 }) {
   if (!open) return null;
+
   return (
     <div style={{
       display: 'flex', flexDirection: 'column',
       border: '1px solid var(--border-strong)',
       marginBottom: '4px',
     }}>
-      {STRATEGIC_MARKS.map((m, i) => {
-        const isDone = !!checked[m.id];
-        const isLastRow = i === STRATEGIC_MARKS.length - 1;
+      {options.map((label, index) => {
+        const id = `drawing_${index + 1}`;
+        const isDone = !!checked[id];
         return (
           <div
-            key={m.id}
-            onClick={e => { e.stopPropagation(); onToggle(m.id); }}
+            key={id}
+            onClick={event => { event.stopPropagation(); onToggle(id); }}
             style={{
               display: 'flex', alignItems: 'center', gap: '10px',
               padding: '12px 16px', cursor: 'pointer',
               background: isDone ? 'var(--phase-accent-bg)' : 'transparent',
-              borderBottom: isLastRow ? 'none' : '1px solid var(--border)',
+              borderBottom: index === options.length - 1 ? 'none' : '1px solid var(--border)',
               transition: 'background 120ms',
             }}
           >
@@ -53,7 +54,6 @@ export function StrategicMarkingChecklist({
               border: `1.5px solid ${isDone ? 'var(--phase-accent)' : 'var(--border-strong)'}`,
               background: isDone ? 'var(--phase-accent)' : 'transparent',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'border-color 100ms, background 100ms',
             }}>
               {isDone && <span style={{ fontSize: '8px', color: 'white', fontWeight: 900, lineHeight: 1 }}>✓</span>}
             </div>
@@ -63,10 +63,10 @@ export function StrategicMarkingChecklist({
               textDecoration: isDone ? 'line-through' : 'none',
               textDecorationColor: 'var(--text-4)',
             }}>
-              {m.label}
+              {label}
             </span>
             <span style={{ ...MONO, fontSize: '8px', fontWeight: 800, letterSpacing: '0.1em', color: isDone ? 'var(--phase-accent)' : 'var(--text-4)', flexShrink: 0 }}>
-              {m.tier}
+              {String(index + 1).padStart(2, '0')}
             </span>
           </div>
         );
@@ -75,293 +75,239 @@ export function StrategicMarkingChecklist({
   );
 }
 
-// ─── Component 2: Bias ───────────────────────────────────────────────────────
-
-export function BiasDimensions() {
-  const { SYSTEM_DATA, selections, setSelections, highestStep } = useNetra();
-
-  const dims     = (SYSTEM_DATA.preSessionContext?.dimensions || []).filter(dim => ![
-    'correlatedMarketAlignment', 'preSessionDisplacement', 'displacementSize',
-  ].includes(dim.id));
-  const rb       = (selections.preSessionContext || {}) as Record<string, string>;
-  const isLocked = highestStep > 1;
-
-  const setRb = (key: string, val: string) => {
-    if (isLocked) return;
-    setSelections({ ...selections, preSessionContext: { ...rb, [key]: val } });
-  };
-
-  return (
-    <div className="flex flex-col phase-theme-1">
-      {dims.map((dim) => (
-        <div key={dim.id} className="precision-row">
-          <div className="precision-label">{dim.name}</div>
-          <div className="precision-selector">
-            {(dim.options || []).map(opt => {
-              const isSelected = rb[dim.id] === opt;
-              return (
-                <button
-                  key={opt}
-                  onClick={() => setRb(dim.id, opt)}
-                  disabled={isLocked}
-                  className={`precision-opt ${isSelected ? 'selected' : ''} ${isLocked && !isSelected ? 'opacity-30 cursor-not-allowed' : ''}`}
-                >
-                  {opt}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
+export function HypothesisH1Components() {
+  const { SYSTEM_DATA, selections, setSelections, highestStep, stepTimestamps } = useNetra();
+  const components = useMemo(
+    () => SYSTEM_DATA.hypothesisH1?.dimensions || [],
+    [SYSTEM_DATA.hypothesisH1?.dimensions],
   );
-}
+  const [openComponents, setOpenComponents] = useState<Record<string, boolean>>({});
+  const [checklists, setChecklists] = useState<Record<string, Record<string, boolean>>>({});
 
-// ─── Component 3: HTF Structure ──────────────────────────────────────────────
-
-export function HTFDimensions() {
-  const { SYSTEM_DATA, selections, setSelections, highestStep } = useNetra();
-
-  const htfGate  = useHTFGate();
-  const isStop   = htfGate === 'STOP';
-  const isLocked = highestStep > 2;
-
-  const htf  = (selections.htfStructure || {}) as Record<string, string>;
-  const dims = (SYSTEM_DATA.htfStructure?.dimensions || []).filter(dim => !dim.multiselect);
-
-  const toggleHtf = (key: string, val: string) => {
-    if (isLocked) return;
-    setSelections({ ...selections, htfStructure: { ...htf, [key]: val } });
-  };
-
-  const htfAnchor = htf.htfAnchorCondition || htf.anchorCondition;
-  const htfProtection = htf.htfProtectionCondition || htf.protectionCondition;
-  const stopReason = htf.structuralContinuity === 'Broken Continuity'
-    ? 'Structural continuity is broken. Price has violated HTF structure — no valid trade environment exists.'
-    : htfAnchor === 'Anchor Failure'
-    ? 'Anchor has failed. Foundational structural origin has failed — no valid trade environment exists.'
-    : htfProtection === 'Protection Failure'
-    ? 'Protection has failed. Defended structural boundary has failed — no valid trade environment exists.'
-    : 'Late maturity + deep rotation + near destination forms a terminal squeeze. Continuation probability is too low.';
-
-  return (
-    <div className="flex flex-col phase-theme-1">
-      {dims.map((dim) => {
-        return (
-          <div key={dim.id} className="precision-row flex items-center">
-            <div className="precision-label">{dim.name}</div>
-            <div className="precision-selector flex-1">
-              {(dim.options || []).map(opt => {
-                const isSelected = htf[dim.id] === opt;
-                return (
-                  <button
-                    key={opt}
-                    onClick={() => toggleHtf(dim.id, opt)}
-                    disabled={isLocked}
-                    className={`precision-opt ${isSelected ? 'selected' : ''} ${isLocked && !isSelected ? 'opacity-30 cursor-not-allowed' : ''}`}
-                  >{opt}</button>
-                );
-              })}
-            </div>
-            {dim.id === 'legMaturity' && (
-              <div className="flex gap-2 ml-4">
-                <input type="text" placeholder="Avg No Of Legs" value={htf['avgNoOfLegs'] || ''} onChange={e => toggleHtf('avgNoOfLegs', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text-1)] w-24 outline-none focus:border-[var(--accent)]" />
-                <input type="text" placeholder="Current Leg No" value={htf['currentLegNo'] || ''} onChange={e => toggleHtf('currentLegNo', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text-1)] w-24 outline-none focus:border-[var(--accent)]" />
-              </div>
-            )}
-            {dim.id === 'rotationDepth' && (
-              <div className="flex gap-2 ml-4">
-                <input type="text" placeholder="Avg" value={htf['avgRotation'] || ''} onChange={e => toggleHtf('avgRotation', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text-1)] w-16 outline-none focus:border-[var(--accent)]" />
-                <input type="text" placeholder="curr" value={htf['currRotation'] || ''} onChange={e => toggleHtf('currRotation', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text-1)] w-16 outline-none focus:border-[var(--accent)]" />
-              </div>
-            )}
-            {dim.id === 'structuralCompression' && (
-              <div className="flex gap-2 ml-4">
-                <input type="text" placeholder="Avg Height" value={htf['avgHeight'] || ''} onChange={e => toggleHtf('avgHeight', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text-1)] w-20 outline-none focus:border-[var(--accent)]" />
-                <input type="text" placeholder="Current Height" value={htf['currentHeight'] || ''} onChange={e => toggleHtf('currentHeight', e.target.value)} disabled={isLocked} className="px-2 py-1 text-[10px] bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text-1)] w-24 outline-none focus:border-[var(--accent)]" />
-              </div>
-            )}
-          </div>
-        );
-      })}
-
-      {isStop && !isLocked && (
-        <div className="flex flex-col gap-1.5 px-4 py-3 mt-3" style={{ background: 'var(--red-bg)', border: '1px solid var(--red)' }}>
-          <span style={{ fontSize: '9px', fontWeight: 900, color: 'var(--red)', letterSpacing: '0.2em', textTransform: 'uppercase' }}>⛔ NO ENGAGEMENT — Session Ends Here</span>
-          <span style={{ fontSize: '10px', color: 'var(--red)', lineHeight: 1.5 }}>{stopReason}</span>
-          <span style={{ fontSize: '9px', color: 'var(--red)', opacity: 0.6, marginTop: '4px' }}>Chart closes. No further analysis permitted for this session.</span>
-        </div>
-      )}
-    </div>
+  const preSessionContext = selections.preSessionContext || {};
+  const htfStructure = selections.htfStructure || {};
+  const isLocked = highestStep > 2 || Boolean(
+    stepTimestamps.hypothesisH1
+    || stepTimestamps.htfStructure
+    || stepTimestamps.preSessionContext
   );
-}
+  const checklistSelectionSignature = components
+    .filter(component => component.display === 'checklist')
+    .map(component => {
+      const source = component.selectionTarget === 'preSessionContext' ? preSessionContext : htfStructure;
+      return source[component.selectionIdKey || ''] || '';
+    })
+    .join('|');
 
-// ─── Component 4: HTF Events ───────────────────────────────────────────────
+  useEffect(() => {
+    setChecklists(Object.fromEntries(
+      components
+        .filter(component => component.display === 'checklist')
+        .map(component => {
+          const source = component.selectionTarget === 'preSessionContext' ? preSessionContext : htfStructure;
+          const selectedIds = String(source[component.selectionIdKey || ''] || '')
+            .split(',')
+            .map(value => value.trim())
+            .filter(Boolean);
+          return [component.id, Object.fromEntries(selectedIds.map(id => [id, true]))];
+        }),
+    ));
+  }, [components, checklistSelectionSignature]);
 
-export function HTFEvents() {
-  const { SYSTEM_DATA, selections, setSelections, highestStep } = useNetra();
-
-  const isLocked = highestStep > 2;
-  const htf  = (selections.htfStructure || {}) as Record<string, string>;
-  const dims = (SYSTEM_DATA.htfStructure?.dimensions || []).filter(dim => dim.multiselect);
-
-  const toggleHtf = (key: string, val: string) => {
-    if (isLocked) return;
-    const currentVal = htf[key] || '';
-    let selectedVals = currentVal ? currentVal.split(', ') : [];
-    if (val === 'No Significant Event') {
-      selectedVals = ['No Significant Event'];
-    } else {
-      selectedVals = selectedVals.filter(v => v !== 'No Significant Event');
-      if (selectedVals.includes(val)) {
-        selectedVals = selectedVals.filter(v => v !== val);
-      } else {
-        selectedVals.push(val);
-      }
-    }
-    const newVal = selectedVals.join(', ');
-    setSelections({ ...selections, htfStructure: { ...htf, [key]: newVal } });
-  };
-
-  return (
-    <div className="flex flex-col phase-theme-1">
-      {dims.map((dim) => {
-        const selectedVals = htf[dim.id] ? String(htf[dim.id]).split(', ') : [];
-        return (
-          <div key={dim.id} className="precision-row flex items-center">
-            <div className="precision-label">{dim.name}</div>
-            <div className="precision-selector flex-1">
-              {(dim.options || []).map(opt => {
-                const isSelected = selectedVals.includes(opt);
-                return (
-                  <button
-                    key={opt}
-                    onClick={() => toggleHtf(dim.id, opt)}
-                    disabled={isLocked}
-                    className={`precision-opt ${isSelected ? 'selected' : ''} ${isLocked && !isSelected ? 'opacity-30 cursor-not-allowed' : ''}`}
-                  >{opt}</button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
-    </div>
+  const sourceFor = (target: H1SelectionTarget) => (
+    target === 'preSessionContext' ? preSessionContext : htfStructure
   );
-}
 
-// ─── Pre-Session Context footer ──────────────────────────────────────────────
-
-export function PreSessionActions() {
-  const {
-    SYSTEM_DATA, selections, setSelections,
-    notes, setNotes,
-    highestStep, confirmStep, editStep,
-    stepTimestamps,
-  } = useNetra();
-
-  const [editing, setEditing] = useState(false);
-  const isLocked = highestStep > 1 && !editing;
-
-  const biasDims = SYSTEM_DATA.preSessionContext?.dimensions || [];
-  const rb       = (selections.preSessionContext || {}) as Record<string, string>;
-  const allBias  = biasDims.length > 0 && biasDims.every(d => !!rb[d.id]);
-  const hasData  = Object.keys(rb).length > 0;
-  const canConfirm = !isLocked;
-
-  const handleEdit  = () => { setEditing(false); editStep(1); };
-  const handleReset = () => {
+  const setTargetValues = (target: H1SelectionTarget, values: Record<string, string>) => {
     if (isLocked) return;
-    setSelections({ ...selections, preSessionContext: {} });
-    setNotes({ ...notes, preSessionContext: '' });
+    setSelections({ ...selections, [target]: { ...sourceFor(target), ...values } });
   };
 
-  return (
-    <>
-      <div style={{ borderTop: '1px solid var(--border-strong)', margin: '16px 0 0 0' }} />
-      <div className="flex gap-4 items-start pt-4">
-        <textarea
-          value={notes.preSessionContext || ''}
-          onChange={e => setNotes({ ...notes, preSessionContext: e.target.value })}
-          placeholder="Pre-session notes — directional bias, correlated market, displacement context..."
-          disabled={isLocked}
-          className="flex-1 bg-transparent outline-none resize-none text-[12px] text-[var(--text-2)] placeholder:text-[var(--text-4)] leading-relaxed min-h-[44px]"
-        />
-        <div className="flex gap-2 shrink-0">
-          <button onClick={handleEdit} className="btn-edit w-20" disabled={!isLocked}>Edit</button>
-          <button onClick={handleReset} className="btn-reset w-20" disabled={isLocked || !hasData}>Reset</button>
-          <button
-            onClick={() => confirmStep(1)}
-            className={`${isLocked ? 'btn-confirmed' : 'btn-confirm'} w-36`}
-            disabled={!canConfirm}
-          >
-            {isLocked ? '✓ Confirmed' : 'Confirm Context'}
-          </button>
+  const selectedValue = (target: H1SelectionTarget, dimension: SystemDimension) => {
+    const source = sourceFor(target);
+    return source[dimension.id]
+      || (dimension.selectionAliases || []).map(alias => source[alias]).find(Boolean)
+      || '';
+  };
+
+  const setDimensionValue = (target: H1SelectionTarget, dimension: SystemDimension, value: string) => {
+    const aliases = dimension.selectionAliases || [];
+    setTargetValues(target, Object.fromEntries([dimension.id, ...aliases].map(key => [key, value])));
+  };
+
+  const toggleMultiselect = (target: H1SelectionTarget, dimension: SystemDimension, option: string) => {
+    const currentValues = selectedValue(target, dimension).split(', ').filter(Boolean);
+    const exclusiveOptions = dimension.exclusiveOptions || [];
+    const nextValues = exclusiveOptions.includes(option)
+      ? [option]
+      : currentValues
+          .filter(value => !exclusiveOptions.includes(value))
+          .filter(value => value !== option)
+          .concat(currentValues.includes(option) ? [] : option);
+    setDimensionValue(target, dimension, nextValues.join(', '));
+  };
+
+  const toggleChecklist = (component: SystemDimension, id: string) => {
+    if (isLocked) return;
+    const current = checklists[component.id] || {};
+    const next = { ...current, [id]: !current[id] };
+    const selectedItems = (component.options || [])
+      .map((label, index) => ({ id: `drawing_${index + 1}`, label }))
+      .filter(item => next[item.id]);
+    const values: Record<string, string> = {};
+    if (component.selectionIdKey) values[component.selectionIdKey] = selectedItems.map(item => item.id).join(', ');
+    if (component.selectionValueKey) values[component.selectionValueKey] = selectedItems.map(item => item.label).join(' | ');
+    const target: H1SelectionTarget = component.selectionTarget === 'preSessionContext'
+      ? 'preSessionContext'
+      : 'htfStructure';
+    setChecklists({ ...checklists, [component.id]: next });
+    setTargetValues(target, values);
+  };
+
+  const renderDimension = (
+    dimension: SystemDimension,
+    target: H1SelectionTarget,
+    forceMultiselect: boolean,
+  ) => {
+    const value = selectedValue(target, dimension);
+    const selectedValues = value.split(', ').filter(Boolean);
+    const isMultiselect = forceMultiselect || !!dimension.multiselect;
+    const inputs = Array.isArray(dimension.inputs) ? dimension.inputs as SupplementalInput[] : [];
+
+    return (
+      <div key={dimension.id} className="precision-row flex items-center">
+        <div className="precision-label">{dimension.name}</div>
+        <div className="precision-selector flex-1">
+          {(dimension.options || []).map(option => {
+            const isSelected = isMultiselect ? selectedValues.includes(option) : value === option;
+            return (
+              <button
+                key={option}
+                onClick={() => isMultiselect
+                  ? toggleMultiselect(target, dimension, option)
+                  : setDimensionValue(target, dimension, option)}
+                disabled={isLocked}
+                className={`precision-opt ${isSelected ? 'selected' : ''} ${isLocked && !isSelected ? 'opacity-30 cursor-not-allowed' : ''}`}
+              >
+                {option}
+              </button>
+            );
+          })}
         </div>
+        {inputs.length > 0 && (
+          <div className="flex gap-2 ml-4">
+            {inputs.map(input => (
+              <input
+                key={input.id}
+                type="text"
+                placeholder={input.placeholder}
+                value={sourceFor(target)[input.id] || ''}
+                onChange={event => setTargetValues(target, { [input.id]: event.target.value })}
+                disabled={isLocked}
+                className="terminal-inline-input"
+                style={{ width: input.width || '80px' }}
+              />
+            ))}
+          </div>
+        )}
       </div>
-      {stepTimestamps.preSessionContext && (
-        <div className="text-right text-[9px] font-mono text-[var(--text-4)] mt-1">
-          Locked: {stepTimestamps.preSessionContext}
-        </div>
-      )}
-    </>
+    );
+  };
+
+  return (
+    <div className="flex flex-col fade-up phase-theme-1">
+      {components.map((component, index) => {
+        const display = component.display || 'dimensions';
+        const isChecklist = display === 'checklist';
+        const target: H1SelectionTarget = component.selectionTarget === 'preSessionContext'
+          ? 'preSessionContext'
+          : 'htfStructure';
+        const nestedDimensions = component.dimensions || [];
+        const options = component.options || [];
+        const checked = checklists[component.id] || {};
+        const done = options.filter((_, optionIndex) => checked[`drawing_${optionIndex + 1}`]).length;
+        const isOpen = !!openComponents[component.id];
+
+        return (
+          <div key={component.id}>
+            <TerminalComponentHeader
+              title={component.name}
+              count={isChecklist ? `${done}/${options.length}` : undefined}
+              meta={component.duration}
+              collapsible={isChecklist}
+              open={isOpen}
+              onToggle={() => setOpenComponents(current => ({ ...current, [component.id]: !current[component.id] }))}
+              className={index > 0 ? 'is-spaced' : ''}
+            />
+
+            {isChecklist ? (
+              <ChecklistRows
+                open={isOpen}
+                options={options}
+                checked={checked}
+                onToggle={id => toggleChecklist(component, id)}
+              />
+            ) : (
+              nestedDimensions.map(dimension => renderDimension(dimension, target, display === 'multiselect'))
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
-// ─── Macro Mapping footer: HTF-only confirm ───────────────────────────────────
-
-export function MacroMappingActions() {
+export function HypothesisH1Actions() {
   const {
-    SYSTEM_DATA, selections, setSelections,
+    SYSTEM_DATA,
+    selections, setSelections,
     notes, setNotes,
-    highestStep, confirmStep, editStep,
-    stepTimestamps,
+    highestStep, stepTimestamps,
+    confirmHypothesisH1, editHypothesisH1,
   } = useNetra();
 
-  const [editing, setEditing] = useState(false);
+  const config = SYSTEM_DATA.hypothesisH1;
+  const lockedAt = stepTimestamps.hypothesisH1
+    || stepTimestamps.htfStructure
+    || stepTimestamps.preSessionContext;
+  const isLocked = highestStep > 2 || Boolean(lockedAt);
+  const hasAnyData = Object.keys(selections.preSessionContext || {}).length > 0
+    || Object.keys(selections.htfStructure || {}).length > 0;
 
-  const htfGate  = useHTFGate();
-  const isStop   = htfGate === 'STOP';
-  const isLocked = highestStep > 2 && !editing;
-
-  const htfDims    = SYSTEM_DATA.htfStructure?.dimensions || [];
-  const htf        = (selections.htfStructure || {}) as Record<string, string>;
-  const allHTF     = htfDims.length === 0 || htfDims.every(d => !!htf[d.id]);
-  const hasAnyData = Object.keys(htf).length > 0;
-  const canConfirm = !isLocked;
-  const lockedAt   = stepTimestamps.htfStructure;
-
-  const handleEdit  = () => { setEditing(false); editStep(2); };
   const handleReset = () => {
     if (isLocked) return;
-    setSelections({ ...selections, htfStructure: {} });
+    setSelections({ ...selections, preSessionContext: {}, htfStructure: {} });
+    setNotes({ ...notes, preSessionContext: '', htfStructure: '' });
   };
-  const handleConfirm = () => { confirmStep(1); confirmStep(2); };
 
   return (
     <>
-      <div style={{ borderTop: '1px solid var(--border-strong)', margin: '16px 0 0 0' }} />
-      <div className="flex gap-4 items-start pt-4">
-        <textarea
-          value={notes.htfStructure || ''}
-          onChange={e => setNotes({ ...notes, htfStructure: e.target.value })}
-          placeholder="HTF structure notes — structural context, leg maturity, compression state..."
-          disabled={isLocked}
-          className="flex-1 bg-transparent outline-none resize-none text-[12px] text-[var(--text-2)] placeholder:text-[var(--text-4)] leading-relaxed min-h-[44px]"
-        />
-        <div className="flex gap-2 shrink-0">
-          <button onClick={handleEdit} className="btn-edit w-20" disabled={!isLocked}>Edit</button>
+      <div className="terminal-action-bar">
+        <div className="flex-1 min-w-0">
+          {(config?.notes || []).map(noteConfig => (
+            <textarea
+              key={noteConfig.selectionTarget}
+              value={notes[noteConfig.selectionTarget] || ''}
+              onChange={event => setNotes({ ...notes, [noteConfig.selectionTarget]: event.target.value })}
+              placeholder={noteConfig.placeholder}
+              disabled={isLocked}
+              className="terminal-note"
+            />
+          ))}
+        </div>
+        <div className="terminal-action-buttons">
+          <button onClick={editHypothesisH1} className="btn-edit w-20">Edit</button>
           <button onClick={handleReset} className="btn-reset w-20" disabled={isLocked || !hasAnyData}>Reset</button>
           <button
-            onClick={handleConfirm}
-            className={`${isLocked ? 'btn-confirmed' : 'btn-confirm'} w-36`}
-            disabled={!canConfirm}
+            onClick={confirmHypothesisH1}
+            className={`${isLocked ? 'btn-confirmed' : 'btn-confirm'} w-44`}
+            disabled={isLocked}
           >
-            {isLocked ? '✓ Confirmed' : 'Confirm HTF'}
+            {isLocked ? `✓ ${config?.confirmedLabel || 'H1 Confirmed'}` : config?.confirmLabel || 'Confirm H1'}
           </button>
         </div>
       </div>
-      {lockedAt && (
+      {isLocked && lockedAt && (
         <div className="text-right text-[9px] font-mono text-[var(--text-4)] mt-1">
           Locked: {lockedAt}
         </div>
