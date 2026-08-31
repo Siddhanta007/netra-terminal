@@ -13,6 +13,7 @@ import { useNetraUtils } from './useNetraUtils';
 import { aiSuggestionText, compactLatestWaitCheckpoint } from '../utils/aiContext';
 import { buildAgentWorkflowRequest } from '../utils/agentWorkflowRequest';
 import { getEditableHypothesisText } from '../utils/hypothesisText';
+import { waitForNextPaint } from '../utils/waitForNextPaint';
 
 export function useAnalysisFlow() {
   const dispatch = useDispatch<AppDispatch>();
@@ -162,7 +163,7 @@ export function useAnalysisFlow() {
     };
   }, [selections, notes, liveMarketContext, sysData, selectedNetraState, finalCommand, strikeSelections, saturationSelections, interSelections, recognitionCheckpoints, netraOutput, h1Hypothesis]);
 
-  const triggerNeuralSynthesis = useCallback(() => {
+  const triggerNeuralSynthesis = useCallback(async () => {
     if (isEvaluating) return;
     const latestCheckpoint = recognitionCheckpoints[recognitionCheckpoints.length - 1];
     if (recognitionCheckpoints.some(checkpoint => checkpoint.wait?.resolutionStatus === 'OPEN')) {
@@ -172,6 +173,7 @@ export function useAnalysisFlow() {
     if (!checkGuestLimit()) { showToast('Guest limit reached — sign in to continue', 'error'); return; }
     dispatch(setIsEvaluating(true));
     dispatch(setNetraOutput(null));
+    await waitForNextPaint();
 
     if (abortControllerRef.current) abortControllerRef.current.abort();
     abortControllerRef.current = new AbortController();

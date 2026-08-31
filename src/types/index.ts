@@ -338,6 +338,7 @@ export interface TradePhase10 extends AuditData { execution_rating?: number; les
 
 export interface TradeLog {
   id: string;
+  state_revision?: number;
   name: string;
   username?: string;
   created_by?: string;

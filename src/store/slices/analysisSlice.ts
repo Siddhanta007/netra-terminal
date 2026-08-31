@@ -52,25 +52,19 @@ interface AnalysisState {
   rulesAcknowledged: boolean[];
 }
 
-const persistedNetraOutput = loadState<NetraOutput | null>('netraOutput', null);
-const cleanPersistedNetraOutput =
-  persistedNetraOutput && (persistedNetraOutput as Record<string, unknown>).state_override
-    ? null
-    : persistedNetraOutput;
-
 const initialState: AnalysisState = {
-  highestStep: loadState('highestStep', 1),
-  selections: loadState('selections', { preSessionContext: {}, htfStructure: {}, marketPulse: {}, liquidityContext: {} }),
-  notes: loadState('notes', { preSessionContext: '', htfStructure: '', marketPulse: '', liquidityContext: '', weapon: '' }),
-  finalCommand: loadState('finalCommand', null),
-  commandLocked: loadState('commandLocked', false),
-  weaponLocked: loadState('weaponLocked', false),
-  netraOutput: cleanPersistedNetraOutput,       // expensive AI call — persist so a reload doesn't re-run it
-  selectedNetraState: loadState<Record<string, unknown> | null>('selectedNetraState', null),
-  sysRecommendation: loadState('sysRecommendation', null),
-  interSelections: loadState('interSelections', { pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }),
-  strikeSelections: loadState('strikeSelections', { impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' }),
-  saturationSelections: loadState('saturationSelections', { expansionQuality: '', pullbackQuality: '', followThrough: '', structuralFatigue: '', liquidityConsumption: '', emotionalParticipation: '' }),
+  highestStep: 1,
+  selections: { preSessionContext: {}, htfStructure: {}, marketPulse: {}, liquidityContext: {} },
+  notes: { preSessionContext: '', htfStructure: '', marketPulse: '', liquidityContext: '', weapon: '' },
+  finalCommand: null,
+  commandLocked: false,
+  weaponLocked: false,
+  netraOutput: null,
+  selectedNetraState: null,
+  sysRecommendation: null,
+  interSelections: { pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' },
+  strikeSelections: { impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '', zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '', postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '' },
+  saturationSelections: { expansionQuality: '', pullbackQuality: '', followThrough: '', structuralFatigue: '', liquidityConsumption: '', emotionalParticipation: '' },
   waitSelections: {
     waitingFor: '', referenceLocation: '', requiredResolution: '', developmentStage: '',
     institutionalSignature: '', validityHorizon: '', resolutionStatus: 'OPEN',
@@ -79,10 +73,10 @@ const initialState: AnalysisState = {
   // P5 belongs to the active Mongo session. Never hydrate another session's
   // recognition path from a single global browser key.
   recognitionCheckpoints: [],
-  weaponStageLog: loadState('weaponStageLog', [] as Array<{ stage: string; ts: string }>),
-  stateTimeline: loadState('stateTimeline', [] as Array<{ state_id: string; ts: string }>),
+  weaponStageLog: [],
+  stateTimeline: [],
   liveMarketContext: {},
-  selectedWeaponId: loadState('selectedWeaponId', null),
+  selectedWeaponId: null,
   isEvaluating: false,
   h1Hypothesis: null,
   h1Proposal: null,
@@ -90,11 +84,11 @@ const initialState: AnalysisState = {
   isConfirmingH1: false,
   isGeneratingH1: false,
   isPredictingWeapon: false,
-  weaponPrediction: loadState<WeaponPrediction | null>('weaponPrediction', null),  // expensive AI call — persist across reloads
-  imageDescription: loadState('imageDescription', null),
+  weaponPrediction: null,
+  imageDescription: null,
   isUploadingImage: false,
   analyticsData: null,
-  stepTimestamps: loadState('stepTimestamps', {}),
+  stepTimestamps: {},
   // Mission Control Data
   rAmount: loadState('rAmount', ''),
   dailyLossLimit: loadState('dailyLossLimit', ''),

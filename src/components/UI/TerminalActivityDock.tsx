@@ -1,4 +1,5 @@
 import type { ToastType } from '@/types';
+import { ActionSpinner } from './LoadingSpinners';
 
 type TerminalActivityDockProps = {
   loading?: boolean;
@@ -19,9 +20,7 @@ export function TerminalActivityDock({
       aria-busy={loading || undefined}
     >
       {loading ? (
-        <span className="terminal-multicolor-loader" aria-hidden="true">
-          <i /><i /><i /><i />
-        </span>
+        <ActionSpinner label={message} showLabel={false} />
       ) : (
         <span className="terminal-activity-symbol" aria-hidden="true">
           {tone === 'error' ? '×' : tone === 'warning' ? '!' : tone === 'info' ? 'i' : '✓'}

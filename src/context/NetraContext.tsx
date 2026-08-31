@@ -99,8 +99,8 @@ export interface NetraContextValue {
   confirmStep: (step: number) => void;
   editStep: (step: number) => void;
   confirmHypothesisH1: () => Promise<void>;
-  editHypothesisH1: () => void;
-  editFinalH1Hypothesis: () => void;
+  editHypothesisH1: (onConfirmed?: () => void) => void;
+  editFinalH1Hypothesis: (onConfirmed?: () => void) => void;
   doResetStep: (step: number) => void;
   confirmMarketPulse: () => Promise<void>;
   editMarketPulse: () => void;
@@ -175,11 +175,12 @@ export interface NetraContextValue {
   handleAuth: () => void;
   initializeMission: () => void;
   isInitializingMission: boolean;
+  isLoadingSession: boolean;
   resumeSession: (log: TradeLog) => void;
   forkSession: (log: TradeLog, newName: string) => Promise<boolean>;
   forkCurrentSession: (phaseNum: number, newName: string, fork?: { recordKey: string; label: string; clearSelectionKeys?: string[] }) => Promise<boolean>;
   loadSessionById: (id: string) => Promise<void>;
-  saveSession: (options?: { silent?: boolean; recognitionCheckpoints?: RecognitionCheckpoint[]; highestStep?: number; stepTimestamps?: Record<string, string>; clearDownstream?: boolean; clearAfter?: 'pre_session' | 'htf' | 'market_pulse' | 'decision_path' | 'pinaka_state' | 'command'; reopenH2?: boolean; selectedNetraState?: Record<string, unknown> | null; liveMarketContext?: Record<string, unknown> }) => Promise<boolean>;
+  saveSession: (options?: { silent?: boolean; recognitionCheckpoints?: RecognitionCheckpoint[]; highestStep?: number; stepTimestamps?: Record<string, string>; clearDownstream?: boolean; clearAfter?: 'pre_session' | 'htf' | 'market_pulse' | 'decision_path' | 'pinaka_state' | 'command'; preserveH1Proposal?: boolean; reopenH2?: boolean; selectedNetraState?: Record<string, unknown> | null; liveMarketContext?: Record<string, unknown> }) => Promise<boolean>;
   resetTerminalState: () => void;
   logout: () => void;
   // Logs
@@ -380,12 +381,19 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
   const netraOutput = useSelector((s: RootState) => s.analysis.netraOutput);
   const [persistenceRevision, setPersistenceRevision] = useState(0);
   const persistenceClearAfterRef = useRef<null | 'pre_session' | 'htf' | 'market_pulse'>(null);
+  const persistencePreserveH1ProposalRef = useRef(false);
 
   useEffect(() => {
     if (activeSessionId && persistenceRevision > 0) {
       const clearAfter = persistenceClearAfterRef.current;
+      const preserveH1Proposal = persistencePreserveH1ProposalRef.current;
       persistenceClearAfterRef.current = null;
-      void session_.saveSession({ silent: true, ...(clearAfter ? { clearAfter } : {}) });
+      persistencePreserveH1ProposalRef.current = false;
+      void session_.saveSession({
+        silent: true,
+        ...(clearAfter ? { clearAfter } : {}),
+        ...(preserveH1Proposal ? { preserveH1Proposal: true } : {}),
+      });
     }
   // The revision changes only after Confirm/Edit dispatches. The effect runs
   // after Redux has re-rendered, so saveSession's snapshot ref is current.
@@ -672,70 +680,80 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     }
   }, [dispatch, stepTimestamps, selections, notes, activeSessionId]);
 
-  const editHypothesisH1 = useCallback(() => {
-    editStep(2);
-    dispatch(setH1HypothesisAction(null));
-    dispatch(setH1ProposalAction(null));
-    dispatch(setHighestStepAction(1));
-    dispatch(setStepTimestampsAction(Object.fromEntries(
-      Object.entries(stepTimestamps).filter(([key]) => ![
-        'hypothesisH1', 'preSessionContext', 'htfStructure', 'marketPulse',
-        'liquidityContext', 'evaluation', 'command', 'matrix', 'armory', 'control',
-      ].includes(key)),
-    )));
+  const editHypothesisH1 = useCallback((onConfirmed?: () => void) => {
+    dispatch(setConfirmModalAction({
+      title: 'Reopen Macro Mapping?',
+      desc: 'This intentionally invalidates H1 and every downstream Market Pulse, command, weapon, and execution decision. The previous Mongo session will not be overwritten unless you confirm.',
+      confirmText: 'Reopen and clear',
+      loadingText: 'Reopening workflow…',
+      onConfirm: () => {
+        editStep(2);
+        dispatch(setH1HypothesisAction(null));
+        dispatch(setH1ProposalAction(null));
+        dispatch(setHighestStepAction(1));
+        dispatch(setStepTimestampsAction(Object.fromEntries(
+          Object.entries(stepTimestamps).filter(([key]) => ![
+            'hypothesisH1', 'preSessionContext', 'htfStructure', 'marketPulse',
+            'liquidityContext', 'evaluation', 'command', 'matrix', 'armory', 'control',
+          ].includes(key)),
+        )));
+        onConfirmed?.();
+      },
+    }));
   }, [dispatch, editStep, stepTimestamps]);
 
-  const editFinalH1Hypothesis = useCallback(() => {
-    // Reopening the analyst-owned H1 keeps the Macro Mapping evidence and
-    // Maya proposal, but invalidates every lower-timeframe decision.
-    persistenceClearAfterRef.current = 'htf';
-    dispatch(setHighestStepAction(3));
-    dispatch(setH1HypothesisAction(
-      hypothesis_.h1Hypothesis
-        ? { ...hypothesis_.h1Hypothesis, status: 'PROPOSED' }
-        : null,
-    ));
-    dispatch(setSelectionsAction({
-      ...selections,
-      marketPulse: {},
-      liquidityContext: {},
+  const editFinalH1Hypothesis = useCallback((onConfirmed?: () => void) => {
+    dispatch(setConfirmModalAction({
+      title: 'Edit Confirmed H1?',
+      desc: 'Changing confirmed H1 invalidates Market Pulse, H2, command, weapon, and execution data. The Maya H1 proposal will be preserved for editing.',
+      confirmText: 'Edit and invalidate',
+      loadingText: 'Invalidating downstream state…',
+      onConfirm: () => {
+        // Reopening the analyst-owned H1 keeps the Macro Mapping evidence and
+        // Maya proposal, but invalidates every lower-timeframe decision.
+        persistenceClearAfterRef.current = 'htf';
+        persistencePreserveH1ProposalRef.current = true;
+        dispatch(setHighestStepAction(3));
+        dispatch(setH1HypothesisAction(
+          hypothesis_.h1Hypothesis
+            ? { ...hypothesis_.h1Hypothesis, status: 'PROPOSED' }
+            : null,
+        ));
+        dispatch(setSelectionsAction({ ...selections, marketPulse: {}, liquidityContext: {} }));
+        dispatch(setNotesAction({ ...notes, marketPulse: '', liquidityContext: '', command: '' }));
+        dispatch(setFinalCommandAction(null));
+        dispatch(setNetraOutputAction(null));
+        dispatch(setSelectedNetraStateAction(null));
+        dispatch(setSysRecommendationAction(null));
+        dispatch(setSelectedWeaponIdAction(null));
+        dispatch(setCommandLockedAction(false));
+        dispatch(setWeaponLockedAction(false));
+        dispatch(setWeaponPredictionAction(null));
+        dispatch(setRecognitionCheckpointsAction([]));
+        dispatch(setWaitSelectionsAction({
+          waitingFor: '', referenceLocation: '', requiredResolution: '', developmentStage: '',
+          institutionalSignature: '', validityHorizon: '', waitNote: '', resolutionStatus: 'OPEN',
+          resolutionEvent: '', resolutionNote: '', openedAt: '', resolvedAt: '',
+        }));
+        dispatch(setInterSelectionsAction({ pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }));
+        dispatch(setStrikeSelectionsAction({
+          impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '',
+          zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '',
+          postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '',
+        }));
+        dispatch(setSaturationSelectionsAction({}));
+        dispatch(setWeaponStageLogAction([]));
+        if (activeSessionId) localStorage.removeItem(tradeCardsStorageKey(activeSessionId));
+        dispatch(setStepTimestampsAction(Object.fromEntries(
+          Object.entries(stepTimestamps).filter(([key]) => ![
+            'marketPulse', 'liquidityContext', 'evaluation', 'command', 'matrix', 'armory', 'control',
+          ].includes(key)),
+        )));
+        setPersistenceRevision(revision => revision + 1);
+        onConfirmed?.();
+        showToast('Macro Mapping Hypothesis reopened — downstream data cleared');
+      },
     }));
-    dispatch(setNotesAction({
-      ...notes,
-      marketPulse: '',
-      liquidityContext: '',
-      command: '',
-    }));
-    dispatch(setFinalCommandAction(null));
-    dispatch(setNetraOutputAction(null));
-    dispatch(setSelectedNetraStateAction(null));
-    dispatch(setSysRecommendationAction(null));
-    dispatch(setSelectedWeaponIdAction(null));
-    dispatch(setCommandLockedAction(false));
-    dispatch(setWeaponLockedAction(false));
-    dispatch(setWeaponPredictionAction(null));
-    dispatch(setRecognitionCheckpointsAction([]));
-    dispatch(setWaitSelectionsAction({
-      waitingFor: '', referenceLocation: '', requiredResolution: '', developmentStage: '',
-      institutionalSignature: '', validityHorizon: '', waitNote: '', resolutionStatus: 'OPEN',
-      resolutionEvent: '', resolutionNote: '', openedAt: '', resolvedAt: '',
-    }));
-    dispatch(setInterSelectionsAction({ pattern: '', friction: '', sweep: '', response: '', reversion: '', flip: '' }));
-    dispatch(setStrikeSelectionsAction({
-      impulseQuality: '', continuationZone: '', pullbackDepth: '', pullbackQuality: '',
-      zoneReaction: '', continuationTrigger: '', compressionQuality: '', breakoutEnergy: '',
-      postBreakoutBehaviour: '', boundaryBreakQuality: '', acceptanceQuality: '', entryPattern: '',
-    }));
-    dispatch(setSaturationSelectionsAction({}));
-    dispatch(setWeaponStageLogAction([]));
-    if (activeSessionId) localStorage.removeItem(tradeCardsStorageKey(activeSessionId));
-    dispatch(setStepTimestampsAction(Object.fromEntries(
-      Object.entries(stepTimestamps).filter(([key]) => ![
-        'marketPulse', 'liquidityContext', 'evaluation', 'command', 'matrix', 'armory', 'control',
-      ].includes(key)),
-    )));
-    setPersistenceRevision(revision => revision + 1);
-    showToast('Macro Mapping Hypothesis reopened — downstream data cleared');
   }, [activeSessionId, dispatch, hypothesis_.h1Hypothesis, notes, selections, showToast, stepTimestamps]);
 
   const doResetStep = useCallback((stepLevel: number) => {
@@ -872,6 +890,7 @@ export function NetraProvider({ children }: { children: React.ReactNode }) {
     handleAuth: session_.handleAuth,
     initializeMission: session_.initializeMission,
     isInitializingMission: session_.isInitializingMission,
+    isLoadingSession: session_.isLoadingSession,
     resumeSession: session_.resumeSession,
     forkSession: session_.forkSession,
     forkCurrentSession: session_.forkCurrentSession,

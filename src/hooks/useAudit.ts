@@ -6,6 +6,7 @@ import { RootState, AppDispatch } from '../store';
 import { setAuditData, setIsAuditing } from '../store/slices/logsSlice';
 import { API_BASE } from '../utils/constants';
 import { useNetraUtils } from './useNetraUtils';
+import { waitForNextPaint } from '../utils/waitForNextPaint';
 
 export function useAudit() {
   const dispatch = useDispatch<AppDispatch>();
@@ -22,7 +23,7 @@ export function useAudit() {
     return () => { auditAbortControllerRef.current?.abort(); };
   }, []);
 
-  const triggerPostTradeAudit = useCallback(() => {
+  const triggerPostTradeAudit = useCallback(async () => {
     if (isAuditing) return;
     if (!activeSessionId) {
       showToast('No active terminal session', 'error');
@@ -34,6 +35,7 @@ export function useAudit() {
     }
     dispatch(setIsAuditing(true));
     dispatch(setAuditData(null));
+    await waitForNextPaint();
 
     if (auditAbortControllerRef.current) auditAbortControllerRef.current.abort();
     auditAbortControllerRef.current = new AbortController();

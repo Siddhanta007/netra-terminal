@@ -10,7 +10,8 @@ import { tradeCardsStorageKey } from '@/features/terminal/phases/phase-10-missio
 import { API_BASE } from '@/utils/constants';
 import { useNetraUtils } from '@/hooks/useNetraUtils';
 import { TerminalEmptyState, TerminalStatusBadge } from '@/components/UI/TerminalPrimitives';
-import { LuxuryShapeSpinner } from '@/components/UI/LuxuryShapeSpinner';
+import { ActionSpinner } from '@/components/UI/LoadingSpinners';
+import { waitForNextPaint } from '@/utils/waitForNextPaint';
 
 interface StateOption { id: string; name: string; mode: string; command?: string }
 
@@ -147,9 +148,10 @@ export default function PhaseNetraState({ embedded = false }: { embedded?: boole
   }, []);
 
   // ── override: fetch the chosen state's projection, replace the recognised state ──
-  const selectState = (id: string) => {
+  const selectState = async (id: string) => {
     if (!id || hasOpenWait || candidateCheckpoint?.commandSelected) return;
     setSwitching(true);
+    await waitForNextPaint();
     fetch(`${API_BASE}/api/states/${id}`)
       .then(r => r.ok ? r.json() : null)
       .then(proj => {
@@ -213,7 +215,9 @@ export default function PhaseNetraState({ embedded = false }: { embedded?: boole
         <div className="market-hypothesis-section-heading">
           <span>{h2Config?.catalogLabel}</span>
           <div />
-          <small>{String(catalog.length).padStart(2, '0')} OPTIONS</small>
+          {switching
+            ? <ActionSpinner compact label="Loading state" />
+            : <small>{String(catalog.length).padStart(2, '0')} OPTIONS</small>}
         </div>
         <div className="market-hypothesis-options">
         {catalog.map(state => {
@@ -246,7 +250,7 @@ export default function PhaseNetraState({ embedded = false }: { embedded?: boole
         })}
         {catalog.length === 0 && (
           catalogLoading
-            ? <div className="netra-ai-spinner-shell" style={{ minHeight: 110 }}><LuxuryShapeSpinner compact micro className="netra-lux-inline" label="States" /></div>
+            ? <div className="netra-ai-spinner-shell" style={{ minHeight: 110 }}><ActionSpinner compact label="Loading states" /></div>
             : <TerminalEmptyState title="No states available" />
         )}
         </div>

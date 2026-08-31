@@ -34,6 +34,7 @@ import AboutPage from './pages/AboutPage';
 import PortfolioPage from './pages/PortfolioPage';
 import { buildForkName } from './utils/forkNaming';
 import { TerminalActivityDock } from './components/UI/TerminalActivityDock';
+import { PageLoadingSpinner } from './components/UI/LoadingSpinners';
 import { TerminalPhaseCard } from './components/UI/TerminalPrimitives';
 import ForkButton from './components/UI/ForkButton';
 import Footer from './components/Layout/Footer';
@@ -42,6 +43,7 @@ import { MODEL_DATA } from './utils/modelData';
 import { TimeInput, NumInput, PageCorners } from './app/widgets';
 import { TERMINAL_STATS_EVENT, computeTerminalSessionStats, tradeCardsStorageKey } from './features/terminal/phases/phase-10-mission-control/missionControl/helpers';
 import { loadState, saveState } from './utils/storage';
+import { waitForNextPaint } from './utils/waitForNextPaint';
 
 const FULL_ACCESS_PAGES = ["home", "pinaka", "trishul", "about", "portfolio"];
 const MAYA_CHAT_PANE_DEFAULT_WIDTH = 440;
@@ -111,11 +113,10 @@ function normalizeAssetTickerInput(value: string) {
 
 function NetraBootLoader() {
   return (
-    <div className="netra-terminal-boot-screen" aria-busy="true">
-      <div className="netra-terminal-boot-mark">NETRA</div>
-      <TerminalActivityDock loading message="Loading terminal" />
+    <>
+      <PageLoadingSpinner label="Loading Terminal" />
       <GlobalOverlay />
-    </div>
+    </>
   );
 }
 
@@ -138,6 +139,7 @@ export default function NetraTerminal() {
     resumeSession, forkSession, forkCurrentSession, loadSessionById, resetTerminalState,
     initializeMission,
     isInitializingMission,
+    isLoadingSession,
     saveSession,
     confirmStep, editStep, doResetStep,
     fetchAnalytics,
@@ -163,6 +165,7 @@ export default function NetraTerminal() {
   }>({ isOpen: false, defaultName: '' });
   const [forkInputName, setForkInputName] = useState('');
   const [isForkingSession, setIsForkingSession] = useState(false);
+  const [isSavingSession, setIsSavingSession] = useState(false);
   const forkConfirmButtonRef = useRef<HTMLButtonElement>(null);
   const [liveCorrelation, setLiveCorrelation] = useState('');
   const [liveDisplacement, setLiveDisplacement] = useState('');
@@ -173,14 +176,21 @@ export default function NetraTerminal() {
   const [isTreeOpen, setIsTreeOpen] = useState(false);
 
   const saveAllData = useCallback(async (): Promise<boolean> => {
+    if (isSavingSession) return false;
+    setIsSavingSession(true);
     // Mounted trade cards contribute their MongoDB upsert tasks synchronously.
     // saveSession also stores their complete phase-9 snapshot on the session.
-    const request: SaveTradeCardsRequest = { tasks: [] };
-    window.dispatchEvent(new CustomEvent(SAVE_TRADE_CARDS_EVENT, { detail: request }));
-    const tradeResults = await Promise.all(request.tasks);
-    const sessionSaved = await saveSession({ silent: true });
-    return sessionSaved && tradeResults.every(Boolean);
-  }, [saveSession]);
+    try {
+      await waitForNextPaint();
+      const request: SaveTradeCardsRequest = { tasks: [] };
+      window.dispatchEvent(new CustomEvent(SAVE_TRADE_CARDS_EVENT, { detail: request }));
+      const tradeResults = await Promise.all(request.tasks);
+      const sessionSaved = await saveSession({ silent: true });
+      return sessionSaved && tradeResults.every(Boolean);
+    } finally {
+      setIsSavingSession(false);
+    }
+  }, [isSavingSession, saveSession]);
 
   // Inline rename for asset/trade name in subheader
   const [renamingField, setRenamingField]   = useState<'asset' | 'trade' | null>(null);
@@ -209,6 +219,7 @@ export default function NetraTerminal() {
     setForkModalState({ ...forkModalState, isOpen: false });
     setIsForkingSession(true);
     try {
+      await waitForNextPaint();
       if (request.log) {
         const forked = await forkSession(request.log, name);
         if (!forked) setForkModalState({ ...request, isOpen: true });
@@ -907,7 +918,7 @@ export default function NetraTerminal() {
                           });
                         },
                         'emerald',
-                        isAiLoading
+                        isAiLoading || isSavingSession
                       )}
                       {subBtn('Cut',
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
@@ -926,6 +937,7 @@ export default function NetraTerminal() {
                           });
                         },
                         'coral',
+                        isSavingSession,
                       )}
                     </div>
                   )}
@@ -1454,8 +1466,6 @@ export default function NetraTerminal() {
                         <button onClick={() => ctxSetPrepStep(1)} style={{ flex: 1, height: '42px', border: '1px solid rgba(15,23,42,0.15)', background: '#ffffff', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#475569', cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
                         <button
                           onClick={initializeMission}
-                          data-loading-scope="global"
-                          data-loading-label="Initializing Terminal"
                           disabled={isInitializingMission}
                           aria-busy={isInitializingMission}
                           style={{ flex: 2, height: '42px', border: 'none', background: '#4169E1', fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#ffffff', cursor: isInitializingMission ? 'wait' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '9px', opacity: isInitializingMission ? 0.8 : 1 }}
@@ -1750,6 +1760,17 @@ export default function NetraTerminal() {
 
       {isForkingSession && (
         <TerminalActivityDock loading message="Forking branch" />
+      )}
+
+      {isSavingSession && (
+        <TerminalActivityDock loading message="Saving session" />
+      )}
+
+      {(isInitializingMission || isLoadingSession) && (
+        <PageLoadingSpinner
+          overlay
+          label={isInitializingMission ? 'Initializing Terminal' : 'Loading Session'}
+        />
       )}
 
       {forkModalState.isOpen && !isForkingSession && (

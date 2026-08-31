@@ -10,6 +10,7 @@ import {
 import { ChatMessage } from '../types';
 import { API_BASE } from '../utils/constants';
 import { useNetraUtils } from './useNetraUtils';
+import { waitForNextPaint } from '../utils/waitForNextPaint';
 
 export interface ChatThreadSummary {
   chat_id: string;
@@ -191,6 +192,7 @@ export function useChatPanel() {
     if (!chatId || isAiLoading) return;
     dispatch(setIsAiLoading(true));
     try {
+      await waitForNextPaint();
       const { provider: providerVal, model_id: modelIdVal } = getActiveModel();
       const res = await fetch(`${API_BASE}/api/chat/${encodeURIComponent(chatId)}/summarize`, {
         method: 'POST',
@@ -222,6 +224,7 @@ export function useChatPanel() {
     dispatch(appendChatMessage(userMsg));
     dispatch(setChatInput(''));
     dispatch(setIsAiLoading(true));
+    await waitForNextPaint();
 
     let image_base64: string | null = null;
     let image_type: string | null = null;

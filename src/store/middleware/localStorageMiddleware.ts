@@ -10,26 +10,11 @@ interface RegistrySlice {
 }
 type StateWithRegistry = { sessionRegistry: RegistrySlice };
 type StateWithChat = { chat: { sources: string[] } };
-type StateWithAnalysis = { analysis: { stateTimeline: unknown; recognitionCheckpoints: unknown } };
 
-// Maps action type → localStorage key. Only listed keys are persisted.
+// Maps global/user-preference actions → localStorage keys. Terminal analysis
+// belongs to the active Mongo session and must not leak through browser-global
+// keys when the user switches sessions.
 const PERSIST_MAP: Record<string, string> = {
-  'analysis/setHighestStep': 'highestStep',
-  'analysis/setSelections': 'selections',
-  'analysis/setNotes': 'notes',
-  'analysis/setFinalCommand': 'finalCommand',
-  'analysis/setNetraOutput': 'netraOutput',            // recognition — expensive AI output, persist across reloads
-  'analysis/setSelectedNetraState': 'selectedNetraState',
-  'analysis/setWeaponPrediction': 'weaponPrediction',  // weapon co-pilot — expensive AI output, persist across reloads
-  'analysis/setSysRecommendation': 'sysRecommendation',
-  'analysis/setCommandLocked': 'commandLocked',
-  'analysis/setWeaponLocked': 'weaponLocked',
-  'analysis/setInterSelections': 'interSelections',
-  'analysis/setStrikeSelections': 'strikeSelections',
-  'analysis/setSaturationSelections': 'saturationSelections',
-  'analysis/setSelectedWeaponId': 'selectedWeaponId',
-  'analysis/setImageDescription': 'imageDescription',
-  'analysis/setStepTimestamps': 'stepTimestamps',
   'model/setSelectedModel': 'selectedModel',
   'model/setVisionModel': 'visionModel',
   'model/setModelConfig': 'modelConfig',
@@ -65,11 +50,6 @@ export const localStorageMiddleware: Middleware = (storeAPI) => (next) => (actio
   if (actionType === 'chat/toggleSource') {
     const state = storeAPI.getState() as StateWithChat;
     saveState('chatSources', state.chat.sources);
-    return result;
-  }
-  if (actionType === 'analysis/appendStateRecognition' || actionType === 'analysis/setStateTimeline') {
-    const state = storeAPI.getState() as StateWithAnalysis;
-    saveState('stateTimeline', state.analysis.stateTimeline);
     return result;
   }
   const key = PERSIST_MAP[actionType];

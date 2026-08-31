@@ -139,13 +139,16 @@ function FinalHypothesisBox({ embedded = false }: { embedded?: boolean }) {
         busy={isConfirmingH1}
         onChange={setDraftClaim}
         onEdit={() => {
-          if (h1Hypothesis?.status === 'CONFIRMED') editFinalH1Hypothesis();
-          setEditing(true);
+          if (h1Hypothesis?.status === 'CONFIRMED') editFinalH1Hypothesis(() => setEditing(true));
+          else setEditing(true);
         }}
         onReset={() => {
-          if (h1Hypothesis?.status === 'CONFIRMED') editFinalH1Hypothesis();
-          setDraftClaim(getEditableHypothesisText(h1Proposal));
-          setEditing(true);
+          const resetEditor = () => {
+            setDraftClaim(getEditableHypothesisText(h1Proposal));
+            setEditing(true);
+          };
+          if (h1Hypothesis?.status === 'CONFIRMED') editFinalH1Hypothesis(resetEditor);
+          else resetEditor();
         }}
         onConfirm={() => void confirm()}
         editDisabled={false}

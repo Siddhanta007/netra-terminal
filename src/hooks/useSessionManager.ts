@@ -28,6 +28,30 @@ import { tradeCardsStorageKey } from '../features/terminal/phases/phase-10-missi
 import { buildForkName } from '../utils/forkNaming';
 import { aiSuggestionText, compactLatestWaitCheckpoint } from '../utils/aiContext';
 
+type SessionClearBoundary = 'pre_session' | 'htf' | 'market_pulse' | 'decision_path' | 'pinaka_state' | 'command';
+
+interface SaveSessionOptions {
+  silent?: boolean;
+  recognitionCheckpoints?: RecognitionCheckpoint[];
+  highestStep?: number;
+  stepTimestamps?: Record<string, string>;
+  clearDownstream?: boolean;
+  clearAfter?: SessionClearBoundary;
+  preserveH1Proposal?: boolean;
+  reopenH2?: boolean;
+  selectedNetraState?: Record<string, unknown> | null;
+  liveMarketContext?: Record<string, unknown>;
+}
+
+function rememberServerRevision(
+  log: TradeLog,
+  sessionRef: { current: string | null },
+  revisionRef: { current: number },
+) {
+  sessionRef.current = String(log.id);
+  revisionRef.current = Number(log.state_revision ?? 0);
+}
+
 function firstTradeCard(log: TradeLog): Record<string, any> | null {
   if (log.phase_9?.trade_1) {
     const block = log.phase_9.trade_1 as Record<string, any>;
@@ -154,6 +178,7 @@ export function useSessionManager() {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const [isInitializingMission, setIsInitializingMission] = useState(false);
+  const [isLoadingSession, setIsLoadingSession] = useState(false);
   const initializationInFlightRef = useRef(false);
   const { getAuthHeaders, showToast } = useNetraUtils();
 
@@ -194,6 +219,8 @@ export function useSessionManager() {
     h1Proposal: null as H1Hypothesis | null,
   });
   const saveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
+  const revisionSessionIdRef = useRef<string | null>(null);
+  const stateRevisionRef = useRef(0);
 
   // Keep ref in sync with selectors on every render
   const highestStep = useSelector((s: RootState) => s.analysis.highestStep);
@@ -277,10 +304,12 @@ export function useSessionManager() {
   }), []);
 
   const loadSessionById = useCallback(async (id: string) => {
+    setIsLoadingSession(true);
     try {
       const res = await fetch(`${API_BASE}/api/logs/${encodeURIComponent(id)}`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Not found');
       const log: TradeLog = await res.json();
+      rememberServerRevision(log, revisionSessionIdRef, stateRevisionRef);
 
       const r = resolveLogState(log);
       dispatch(setHighestStep(r.highestStep));
@@ -298,6 +327,7 @@ export function useSessionManager() {
       dispatch(setSysRecommendation(r.sysRec));
       dispatch(setWeaponPrediction(r.wpPred as Parameters<typeof setWeaponPrediction>[0] | null));
       dispatch(setSelectedWeaponId(r.weaponId));
+      dispatch(setWeaponLocked(Boolean(r.weaponId)));
       dispatch(setStepTimestamps(r.stepTimestamps));
       dispatch(setTradeName(log.name || ''));
       if (r.imgDesc) dispatch(setImageDescription(r.imgDesc));
@@ -319,6 +349,8 @@ export function useSessionManager() {
       navigate('/mission/pinaka');
     } catch {
       showToast('Failed to load session', 'error');
+    } finally {
+      setIsLoadingSession(false);
     }
   }, [dispatch, getAuthHeaders, session, navigate, showToast]);
 
@@ -406,6 +438,7 @@ export function useSessionManager() {
     })
       .then((res) => { if (!res.ok) throw new Error('Schema Validation Failed'); return res.json(); })
       .then((data: TradeLog) => {
+        rememberServerRevision(data, revisionSessionIdRef, stateRevisionRef);
         dispatch(setActiveSessionId(data.id));
         dispatch(setTradeName(data.name));
         dispatch(setSession({ ...session!, assetName: sessionInput.assetName, tradeName: sessionInput.tradeName }));
@@ -427,6 +460,7 @@ export function useSessionManager() {
   }, [dispatch, getAuthHeaders, sessionInput, session, currentModel, resetTerminalState, navigate, showToast, buildSessionMeta]);
 
   const resumeSession = useCallback((log: TradeLog) => {
+    rememberServerRevision(log, revisionSessionIdRef, stateRevisionRef);
     const r = resolveLogState(log);
     dispatch(setHighestStep(r.highestStep));
     dispatch(setSelections({ preSessionContext: r.preSessionContext, htfStructure: r.htfStructure, marketPulse: r.marketPulse, liquidityContext: r.liquidityCtx }));
@@ -443,6 +477,7 @@ export function useSessionManager() {
     dispatch(setSysRecommendation(r.sysRec));
     dispatch(setWeaponPrediction(r.wpPred as Parameters<typeof setWeaponPrediction>[0] | null));
     dispatch(setSelectedWeaponId(r.weaponId));
+    dispatch(setWeaponLocked(Boolean(r.weaponId)));
     dispatch(setStepTimestamps(r.stepTimestamps));
     dispatch(setTradeName(log.name || ''));
     if (r.imgDesc) dispatch(setImageDescription(r.imgDesc));
@@ -489,6 +524,7 @@ export function useSessionManager() {
     })
       .then((res) => { if (!res.ok) throw new Error('Failed to fork session'); return res.json(); })
       .then((data: TradeLog) => {
+        rememberServerRevision(data, revisionSessionIdRef, stateRevisionRef);
         dispatch(setHighestStep(r.highestStep));
         dispatch(setSelections({ preSessionContext: r.preSessionContext, htfStructure: r.htfStructure, marketPulse: r.marketPulse, liquidityContext: r.liquidityCtx }));
         dispatch(setNotes({ preSessionContext: r.note2, htfStructure: r.note3, marketPulse: r.note4mp, liquidityContext: r.note4lq, command: r.noteCommand }));
@@ -504,6 +540,7 @@ export function useSessionManager() {
         dispatch(setSysRecommendation(r.sysRec));
         dispatch(setWeaponPrediction(r.wpPred as Parameters<typeof setWeaponPrediction>[0] | null));
         dispatch(setSelectedWeaponId(r.weaponId));
+        dispatch(setWeaponLocked(Boolean(r.weaponId)));
         dispatch(setStepTimestamps(r.stepTimestamps));
         if (r.imgDesc) dispatch(setImageDescription(r.imgDesc));
         if (r.audit)   dispatch(setAuditData(r.audit as Parameters<typeof setAuditData>[0]));
@@ -588,6 +625,7 @@ export function useSessionManager() {
     })
       .then((res) => { if (!res.ok) throw new Error('Failed to fork session'); return res.json(); })
       .then((data: TradeLog) => {
+        rememberServerRevision(data, revisionSessionIdRef, stateRevisionRef);
         dispatch(setHighestStep(phaseNum));
         dispatch(setSelections(snap.selections));
         dispatch(setNotes(snap.notes));
@@ -604,6 +642,7 @@ export function useSessionManager() {
         dispatch(setSysRecommendation(snap.sysRecommendation));
         dispatch(setWeaponPrediction(snap.weaponPrediction));
         dispatch(setSelectedWeaponId(snap.selectedWeaponId));
+        dispatch(setWeaponLocked(Boolean(snap.selectedWeaponId)));
         if (snap.imageDescription) dispatch(setImageDescription(snap.imageDescription));
         if (snap.auditData) dispatch(setAuditData(snap.auditData));
         dispatch(setStepTimestamps(snap.stepTimestamps));
@@ -778,7 +817,7 @@ export function useSessionManager() {
       });
   }, [dispatch, session, currentModel, navigate, showToast, getAuthHeaders, buildSessionMeta, activeEditLog]);
 
-  const saveSession = useCallback(async (options: { silent?: boolean; recognitionCheckpoints?: RecognitionCheckpoint[]; highestStep?: number; stepTimestamps?: Record<string, string>; clearDownstream?: boolean; clearAfter?: 'pre_session' | 'htf' | 'market_pulse' | 'decision_path' | 'pinaka_state' | 'command'; reopenH2?: boolean; selectedNetraState?: Record<string, unknown> | null; liveMarketContext?: Record<string, unknown> } = {}): Promise<boolean> => {
+  const saveSession = useCallback(async (options: SaveSessionOptions = {}): Promise<boolean> => {
     const snap = analysisRef.current;
     const sessionId = String(snap.activeSessionId || '').trim();
     if (!sessionId) {
@@ -879,6 +918,7 @@ export function useSessionManager() {
 
     const clearAfter = options.clearAfter ?? (options.clearDownstream ? 'decision_path' : null);
     const clearDownstream = !!clearAfter;
+    const clearPreSession = clearAfter === 'pre_session';
     const clearHtf = clearAfter === 'pre_session';
     const clearHypothesis = clearAfter === 'pre_session' || clearAfter === 'htf';
     const clearMarketPulse = clearHtf || clearAfter === 'htf';
@@ -1019,8 +1059,17 @@ export function useSessionManager() {
     }
     if (clearWeapon) marketSnapshot.trade_execution = null;
 
-    const payload = {
+    const phase2HasData = Object.keys(snap.selections.preSessionContext || {}).length > 0 || !!snap.notes.preSessionContext;
+    const phase3HasData = Object.keys(snap.selections.htfStructure || {}).length > 0 || !!snap.notes.htfStructure;
+    const phase4HasData = Object.keys(snap.selections.marketPulse || {}).length > 0
+      || Object.keys(snap.selections.liquidityContext || {}).length > 0
+      || !!snap.notes.marketPulse
+      || !!snap.notes.liquidityContext;
+
+    const payload: Record<string, unknown> = {
       metadata: buildTradeMetadata(session?.userName || 'Unknown', currentModel || 'pinaka', session?.allowedTeams?.[0] || 'default'),
+      mutationIntent: clearDownstream ? 'INVALIDATE' : 'SAVE',
+      ...(clearAfter ? { clearAfter } : {}),
       highestStep:    options.highestStep ?? snap.highestStep,
       tradeName:      snap.tradeName,
       assetName:      snap.assetName,
@@ -1028,7 +1077,7 @@ export function useSessionManager() {
       state_timeline: snap.stateTimeline,
       marketSnapshot,
       ...(clearHypothesis
-        ? { hypothesisH1: null, hypothesisH1Proposal: null }
+        ? { hypothesisH1: null, ...(!options.preserveH1Proposal ? { hypothesisH1Proposal: null } : {}) }
         : snap.h1Hypothesis
           ? { hypothesisH1: snap.h1Hypothesis, ...(snap.h1Proposal ? { hypothesisH1Proposal: snap.h1Proposal } : {}) }
           : snap.h1Proposal
@@ -1042,27 +1091,33 @@ export function useSessionManager() {
 
       phase1: snap.imageDescription
         ? { image_description: snap.imageDescription }
-        : null,
+        : undefined,
 
-      phase2: snap.selections.preSessionContext
+      phase2: clearPreSession
+        ? null
+        : phase2HasData
         ? { selections: snap.selections.preSessionContext, note: snap.notes.preSessionContext }
-        : null,
+        : undefined,
 
-      phase3: !clearHtf && snap.selections.htfStructure
+      phase3: clearHtf
+        ? null
+        : phase3HasData
         ? { selections: snap.selections.htfStructure, note: snap.notes.htfStructure }
-        : null,
+        : undefined,
 
-      phase4: !clearMarketPulse && (snap.selections.marketPulse || snap.selections.liquidityContext)
+      phase4: clearMarketPulse
+        ? null
+        : phase4HasData || clearAfter === 'market_pulse'
         ? {
             marketPulse:          snap.selections.marketPulse,
             liquidityContext:      snap.selections.liquidityContext,
             marketPulse_note:     snap.notes.marketPulse,
             liquidityContext_note: snap.notes.liquidityContext,
           }
-        : null,
+        : undefined,
       ...(options.liveMarketContext ? { phaseLiveContext: options.liveMarketContext } : {}),
 
-      phase5: clearDecisionPath ? null : snap.netraOutput ?? null,
+      phase5: clearDecisionPath ? null : snap.netraOutput ?? undefined,
 
       phase6: !clearDecisionPath && ((!clearCommand && snap.finalCommand) || persistedCheckpoints.length)
         ? {
@@ -1073,9 +1128,9 @@ export function useSessionManager() {
             recommendation: clearCommand ? null : snap.sysRecommendation ?? null,
             recognition_checkpoints: persistedCheckpoints,
           }
-        : null,
+        : clearDecisionPath ? null : undefined,
 
-      phase7: clearWeapon ? null : snap.weaponPrediction ?? null,
+      phase7: clearWeapon ? null : snap.weaponPrediction ?? undefined,
 
       phase8: !clearWeapon && snap.selectedWeaponId
         ? {
@@ -1086,25 +1141,31 @@ export function useSessionManager() {
                 ? snap.saturationSelections
                 : snap.interSelections,
           }
-        : null,
+        : clearWeapon ? null : undefined,
 
-      phase9: clearWeapon ? null : phase9,
-      phase_9: clearWeapon ? null : phase_9,
+      phase9: clearWeapon ? null : phase9 ?? undefined,
+      phase_9: clearWeapon ? null : phase_9 ?? undefined,
 
       // phase10 is written separately by useAudit after audit completes
     };
 
     const persist = async (): Promise<boolean> => {
       try {
+        const expectedRevision = revisionSessionIdRef.current === sessionId
+          ? stateRevisionRef.current
+          : 0;
         const res = await fetch(`${API_BASE}/api/logs/${encodeURIComponent(sessionId)}/state`, {
           method: 'PUT',
           headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-          body: JSON.stringify(payload),
+          body: JSON.stringify({ ...payload, expectedRevision }),
         });
         if (!res.ok) {
           const error = await res.json().catch(() => ({}));
           throw new Error(error?.detail || `HTTP ${res.status}`);
         }
+        const updated = await res.json() as TradeLog;
+        rememberServerRevision(updated, revisionSessionIdRef, stateRevisionRef);
+        dispatch(setActiveEditLog(updated));
         if (!options.silent) showToast('Session Saved');
         return true;
       } catch (error) {
@@ -1121,7 +1182,7 @@ export function useSessionManager() {
     return queuedSave;
   // analysisRef is a ref — intentionally omitted from deps
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getAuthHeaders, showToast, session, currentModel, sysData]);
+  }, [dispatch, getAuthHeaders, showToast, session, currentModel, sysData]);
 
   const logout = useCallback(() => {
     dispatch(setSession(null));
@@ -1134,7 +1195,7 @@ export function useSessionManager() {
   const activeSessionIdVal = useSelector((s: RootState) => s.session.activeSessionId);
 
   return {
-    session, sessionInput, isLoggingIn, isInitializingMission, activeSessionId: activeSessionIdVal,
+    session, sessionInput, isLoggingIn, isInitializingMission, isLoadingSession, activeSessionId: activeSessionIdVal,
     handleAuth, initializeMission, resumeSession, forkSession, forkCurrentSession, saveSession, resetTerminalState, logout, loadSessionById,
     setSession: (v: RootState['session']['session']) => dispatch(setSession(v)),
     setSessionInput: (v: RootState['session']['sessionInput']) => dispatch(setSessionInput(v)),

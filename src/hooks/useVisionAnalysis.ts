@@ -7,6 +7,7 @@ import { setIsUploadingImage, setImageDescription } from '../store/slices/analys
 import { appendChatMessage } from '../store/slices/chatSlice';
 import { API_BASE } from '../utils/constants';
 import { useNetraUtils } from './useNetraUtils';
+import { waitForNextPaint } from '../utils/waitForNextPaint';
 
 export function useVisionAnalysis(uploadedVisionFiles: File[], setUploadedVisionFiles: (f: File[]) => void) {
   const dispatch = useDispatch<AppDispatch>();
@@ -32,6 +33,7 @@ export function useVisionAnalysis(uploadedVisionFiles: File[], setUploadedVision
     formData.append('model_config', JSON.stringify({ ...modelConfig, model_id: modelIdVal }));
 
     try {
+      await waitForNextPaint();
       showToast('Analyzing Tactical Visuals...', 'success');
       const response = await fetch(`${API_BASE}/api/ai/describe-image`, {
         method: 'POST',

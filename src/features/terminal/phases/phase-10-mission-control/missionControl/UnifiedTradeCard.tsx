@@ -7,8 +7,9 @@ import { mkCard, computeCardStats, autoTimeSeconds, localDateStr, MONO, StatCell
 import { RecognizedState, TransitionBranch } from '@/components/Templates/StateGraph';
 import { API_BASE } from '@/utils/constants';
 import NetraAILabs from '@/components/Templates/NetraAILabs';
-import { LuxuryShapeSpinner } from '@/components/UI/LuxuryShapeSpinner';
+import { ActionSpinner } from '@/components/UI/LoadingSpinners';
 import { buildPhase9TradeBlock, buildTradeMetadata } from '@/types/tradeStorageSchema';
+import { waitForNextPaint } from '@/utils/waitForNextPaint';
 
 // ─── Weapon Name Mapping (Child States to Weapon / Identity) ──────────────────
 const WEAPON_NAME_MAP: Record<string, string> = {
@@ -491,6 +492,7 @@ export default function UnifiedTradeCard({
   const [newPartial, setNewPartial]   = useState({ qty: '', price: '', date: '', time: '', assetExit: '', exitType: 'Partial Exit' });
   const [actionHint, setActionHint] = useState('');
   const [saving,     setSaving]       = useState(false);
+  const [saveAction, setSaveAction]   = useState<'save' | 'close'>('save');
   const [committing, setCommitting]   = useState(false);
   const [deletingCard, setDeletingCard] = useState(false);
   const [saved,      setSaved]        = useState(false);
@@ -667,6 +669,7 @@ export default function UnifiedTradeCard({
   const askMaya = async () => {
     setPredicting(true);
     try {
+      await waitForNextPaint();
       const result = await triggerWeaponPrediction(card.weaponThought);
       if (result) onChange({ weaponPrediction: result as WeaponPrediction });
     } finally {
@@ -939,8 +942,16 @@ export default function UnifiedTradeCard({
     };
   };
 
-  const saveToDb = async (overrides: Partial<TradeCard> = {}): Promise<string | null> => {
-    setSaving(true);
+  const saveToDb = async (
+    overrides: Partial<TradeCard> = {},
+    showSaving = true,
+    action: 'save' | 'close' = 'save',
+  ): Promise<string | null> => {
+    if (showSaving) {
+      setSaveAction(action);
+      setSaving(true);
+      await waitForNextPaint();
+    }
     try {
       const headers = getAuthHeaders({ 'Content-Type': 'application/json' });
       let savedId = card.dbId;
@@ -986,7 +997,7 @@ export default function UnifiedTradeCard({
       setTimeout(() => setSaveError(''), 3000);
       return null;
     } finally {
-      setSaving(false);
+      if (showSaving) setSaving(false);
     }
   };
   saveToDbRef.current = () => saveToDb();
@@ -994,7 +1005,8 @@ export default function UnifiedTradeCard({
   const commitToLearning = async (overrides: Partial<TradeCard> = {}) => {
     setCommitting(true);
     try {
-      const savedId = await saveToDb(overrides);
+      await waitForNextPaint();
+      const savedId = await saveToDb(overrides, false);
       if (!savedId) throw new Error('Save before commit failed');
       const res = await fetch(`${API_BASE}/api/learning/commit-trade/${encodeURIComponent(savedId)}`, {
         method: 'POST',
@@ -1110,6 +1122,7 @@ export default function UnifiedTradeCard({
     setDeletingCard(true);
 
     try {
+      await waitForNextPaint();
       // A saved card is its own terminal-trade record. Removing it only from
       // localStorage leaves that record (and its statistics) behind.
       if (card.dbId) {
@@ -1296,7 +1309,7 @@ export default function UnifiedTradeCard({
           backdropFilter: 'blur(6px)',
           border: '1px solid rgba(244,246,248,0.16)',
         }}>
-          <LuxuryShapeSpinner compact label="Deleting Trade" />
+          <ActionSpinner label="Deleting trade" />
         </div>
       )}
 
@@ -2164,7 +2177,7 @@ export default function UnifiedTradeCard({
                     background: canCommitTrade ? 'rgba(244,246,248,0.08)' : 'transparent', color: MATTE.ink, opacity: canCommitTrade ? 1 : 0.4, borderRadius: '0px', transition: 'all 150ms', outline: 'none'
                   }}
                 >
-                  {committing ? 'Commit…' : 'Commit'}
+                  {committing ? <ActionSpinner compact label="Committing" /> : 'Commit'}
                 </button>
               </>
             ) : (
@@ -2172,6 +2185,7 @@ export default function UnifiedTradeCard({
                 <button
                   className={`trade-footer-button ${saveError ? 'trade-footer-button-danger' : 'trade-footer-button-neutral'}`}
                   onClick={async () => {
+                    setSaveAction('save');
                     const savedId = await saveToDb();
                     if (savedId && card.closed) setClosedEditMode(false);
                   }}
@@ -2182,15 +2196,18 @@ export default function UnifiedTradeCard({
                     background: saveError ? 'rgba(195,154,150,0.06)' : 'transparent', color: MATTE.ink, borderRadius: '0px', transition: 'all 150ms', outline: 'none'
                   }}
                 >
-                  {saving ? 'Saving…' : saveError ? 'Failed' : saved ? '✓ Saved' : card.dbId ? 'Update' : 'Save Draft'}
+                  {saving && saveAction === 'save'
+                    ? <ActionSpinner compact label="Saving" />
+                    : saveError ? 'Failed' : saved ? '✓ Saved' : card.dbId ? 'Update' : 'Save Draft'}
                 </button>
                 <button
                   className="trade-footer-button trade-footer-button-danger"
                   onClick={async () => {
+                    setSaveAction('close');
                     const xd = card.exitDate || localDateStr();
                     const xt = card.exitTime || autoTimeSeconds();
                     const updates = { closed: true, exitDate: xd, exitTime: xt, tradeStatus: 'Closed' };
-                    const savedId = await saveToDb(updates);
+                    const savedId = await saveToDb(updates, true, 'close');
                     if (savedId) {
                       onChange(updates);
                       setClosedEditMode(false);
@@ -2204,7 +2221,9 @@ export default function UnifiedTradeCard({
                     background: canCloseTrade ? 'rgba(195,154,150,0.10)' : 'transparent', color: canCloseTrade ? MATTE.danger : MATTE.ink, opacity: canCloseTrade ? 1 : 0.55, borderRadius: '0px', transition: 'all 150ms', outline: 'none'
                   }}
                 >
-                  {saving ? 'Closing…' : 'Close Trade'}
+                  {saving && saveAction === 'close'
+                    ? <ActionSpinner compact label="Closing" />
+                    : 'Close Trade'}
                 </button>
                 <button
                   className="trade-footer-button trade-footer-button-commit"
@@ -2218,7 +2237,7 @@ export default function UnifiedTradeCard({
                     background: canCommitTrade ? 'rgba(244,246,248,0.08)' : 'transparent', color: MATTE.ink, opacity: canCommitTrade ? 1 : 0.4, borderRadius: '0px', transition: 'all 150ms', outline: 'none'
                   }}
                 >
-                  {committing ? 'Commit…' : 'Commit'}
+                  {committing ? <ActionSpinner compact label="Committing" /> : 'Commit'}
                 </button>
               </>
             )}

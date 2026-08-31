@@ -9,6 +9,7 @@ import { API_BASE } from '../utils/constants';
 import { H1AgentTraceStep, H1Hypothesis } from '../types';
 import { useNetraUtils } from './useNetraUtils';
 import { buildAgentWorkflowRequest } from '../utils/agentWorkflowRequest';
+import { waitForNextPaint } from '../utils/waitForNextPaint';
 
 export function useHypothesisFlow() {
   const dispatch = useDispatch<AppDispatch>();
@@ -49,6 +50,7 @@ export function useHypothesisFlow() {
     dispatch(setIsGeneratingH1(true));
     const { provider, model_id } = getActiveModel();
     try {
+      await waitForNextPaint();
       const response = await fetch(`${API_BASE}/api/hypotheses/h1/generate`, {
         method: 'POST',
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
@@ -82,6 +84,7 @@ export function useHypothesisFlow() {
     if (isConfirmingH1 || !activeSessionId) return null;
     dispatch(setIsConfirmingH1(true));
     try {
+      await waitForNextPaint();
       const response = await fetch(`${API_BASE}/api/hypotheses/h1/${encodeURIComponent(activeSessionId)}/confirm`, {
         method: 'PUT',
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
