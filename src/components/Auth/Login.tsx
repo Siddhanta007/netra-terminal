@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useNetra } from '../../context/NetraContext';
-import GlobalOverlay from '../Layout/GlobalOverlay';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { API_BASE } from '../../utils/constants';
 import { PageGraphics } from '../UI/PageGraphics';
@@ -292,8 +291,6 @@ export default function Login() {
           </div>
         </div>
       </div>
-
-      <GlobalOverlay />
     </div>
   );
 }

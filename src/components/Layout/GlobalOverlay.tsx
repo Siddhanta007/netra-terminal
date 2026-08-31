@@ -1,13 +1,74 @@
 // Global overlay host — renders the toast and the confirm modal above all routes.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNetra } from '../../context/NetraContext';
 import { TerminalActivityDock } from '../UI/TerminalActivityDock';
 import { waitForNextPaint } from '../../utils/waitForNextPaint';
 
 export default function GlobalOverlay() {
-  const { toast, confirmModal, setConfirmModal } = useNetra();
+  const {
+    toast,
+    confirmModal,
+    setConfirmModal,
+    session,
+    sysData,
+    isInitializingMission,
+    isLoadingSession,
+  } = useNetra();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [networkActivity, setNetworkActivity] = useState({ count: 0, label: 'Loading data' });
+
+  useEffect(() => {
+    const originalFetch = window.fetch;
+    let activeRequests = 0;
+    let mounted = true;
+
+    const trackedFetch: typeof window.fetch = async (...args) => {
+      const [input, init] = args;
+      const rawUrl = typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+      let isApiRequest = false;
+      try {
+        isApiRequest = new URL(rawUrl, window.location.href).pathname.includes('/api/');
+      } catch {
+        isApiRequest = false;
+      }
+
+      if (!isApiRequest) return originalFetch(...args);
+
+      const requestMethod = String(
+        init?.method || (input instanceof Request ? input.method : 'GET'),
+      ).toUpperCase();
+      const label = requestMethod === 'GET'
+        ? 'Loading data'
+        : requestMethod === 'DELETE'
+          ? 'Deleting data'
+          : 'Saving data';
+
+      activeRequests += 1;
+      if (mounted) setNetworkActivity({ count: activeRequests, label });
+      try {
+        return await originalFetch(...args);
+      } finally {
+        activeRequests = Math.max(0, activeRequests - 1);
+        if (mounted) setNetworkActivity(current => ({ ...current, count: activeRequests }));
+      }
+    };
+
+    window.fetch = trackedFetch;
+    return () => {
+      mounted = false;
+      if (window.fetch === trackedFetch) window.fetch = originalFetch;
+    };
+  }, []);
+
+  const fullPageLoading = Boolean(session && !sysData) || isInitializingMission || isLoadingSession;
+  const localSpinnerVisible = typeof document !== 'undefined'
+    && Boolean(document.querySelector('[data-netra-local-spinner="true"]'));
+  const showNetworkActivity = networkActivity.count > 0 && !fullPageLoading && !localSpinnerVisible;
 
   const closeModal = () => {
     if (!isSubmitting) setConfirmModal(null);
@@ -78,6 +139,12 @@ export default function GlobalOverlay() {
         <TerminalActivityDock
           loading
           message={confirmModal?.loadingText || 'Processing'}
+        />
+      ) : showNetworkActivity ? (
+        <TerminalActivityDock
+          loading
+          networkActivity
+          message={networkActivity.label}
         />
       ) : toast ? (
         <TerminalActivityDock message={toast.msg} tone={toast.type} />

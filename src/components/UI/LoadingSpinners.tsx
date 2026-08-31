@@ -10,6 +10,7 @@ type ActionSpinnerProps = {
   compact?: boolean;
   showLabel?: boolean;
   className?: string;
+  isGlobal?: boolean;
 };
 
 /** Full-page application loader. This is the only owner of the geometric sequence. */
@@ -30,12 +31,14 @@ export function ActionSpinner({
   compact = false,
   showLabel = true,
   className = '',
+  isGlobal = false,
 }: ActionSpinnerProps) {
   return (
     <span
       className={`netra-action-spinner ${compact ? 'is-compact' : ''} ${className}`}
       role="status"
       aria-label={label}
+      data-netra-local-spinner={isGlobal ? undefined : 'true'}
     >
       <span className="terminal-multicolor-loader" aria-hidden="true">
         <i /><i /><i /><i />

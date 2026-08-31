@@ -5,12 +5,14 @@ type TerminalActivityDockProps = {
   loading?: boolean;
   message: string;
   tone?: ToastType;
+  networkActivity?: boolean;
 };
 
 export function TerminalActivityDock({
   loading = false,
   message,
   tone = 'info',
+  networkActivity = false,
 }: TerminalActivityDockProps) {
   return (
     <div
@@ -20,7 +22,7 @@ export function TerminalActivityDock({
       aria-busy={loading || undefined}
     >
       {loading ? (
-        <ActionSpinner label={message} showLabel={false} />
+        <ActionSpinner label={message} showLabel={false} isGlobal={networkActivity} />
       ) : (
         <span className="terminal-activity-symbol" aria-hidden="true">
           {tone === 'error' ? '×' : tone === 'warning' ? '!' : tone === 'info' ? 'i' : '✓'}
